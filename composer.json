@@ -1,6 +1,6 @@
 {
     "name": "jorisnoo/laravel-remote-sync",
-    "description": "This is my package laravel-remote-sync",
+    "description": "Sync database and files from remote Laravel hosts using laravel-db-snapshots and rsync",
     "keywords": [
         "Joris Noordermeer",
         "laravel",
@@ -18,7 +18,8 @@
     "require": {
         "php": "^8.4",
         "spatie/laravel-package-tools": "^1.16",
-        "illuminate/contracts": "^11.0||^12.0"
+        "illuminate/contracts": "^11.0||^12.0",
+        "spatie/laravel-db-snapshots": "^2.7"
     },
     "require-dev": {
         "laravel/pint": "^1.14",
@@ -64,10 +65,7 @@
         "laravel": {
             "providers": [
                 "Noo\\LaravelRemoteSync\\LaravelRemoteSyncServiceProvider"
-            ],
-            "aliases": {
-                "LaravelRemoteSync": "Noo\\LaravelRemoteSync\\Facades\\LaravelRemoteSync"
-            }
+            ]
         }
     },
     "minimum-stability": "dev",

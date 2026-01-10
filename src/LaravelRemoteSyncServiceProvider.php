@@ -2,7 +2,9 @@
 
 namespace Noo\LaravelRemoteSync;
 
-use Noo\LaravelRemoteSync\Commands\LaravelRemoteSyncCommand;
+use Noo\LaravelRemoteSync\Commands\SyncDatabaseCommand;
+use Noo\LaravelRemoteSync\Commands\SyncFilesCommand;
+use Noo\LaravelRemoteSync\Commands\SyncRemoteCommand;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 
@@ -10,16 +12,18 @@ class LaravelRemoteSyncServiceProvider extends PackageServiceProvider
 {
     public function configurePackage(Package $package): void
     {
-        /*
-         * This class is a Package Service Provider
-         *
-         * More info: https://github.com/spatie/laravel-package-tools
-         */
         $package
-            ->name('laravel-remote-sync')
+            ->name('remote-sync')
             ->hasConfigFile()
-            ->hasViews()
-            ->hasMigration('create_laravel_remote_sync_table')
-            ->hasCommand(LaravelRemoteSyncCommand::class);
+            ->hasCommands([
+                SyncRemoteCommand::class,
+                SyncDatabaseCommand::class,
+                SyncFilesCommand::class,
+            ]);
+    }
+
+    public function packageRegistered(): void
+    {
+        $this->app->singleton(RemoteSyncService::class);
     }
 }
