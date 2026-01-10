@@ -2,9 +2,9 @@
 
 namespace Noo\LaravelRemoteSync;
 
+use Noo\LaravelRemoteSync\Commands\LaravelRemoteSyncCommand;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
-use Noo\LaravelRemoteSync\Commands\LaravelRemoteSyncCommand;
 
 class LaravelRemoteSyncServiceProvider extends PackageServiceProvider
 {
