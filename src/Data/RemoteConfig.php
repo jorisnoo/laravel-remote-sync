@@ -8,6 +8,7 @@ readonly class RemoteConfig
         public string $name,
         public string $host,
         public string $path,
+        public bool $pushAllowed = false,
     ) {}
 
     public function storagePath(): string

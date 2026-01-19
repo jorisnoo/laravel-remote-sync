@@ -16,10 +16,12 @@ return [
         'production' => [
             'host' => env('REMOTE_SYNC_PRODUCTION_HOST'),
             'path' => env('REMOTE_SYNC_PRODUCTION_PATH'),
+            'push_allowed' => env('REMOTE_SYNC_PRODUCTION_PUSH_ALLOWED', false),
         ],
         'staging' => [
             'host' => env('REMOTE_SYNC_STAGING_HOST'),
             'path' => env('REMOTE_SYNC_STAGING_PATH'),
+            'push_allowed' => env('REMOTE_SYNC_STAGING_PUSH_ALLOWED', true),
         ],
     ],
 
@@ -85,6 +87,7 @@ return [
     'timeouts' => [
         'snapshot_create' => 300,
         'snapshot_download' => 600,
+        'snapshot_upload' => 600,
         'snapshot_cleanup' => 60,
         'file_sync' => 1800,
     ],

@@ -28,6 +28,7 @@ class RemoteSyncService
             name: $name,
             host: $remote['host'],
             path: $remote['path'],
+            pushAllowed: $remote['push_allowed'] ?? false,
         );
     }
 
@@ -104,6 +105,64 @@ class RemoteSyncService
     {
         $command = "cd {$remote->currentPath()} && php artisan snapshot:delete {$snapshotName} --no-interaction";
         $timeout = config('remote-sync.timeouts.snapshot_cleanup', 60);
+
+        return $this->executeRemoteCommand($remote, $command, $timeout);
+    }
+
+    public function rsyncUpload(
+        RemoteConfig $remote,
+        string $sourcePath,
+        string $destinationPath,
+        array $options = [],
+        ?int $timeout = null
+    ): ProcessResult {
+        $timeout ??= config('remote-sync.timeouts.file_sync', 1800);
+
+        $defaultOptions = ['-avz', '--progress'];
+        $options = array_merge($defaultOptions, $options);
+
+        $destination = "{$remote->host}:{$destinationPath}";
+
+        return Process::timeout($timeout)
+            ->tty()
+            ->run(array_merge(['rsync'], $options, [$sourcePath, $destination]));
+    }
+
+    public function uploadSnapshot(RemoteConfig $remote, string $snapshotName, string $localPath): ProcessResult
+    {
+        $remotePath = "{$remote->storagePath()}/snapshots/";
+        $localFile = "{$localPath}/{$snapshotName}.sql.gz";
+        $timeout = config('remote-sync.timeouts.snapshot_upload', 600);
+
+        return Process::timeout($timeout)
+            ->tty()
+            ->run([
+                'rsync',
+                '-avz',
+                '--progress',
+                '--partial',
+                $localFile,
+                "{$remote->host}:{$remotePath}",
+            ]);
+    }
+
+    public function loadRemoteSnapshot(RemoteConfig $remote, string $snapshotName): ProcessResult
+    {
+        $command = "cd {$remote->currentPath()} && php artisan snapshot:load {$snapshotName} --force";
+        $timeout = config('remote-sync.timeouts.snapshot_create', 300);
+
+        return $this->executeRemoteCommand($remote, $command, $timeout);
+    }
+
+    public function createRemoteBackup(RemoteConfig $remote, string $backupName): ProcessResult
+    {
+        $excludeTables = config('remote-sync.exclude_tables', []);
+        $excludeFlags = collect($excludeTables)
+            ->map(fn (string $table) => "--exclude={$table}")
+            ->implode(' ');
+
+        $command = "cd {$remote->currentPath()} && php artisan snapshot:create {$backupName} {$excludeFlags} --compress";
+        $timeout = config('remote-sync.timeouts.snapshot_create', 300);
 
         return $this->executeRemoteCommand($remote, $command, $timeout);
     }

@@ -2,6 +2,9 @@
 
 namespace Noo\LaravelRemoteSync;
 
+use Noo\LaravelRemoteSync\Commands\PushDatabaseCommand;
+use Noo\LaravelRemoteSync\Commands\PushFilesCommand;
+use Noo\LaravelRemoteSync\Commands\PushRemoteCommand;
 use Noo\LaravelRemoteSync\Commands\SyncDatabaseCommand;
 use Noo\LaravelRemoteSync\Commands\SyncFilesCommand;
 use Noo\LaravelRemoteSync\Commands\SyncRemoteCommand;
@@ -19,6 +22,9 @@ class LaravelRemoteSyncServiceProvider extends PackageServiceProvider
                 SyncRemoteCommand::class,
                 SyncDatabaseCommand::class,
                 SyncFilesCommand::class,
+                PushRemoteCommand::class,
+                PushDatabaseCommand::class,
+                PushFilesCommand::class,
             ]);
     }
 
