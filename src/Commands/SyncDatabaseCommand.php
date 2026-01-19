@@ -3,6 +3,7 @@
 namespace Noo\LaravelRemoteSync\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 use Noo\LaravelRemoteSync\Concerns\InteractsWithRemote;
 use Spatie\DbSnapshots\Commands\Create as SnapshotCreate;
 use Spatie\DbSnapshots\Commands\Load as SnapshotLoad;
@@ -136,9 +137,12 @@ class SyncDatabaseCommand extends Command
     {
         $this->components->info('Loading snapshot into database...');
 
+        $this->dropNonExcludedTables();
+
         $exitCode = $this->call(SnapshotLoad::class, [
             'name' => $this->snapshotName,
             '--force' => true,
+            '--drop-tables' => 0,
         ]);
 
         if ($exitCode !== 0) {
@@ -149,7 +153,59 @@ class SyncDatabaseCommand extends Command
 
         $this->components->info('Snapshot loaded.');
 
+        $this->truncateExcludedTables();
+
         return true;
+    }
+
+    protected function dropNonExcludedTables(): void
+    {
+        $excludedTables = config('remote-sync.exclude_tables', []);
+        $schemaBuilder = DB::connection()->getSchemaBuilder();
+
+        $allTables = $schemaBuilder->getTableListing();
+
+        $tablesToDrop = array_filter(
+            $allTables,
+            fn (string $table) => ! in_array($table, $excludedTables, true)
+        );
+
+        if (empty($tablesToDrop)) {
+            return;
+        }
+
+        $schemaBuilder->disableForeignKeyConstraints();
+
+        foreach ($tablesToDrop as $table) {
+            $schemaBuilder->drop($table);
+        }
+
+        $schemaBuilder->enableForeignKeyConstraints();
+    }
+
+    protected function truncateExcludedTables(): void
+    {
+        $excludedTables = config('remote-sync.exclude_tables', []);
+        $schemaBuilder = DB::connection()->getSchemaBuilder();
+
+        $existingTables = $schemaBuilder->getTableListing();
+
+        $tablesToTruncate = array_filter(
+            $excludedTables,
+            fn (string $table) => in_array($table, $existingTables, true)
+        );
+
+        if (empty($tablesToTruncate)) {
+            return;
+        }
+
+        $schemaBuilder->disableForeignKeyConstraints();
+
+        foreach ($tablesToTruncate as $table) {
+            DB::table($table)->truncate();
+        }
+
+        $schemaBuilder->enableForeignKeyConstraints();
     }
 
     protected function cleanupLocalSnapshot(): void
