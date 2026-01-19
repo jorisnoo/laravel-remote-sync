@@ -1,23 +1,31 @@
 changelog:
-  path: CHANGELOG.md
-
-commits:
+  file: CHANGELOG.md
   types:
-    - type: feat
-      section: Added
-    - type: fix
-      section: Fixed
-    - type: docs
-      section: Documentation
-    - type: refactor
-      section: Changed
-    - type: perf
-      section: Changed
-    - type: test
-      hidden: true
-    - type: chore
-      hidden: true
-    - type: ci
-      hidden: true
-    - type: build
-      hidden: true
+    feat: Features
+    fix: Bug Fixes
+    docs: Documentation
+    style: Styles
+    refactor: Code Refactoring
+    perf: Performance Improvements
+    test: Tests
+    build: Build System
+    ci: Continuous Integration
+    chore: Chores
+    revert: Reverts
+  includeHash: true
+  includeDate: true
+  includeAuthor: false
+version:
+  files:
+    - package.json
+  tagPrefix: v
+  tagMessage: Release {version}
+  commitMessage: "release: {version}"
+commits:
+  conventional: true
+  allowCustomTypes: true
+git:
+  push: true
+  pushTags: true
+  signTags: true
+  signCommits: false

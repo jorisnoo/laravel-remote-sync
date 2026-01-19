@@ -17,3 +17,7 @@ All notable changes to this project will be documented in this file.
 ### Documentation
 
 - update readme ([b873752](https://github.com/jorisnoo/laravel-remote-sync/commit/b87375272fcc6532259df53e03f6929aa71ab00a))
+
+### Chores
+
+- **release:** 0.1.0 ([3cc5975](https://github.com/jorisnoo/laravel-remote-sync/commit/3cc5975a40004d6371bd829d0af8da9447acb59d))
