@@ -1,0 +1,23 @@
+changelog:
+  path: CHANGELOG.md
+
+commits:
+  types:
+    - type: feat
+      section: Added
+    - type: fix
+      section: Fixed
+    - type: docs
+      section: Documentation
+    - type: refactor
+      section: Changed
+    - type: perf
+      section: Changed
+    - type: test
+      hidden: true
+    - type: chore
+      hidden: true
+    - type: ci
+      hidden: true
+    - type: build
+      hidden: true
