@@ -1,60 +1,116 @@
-# This is my package laravel-remote-sync
+# Laravel Remote Sync
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/jorisnoo/laravel-remote-sync.svg?style=flat-square)](https://packagist.org/packages/jorisnoo/laravel-remote-sync)
 [![GitHub Tests Action Status](https://img.shields.io/github/actions/workflow/status/jorisnoo/laravel-remote-sync/run-tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/jorisnoo/laravel-remote-sync/actions?query=workflow%3Arun-tests+branch%3Amain)
-[![GitHub Code Style Action Status](https://img.shields.io/github/actions/workflow/status/jorisnoo/laravel-remote-sync/fix-php-code-style-issues.yml?branch=main&label=code%20style&style=flat-square)](https://github.com/jorisnoo/laravel-remote-sync/actions?query=workflow%3A"Fix+PHP+code+style+issues"+branch%3Amain)
 [![Total Downloads](https://img.shields.io/packagist/dt/jorisnoo/laravel-remote-sync.svg?style=flat-square)](https://packagist.org/packages/jorisnoo/laravel-remote-sync)
 
-This is where your description should go. Limit it to a paragraph or two. Consider adding a small example.
+Sync database and storage files from remote Laravel environments to your local machine. Uses [spatie/laravel-db-snapshots](https://github.com/spatie/laravel-db-snapshots) for database syncing and rsync for file transfers.
 
-## Support us
+## Requirements
 
-[<img src="https://github-ads.s3.eu-central-1.amazonaws.com/laravel-remote-sync.jpg?t=1" width="419px" />](https://spatie.be/github-ad-click/laravel-remote-sync)
-
-We invest a lot of resources into creating [best in class open source packages](https://spatie.be/open-source). You can support us by [buying one of our paid products](https://spatie.be/open-source/support-us).
-
-We highly appreciate you sending us a postcard from your hometown, mentioning which of our package(s) you are using. You'll find our address on [our contact page](https://spatie.be/about-us). We publish all received postcards on [our virtual postcard wall](https://spatie.be/open-source/postcards).
+- PHP 8.3+
+- Laravel 11 or 12
+- SSH access to remote host (key-based auth recommended)
+- `rsync` installed locally and on remote
+- Remote server must have `spatie/laravel-db-snapshots` installed
 
 ## Installation
-
-You can install the package via composer:
 
 ```bash
 composer require jorisnoo/laravel-remote-sync
 ```
 
-You can publish and run the migrations with:
+Publish the config file:
 
 ```bash
-php artisan vendor:publish --tag="laravel-remote-sync-migrations"
-php artisan migrate
+php artisan vendor:publish --tag="remote-sync-config"
 ```
 
-You can publish the config file with:
+## Configuration
 
-```bash
-php artisan vendor:publish --tag="laravel-remote-sync-config"
+Add your remote environments to `config/remote-sync.php` or use environment variables:
+
+```env
+REMOTE_SYNC_PRODUCTION_HOST=forge@your-server
+REMOTE_SYNC_PRODUCTION_PATH=/home/forge/your-app.com
+
+REMOTE_SYNC_STAGING_HOST=forge@staging-server
+REMOTE_SYNC_STAGING_PATH=/home/forge/staging.your-app.com
+
+REMOTE_SYNC_DEFAULT=production
 ```
 
-This is the contents of the published config file:
+### Config Options
 
 ```php
 return [
+    'remotes' => [
+        'production' => [
+            'host' => env('REMOTE_SYNC_PRODUCTION_HOST'),
+            'path' => env('REMOTE_SYNC_PRODUCTION_PATH'),
+        ],
+    ],
+
+    'default' => env('REMOTE_SYNC_DEFAULT', 'production'),
+
+    // Storage paths to sync (relative to storage/)
+    'paths' => [
+        'app',
+    ],
+
+    // Tables to exclude from database snapshots
+    'exclude_tables' => [
+        'cache',
+        'cache_locks',
+        'sessions',
+    ],
+
+    // Timeouts in seconds
+    'timeouts' => [
+        'snapshot_create' => 300,
+        'snapshot_download' => 600,
+        'snapshot_cleanup' => 60,
+        'file_sync' => 1800,
+    ],
 ];
-```
-
-Optionally, you can publish the views using
-
-```bash
-php artisan vendor:publish --tag="laravel-remote-sync-views"
 ```
 
 ## Usage
 
-```php
-$laravelRemoteSync = new Noo\LaravelRemoteSync();
-echo $laravelRemoteSync->echoPhrase('Hello, Noo!');
+### Interactive Sync
+
+```bash
+php artisan sync:remote
 ```
+
+Prompts you to select a remote and what to sync (database, files, or both).
+
+### Sync Database Only
+
+```bash
+php artisan sync:database production
+```
+
+Options:
+- `--no-backup` - Skip creating a local backup before syncing
+- `--keep-snapshot` - Keep the downloaded snapshot file after loading
+
+### Sync Files Only
+
+```bash
+php artisan sync:files production
+```
+
+Options:
+- `--path=app/uploads` - Sync only a specific path
+- `--delete` - Delete local files that don't exist on remote
+
+## Safety Features
+
+- Commands refuse to run in production environment
+- Confirmation prompt before syncing
+- Local database backup created before sync (unless `--no-backup`)
+- Graceful cleanup on interrupt (Ctrl+C)
 
 ## Testing
 
@@ -62,23 +118,10 @@ echo $laravelRemoteSync->echoPhrase('Hello, Noo!');
 composer test
 ```
 
-## Changelog
-
-Please see [CHANGELOG](CHANGELOG.md) for more information on what has changed recently.
-
-## Contributing
-
-Please see [CONTRIBUTING](CONTRIBUTING.md) for details.
-
-## Security Vulnerabilities
-
-Please review [our security policy](../../security/policy) on how to report security vulnerabilities.
-
-## Credits
-
-- [Joris Noordermeer](https://github.com/jorisnoo)
-- [All Contributors](../../contributors)
-
 ## License
 
 The MIT License (MIT). Please see [License File](LICENSE.md) for more information.
+
+---
+
+Built with [Claude Code](https://claude.ai/code).
