@@ -216,7 +216,7 @@ class CleanupSnapshotsCommand extends Command
     }
 
     /**
-     * @param array<int, array{path: string, name: string, mtime: int}> $snapshots
+     * @param  array<int, array{path: string, name: string, mtime: int}>  $snapshots
      * @return array<int, array{path: string, name: string, mtime: int}>
      */
     protected function filterSnapshotsToDelete(array $snapshots, int $keep): array
@@ -229,8 +229,8 @@ class CleanupSnapshotsCommand extends Command
     }
 
     /**
-     * @param array<int, array{path: string, name: string, mtime: int}> $localSnapshots
-     * @param array<int, array{path: string, name: string, mtime: int}> $remoteSnapshots
+     * @param  array<int, array{path: string, name: string, mtime: int}>  $localSnapshots
+     * @param  array<int, array{path: string, name: string, mtime: int}>  $remoteSnapshots
      */
     protected function displaySnapshotsToDelete(array $localSnapshots, array $remoteSnapshots, int $keep): void
     {
@@ -276,7 +276,7 @@ class CleanupSnapshotsCommand extends Command
     }
 
     /**
-     * @param array<int, array{path: string, name: string, mtime: int}> $snapshots
+     * @param  array<int, array{path: string, name: string, mtime: int}>  $snapshots
      */
     protected function cleanupLocalSnapshots(array $snapshots): int
     {
@@ -296,7 +296,7 @@ class CleanupSnapshotsCommand extends Command
     }
 
     /**
-     * @param array<int, array{path: string, name: string, mtime: int}> $snapshots
+     * @param  array<int, array{path: string, name: string, mtime: int}>  $snapshots
      */
     protected function cleanupRemoteSnapshots(array $snapshots): int
     {
