@@ -85,6 +85,11 @@ php artisan remote-sync:pull
 
 Prompts you to select a remote and what to pull (database, files, or both).
 
+Options:
+- `--no-backup` - Skip creating a local backup before syncing
+- `--keep-snapshot` - Keep the downloaded snapshot file after loading
+- `--full` - Include all tables (ignores `exclude_tables` config) and drops all local tables before loading
+
 ### Pull Database Only
 
 ```bash
@@ -94,6 +99,7 @@ php artisan remote-sync:pull-database production
 Options:
 - `--no-backup` - Skip creating a local backup before syncing
 - `--keep-snapshot` - Keep the downloaded snapshot file after loading
+- `--full` - Include all tables (ignores `exclude_tables` config) and drops all local tables before loading
 
 ### Pull Files Only
 
