@@ -221,7 +221,7 @@ class SyncDatabaseCommand extends Command
 
     protected function cleanupLocalSnapshot(): void
     {
-        $snapshotPath = $this->syncService->getSnapshotPath() . "/{$this->snapshotName}.sql.gz";
+        $snapshotPath = $this->syncService->getSnapshotPath()."/{$this->snapshotName}.sql.gz";
 
         if (file_exists($snapshotPath)) {
             unlink($snapshotPath);

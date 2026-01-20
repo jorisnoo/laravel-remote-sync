@@ -173,7 +173,7 @@ class PushDatabaseCommand extends Command
             return;
         }
 
-        $snapshotPath = $this->syncService->getSnapshotPath() . "/{$this->snapshotName}.sql.gz";
+        $snapshotPath = $this->syncService->getSnapshotPath()."/{$this->snapshotName}.sql.gz";
 
         if (file_exists($snapshotPath)) {
             unlink($snapshotPath);
