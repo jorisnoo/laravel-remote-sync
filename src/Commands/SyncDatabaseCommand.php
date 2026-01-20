@@ -141,34 +141,11 @@ class SyncDatabaseCommand extends Command
     {
         $this->components->info('Loading snapshot into database...');
 
-        // Run migrate:fresh to ensure all table structures exist (including excluded tables)
-        $this->call('migrate:fresh', ['--force' => true]);
-
-        $this->dropNonExcludedTables();
-
-        // Disable query logging and event dispatcher to prevent memory exhaustion.
-        // Query listeners (Telescope, Debugbar, custom loggers) can cause Monolog
-        // to accumulate large SQL statements, exhausting memory on large snapshots.
-        $connection = DB::connection();
-        $wasLogging = $connection->logging();
-        $connection->disableQueryLog();
-
-        $dispatcher = $connection->getEventDispatcher();
-        $connection->unsetEventDispatcher();
-
-        try {
-            $exitCode = $this->call(SnapshotLoad::class, [
-                'name' => $this->snapshotName,
-                '--force' => true,
-                '--drop-tables' => 0,
-            ]);
-        } finally {
-            $connection->setEventDispatcher($dispatcher);
-
-            if ($wasLogging) {
-                $connection->enableQueryLog();
-            }
-        }
+        $exitCode = $this->call(SnapshotLoad::class, [
+            'name' => $this->snapshotName,
+            '--force' => true,
+            '--drop-tables' => 0,
+        ]);
 
         if ($exitCode !== 0) {
             $this->components->error('Failed to load snapshot.');
@@ -181,31 +158,6 @@ class SyncDatabaseCommand extends Command
         $this->truncateExcludedTables();
 
         return true;
-    }
-
-    protected function dropNonExcludedTables(): void
-    {
-        $excludedTables = config('remote-sync.exclude_tables', []);
-        $schemaBuilder = DB::connection()->getSchemaBuilder();
-
-        $allTables = $schemaBuilder->getTableListing();
-
-        $tablesToDrop = array_filter(
-            $allTables,
-            fn (string $table) => ! in_array($table, $excludedTables, true)
-        );
-
-        if (empty($tablesToDrop)) {
-            return;
-        }
-
-        $schemaBuilder->disableForeignKeyConstraints();
-
-        foreach ($tablesToDrop as $table) {
-            $schemaBuilder->drop($table);
-        }
-
-        $schemaBuilder->enableForeignKeyConstraints();
     }
 
     protected function truncateExcludedTables(): void

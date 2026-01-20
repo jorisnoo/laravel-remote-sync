@@ -46,7 +46,7 @@ class RemoteSyncService
             return $diskConfig['root'];
         }
 
-        return storage_path('app/snapshots');
+        return storage_path('snapshots');
     }
 
     public function executeRemoteCommand(RemoteConfig $remote, string $command, ?int $timeout = null): ProcessResult

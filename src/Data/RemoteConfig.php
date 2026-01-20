@@ -26,11 +26,6 @@ readonly class RemoteConfig
         return "{$this->workingPath()}/storage";
     }
 
-    public function currentPath(): string
-    {
-        return "{$this->path}/current";
-    }
-
     public function withAtomicDetection(bool $isAtomic): self
     {
         return new self(
