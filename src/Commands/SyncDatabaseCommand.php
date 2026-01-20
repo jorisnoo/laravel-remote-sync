@@ -139,10 +139,15 @@ class SyncDatabaseCommand extends Command
 
         $this->dropNonExcludedTables();
 
-        // Disable query logging to prevent memory exhaustion on large snapshots
+        // Disable query logging and event dispatcher to prevent memory exhaustion.
+        // Query listeners (Telescope, Debugbar, custom loggers) can cause Monolog
+        // to accumulate large SQL statements, exhausting memory on large snapshots.
         $connection = DB::connection();
         $wasLogging = $connection->logging();
         $connection->disableQueryLog();
+
+        $dispatcher = $connection->getEventDispatcher();
+        $connection->unsetEventDispatcher();
 
         try {
             $exitCode = $this->call(SnapshotLoad::class, [
@@ -151,6 +156,8 @@ class SyncDatabaseCommand extends Command
                 '--drop-tables' => 0,
             ]);
         } finally {
+            $connection->setEventDispatcher($dispatcher);
+
             if ($wasLogging) {
                 $connection->enableQueryLog();
             }
