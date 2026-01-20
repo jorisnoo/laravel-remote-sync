@@ -132,7 +132,7 @@ class PushDatabaseCommand extends Command
 
     protected function uploadSnapshot(): bool
     {
-        $localPath = storage_path('snapshots');
+        $localPath = $this->syncService->getSnapshotPath();
 
         $this->components->info("Uploading snapshot to [{$this->remote->name}]...");
 
@@ -173,7 +173,7 @@ class PushDatabaseCommand extends Command
             return;
         }
 
-        $snapshotPath = storage_path("snapshots/{$this->snapshotName}.sql.gz");
+        $snapshotPath = $this->syncService->getSnapshotPath() . "/{$this->snapshotName}.sql.gz";
 
         if (file_exists($snapshotPath)) {
             unlink($snapshotPath);

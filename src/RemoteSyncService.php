@@ -37,6 +37,18 @@ class RemoteSyncService
         return array_keys(config('remote-sync.remotes', []));
     }
 
+    public function getSnapshotPath(): string
+    {
+        $diskName = config('db-snapshots.disk', 'snapshots');
+        $diskConfig = config("filesystems.disks.{$diskName}");
+
+        if ($diskConfig && isset($diskConfig['root'])) {
+            return $diskConfig['root'];
+        }
+
+        return storage_path('app/snapshots');
+    }
+
     public function executeRemoteCommand(RemoteConfig $remote, string $command, ?int $timeout = null): ProcessResult
     {
         $timeout ??= 120;

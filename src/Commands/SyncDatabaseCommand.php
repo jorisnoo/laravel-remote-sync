@@ -112,7 +112,7 @@ class SyncDatabaseCommand extends Command
 
     protected function downloadSnapshot(): bool
     {
-        $localPath = storage_path('snapshots/');
+        $localPath = $this->syncService->getSnapshotPath();
 
         if (! is_dir($localPath)) {
             mkdir($localPath, 0755, true);
@@ -210,7 +210,7 @@ class SyncDatabaseCommand extends Command
 
     protected function cleanupLocalSnapshot(): void
     {
-        $snapshotPath = storage_path("snapshots/{$this->snapshotName}.sql.gz");
+        $snapshotPath = $this->syncService->getSnapshotPath() . "/{$this->snapshotName}.sql.gz";
 
         if (file_exists($snapshotPath)) {
             unlink($snapshotPath);
