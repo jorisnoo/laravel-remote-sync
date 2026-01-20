@@ -18,7 +18,7 @@ changelog:
 version:
   files:
     - package.json
-  tagPrefix: v
+  tagPrefix: ""
   tagMessage: Release {version}
   commitMessage: "release: {version}"
 commits:

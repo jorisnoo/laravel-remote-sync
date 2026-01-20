@@ -62,17 +62,34 @@ return [
     */
 
     'exclude_tables' => [
+        // Cache
         'cache',
         'cache_locks',
         'health_cache',
         'health_cache_locks',
+
+        // Monitoring
         'pulse_aggregates',
         'pulse_entries',
         'pulse_values',
         'telescope_entries',
         'telescope_entries_tags',
         'telescope_monitoring',
+
+        // Sessions
         'sessions',
+
+        // Queue/Jobs
+        'jobs',
+        'job_batches',
+        'failed_jobs',
+
+        // Auth tokens
+        'password_reset_tokens',
+        'personal_access_tokens',
+
+        // Notifications
+        'notifications',
     ],
 
     /*
