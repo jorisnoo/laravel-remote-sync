@@ -105,6 +105,15 @@ Options:
 - `--path=app/uploads` - Sync only a specific path
 - `--delete` - Delete local files that don't exist on remote
 
+## Atomic Deployments
+
+The package automatically detects if your remote server uses atomic deployments (Envoyer, Laravel Deployer, etc.) by checking for a `/current` symlink. When detected, it uses the correct working path.
+
+- If `/current` exists → uses `{path}/current` as the working directory
+- If `/current` doesn't exist → uses `{path}` directly
+
+If your path already ends in `/current`, detection is skipped and atomic mode is assumed.
+
 ## Safety Features
 
 - Commands refuse to run in production environment

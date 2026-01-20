@@ -9,15 +9,36 @@ readonly class RemoteConfig
         public string $host,
         public string $path,
         public bool $pushAllowed = false,
+        public ?bool $isAtomic = null,
     ) {}
+
+    public function workingPath(): string
+    {
+        if ($this->isAtomic === true) {
+            return "{$this->path}/current";
+        }
+
+        return $this->path;
+    }
 
     public function storagePath(): string
     {
-        return "{$this->path}/storage";
+        return "{$this->workingPath()}/storage";
     }
 
     public function currentPath(): string
     {
         return "{$this->path}/current";
+    }
+
+    public function withAtomicDetection(bool $isAtomic): self
+    {
+        return new self(
+            $this->name,
+            $this->host,
+            $this->path,
+            $this->pushAllowed,
+            $isAtomic,
+        );
     }
 }

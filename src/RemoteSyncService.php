@@ -48,6 +48,17 @@ class RemoteSyncService
         ]);
     }
 
+    public function isAtomicDeployment(RemoteConfig $remote): bool
+    {
+        $result = $this->executeRemoteCommand(
+            $remote,
+            "test -d {$remote->path}/current && echo 'yes' || echo 'no'",
+            10
+        );
+
+        return trim($result->output()) === 'yes';
+    }
+
     public function rsync(
         RemoteConfig $remote,
         string $sourcePath,
@@ -74,7 +85,7 @@ class RemoteSyncService
             ->map(fn (string $table) => "--exclude={$table}")
             ->implode(' ');
 
-        $command = "cd {$remote->currentPath()} && php artisan snapshot:create {$snapshotName} {$excludeFlags} --compress";
+        $command = "cd {$remote->workingPath()} && php artisan snapshot:create {$snapshotName} {$excludeFlags} --compress";
         $timeout = config('remote-sync.timeouts.snapshot_create', 300);
 
         return $this->executeRemoteCommand($remote, $command, $timeout);
@@ -103,7 +114,7 @@ class RemoteSyncService
 
     public function deleteRemoteSnapshot(RemoteConfig $remote, string $snapshotName): ProcessResult
     {
-        $command = "cd {$remote->currentPath()} && php artisan snapshot:delete {$snapshotName} --no-interaction";
+        $command = "cd {$remote->workingPath()} && php artisan snapshot:delete {$snapshotName} --no-interaction";
         $timeout = config('remote-sync.timeouts.snapshot_cleanup', 60);
 
         return $this->executeRemoteCommand($remote, $command, $timeout);
@@ -148,7 +159,7 @@ class RemoteSyncService
 
     public function loadRemoteSnapshot(RemoteConfig $remote, string $snapshotName): ProcessResult
     {
-        $command = "cd {$remote->currentPath()} && php artisan snapshot:load {$snapshotName} --force";
+        $command = "cd {$remote->workingPath()} && php artisan snapshot:load {$snapshotName} --force";
         $timeout = config('remote-sync.timeouts.snapshot_create', 300);
 
         return $this->executeRemoteCommand($remote, $command, $timeout);
@@ -161,7 +172,7 @@ class RemoteSyncService
             ->map(fn (string $table) => "--exclude={$table}")
             ->implode(' ');
 
-        $command = "cd {$remote->currentPath()} && php artisan snapshot:create {$backupName} {$excludeFlags} --compress";
+        $command = "cd {$remote->workingPath()} && php artisan snapshot:create {$backupName} {$excludeFlags} --compress";
         $timeout = config('remote-sync.timeouts.snapshot_create', 300);
 
         return $this->executeRemoteCommand($remote, $command, $timeout);
