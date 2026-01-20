@@ -90,12 +90,17 @@ class PushRemoteCommand extends Command
 
     protected function selectOperations(): array
     {
+        $options = [
+            'database' => 'Database',
+        ];
+
+        if (! empty(config('remote-sync.paths', []))) {
+            $options['files'] = 'Files';
+        }
+
         return multiselect(
             label: 'What would you like to push?',
-            options: [
-                'database' => 'Database',
-                'files' => 'Files',
-            ],
+            options: $options,
             default: ['database'],
             required: true,
         );
