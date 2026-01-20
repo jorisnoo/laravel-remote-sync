@@ -2,6 +2,7 @@
 
 namespace Noo\LaravelRemoteSync;
 
+use Noo\LaravelRemoteSync\Commands\CleanupSnapshotsCommand;
 use Noo\LaravelRemoteSync\Commands\PushDatabaseCommand;
 use Noo\LaravelRemoteSync\Commands\PushFilesCommand;
 use Noo\LaravelRemoteSync\Commands\PushRemoteCommand;
@@ -25,6 +26,7 @@ class LaravelRemoteSyncServiceProvider extends PackageServiceProvider
                 PushRemoteCommand::class,
                 PushDatabaseCommand::class,
                 PushFilesCommand::class,
+                CleanupSnapshotsCommand::class,
             ]);
     }
 

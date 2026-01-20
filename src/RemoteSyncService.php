@@ -149,6 +149,15 @@ class RemoteSyncService
         return $this->executeRemoteCommand($remote, $command, $timeout);
     }
 
+    public function listRemoteSnapshots(RemoteConfig $remote): ProcessResult
+    {
+        $snapshotPath = "{$remote->storagePath()}/snapshots";
+        $command = "stat -c '%Y %n' {$snapshotPath}/*.sql.gz 2>/dev/null | sort -rn || true";
+        $timeout = config('remote-sync.timeouts.snapshot_cleanup', 60);
+
+        return $this->executeRemoteCommand($remote, $command, $timeout);
+    }
+
     public function rsyncUpload(
         RemoteConfig $remote,
         string $sourcePath,

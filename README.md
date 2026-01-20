@@ -121,6 +121,40 @@ php artisan remote-sync:push-database     # Database only
 php artisan remote-sync:push-files        # Files only
 ```
 
+### Cleanup Snapshots
+
+Remove old database snapshots from local and/or remote storage:
+
+```bash
+php artisan remote-sync:cleanup-snapshots
+```
+
+Options:
+- `--local` - Only cleanup local snapshots
+- `--remote` - Only cleanup remote snapshots
+- `--keep=5` - Number of most recent snapshots to keep (default: 5)
+- `--force` - Skip confirmation prompt
+- `--dry-run` - Show what would be deleted without actually deleting
+
+Examples:
+
+```bash
+# Cleanup both local and remote (interactive)
+php artisan remote-sync:cleanup-snapshots
+
+# Cleanup only local, keep 3 most recent
+php artisan remote-sync:cleanup-snapshots --local --keep=3
+
+# Cleanup only remote production snapshots
+php artisan remote-sync:cleanup-snapshots production --remote
+
+# Preview what would be deleted
+php artisan remote-sync:cleanup-snapshots --dry-run
+
+# Automated cleanup (cron-friendly)
+php artisan remote-sync:cleanup-snapshots production --force --keep=5
+```
+
 ## Atomic Deployments
 
 The package automatically detects if your remote server uses atomic deployments (Envoyer, Laravel Deployer, etc.) by checking for a `/current` symlink. When detected, it uses the correct working path.
