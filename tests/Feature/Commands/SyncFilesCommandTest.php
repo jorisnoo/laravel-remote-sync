@@ -64,7 +64,7 @@ describe('SyncFilesCommand', function () {
 
         $this->artisan('remote-sync:pull-files', ['remote' => 'production'])
             ->expectsConfirmation(
-                "This will replace your local files with data from [production]. Continue?",
+                'This will replace your local files with data from [production]. Continue?',
                 'yes'
             )
             ->expectsOutputToContain('Syncing: app/public')
@@ -104,7 +104,7 @@ describe('SyncFilesCommand', function () {
             '--path' => 'app/custom',
         ])
             ->expectsConfirmation(
-                "This will replace your local files with data from [production]. Continue?",
+                'This will replace your local files with data from [production]. Continue?',
                 'yes'
             )
             ->expectsOutputToContain('Syncing: app/custom')
@@ -142,7 +142,7 @@ describe('SyncFilesCommand', function () {
             '--delete' => true,
         ])
             ->expectsConfirmation(
-                "This will replace your local files with data from [production]. Continue?",
+                'This will replace your local files with data from [production]. Continue?',
                 'yes'
             )
             ->assertSuccessful();
@@ -154,7 +154,7 @@ describe('SyncFilesCommand', function () {
 
         $this->artisan('remote-sync:pull-files', ['remote' => 'production'])
             ->expectsConfirmation(
-                "This will replace your local files with data from [production]. Continue?",
+                'This will replace your local files with data from [production]. Continue?',
                 'no'
             )
             ->expectsOutputToContain('Operation cancelled')
@@ -191,7 +191,7 @@ describe('SyncFilesCommand', function () {
 
         $this->artisan('remote-sync:pull-files', ['remote' => 'production'])
             ->expectsConfirmation(
-                "This will replace your local files with data from [production]. Continue?",
+                'This will replace your local files with data from [production]. Continue?',
                 'yes'
             )
             ->assertSuccessful();
@@ -227,7 +227,7 @@ describe('SyncFilesCommand', function () {
 
         $this->artisan('remote-sync:pull-files', ['remote' => 'production'])
             ->expectsConfirmation(
-                "This will replace your local files with data from [production]. Continue?",
+                'This will replace your local files with data from [production]. Continue?',
                 'yes'
             )
             ->expectsOutputToContain('Failed to sync app/public')
@@ -240,7 +240,7 @@ describe('SyncFilesCommand', function () {
 
         $this->artisan('remote-sync:pull-files')
             ->expectsConfirmation(
-                "This will replace your local files with data from [production]. Continue?",
+                'This will replace your local files with data from [production]. Continue?',
                 'no'
             )
             ->assertSuccessful();
@@ -281,7 +281,7 @@ describe('SyncFilesCommand', function () {
 
         $this->artisan('remote-sync:pull-files', ['remote' => 'production'])
             ->expectsConfirmation(
-                "This will replace your local files with data from [production]. Continue?",
+                'This will replace your local files with data from [production]. Continue?',
                 'yes'
             )
             ->assertSuccessful();

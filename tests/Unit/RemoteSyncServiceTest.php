@@ -266,7 +266,6 @@ describe('RemoteSyncService', function () {
         });
     });
 
-
     describe('createRemoteSnapshot', function () {
         it('builds correct artisan command without exclusions when full=true', function () {
             Process::fake();

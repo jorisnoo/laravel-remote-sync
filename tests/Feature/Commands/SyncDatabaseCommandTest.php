@@ -1,7 +1,6 @@
 <?php
 
 use Illuminate\Support\Facades\Process;
-use Noo\LaravelRemoteSync\RemoteSyncService;
 
 beforeEach(function () {
     Process::fake([
@@ -47,7 +46,7 @@ describe('SyncDatabaseCommand', function () {
         $this->artisan('remote-sync:pull-database', ['remote' => 'production'])
             ->expectsOutputToContain('Could not detect remote database driver')
             ->expectsConfirmation(
-                "This will replace your local database with data from [production]. Continue?",
+                'This will replace your local database with data from [production]. Continue?',
                 'no'
             )
             ->assertSuccessful();
@@ -77,7 +76,7 @@ describe('SyncDatabaseCommand', function () {
 
         $this->artisan('remote-sync:pull-database', ['remote' => 'production'])
             ->expectsConfirmation(
-                "This will replace your local database with data from [production]. Continue?",
+                'This will replace your local database with data from [production]. Continue?',
                 'no'
             )
             ->assertSuccessful();
@@ -93,7 +92,7 @@ describe('SyncDatabaseCommand', function () {
 
         $this->artisan('remote-sync:pull-database', ['remote' => 'production'])
             ->expectsConfirmation(
-                "This will replace your local database with data from [production]. Continue?",
+                'This will replace your local database with data from [production]. Continue?',
                 'no'
             )
             ->expectsOutputToContain('Operation cancelled')
@@ -110,7 +109,7 @@ describe('SyncDatabaseCommand', function () {
 
         $this->artisan('remote-sync:pull-database', ['remote' => 'production'])
             ->expectsConfirmation(
-                "This will replace your local database with data from [production]. Continue?",
+                'This will replace your local database with data from [production]. Continue?',
                 'no'
             )
             ->assertSuccessful();
@@ -126,7 +125,7 @@ describe('SyncDatabaseCommand', function () {
 
         $this->artisan('remote-sync:pull-database')
             ->expectsConfirmation(
-                "This will replace your local database with data from [production]. Continue?",
+                'This will replace your local database with data from [production]. Continue?',
                 'no'
             )
             ->assertSuccessful();
@@ -148,7 +147,7 @@ describe('SyncDatabaseCommand', function () {
 
         $this->artisan('remote-sync:pull-database', ['remote' => 'production'])
             ->expectsConfirmation(
-                "This will replace your local database with data from [production]. Continue?",
+                'This will replace your local database with data from [production]. Continue?',
                 'no'
             )
             ->assertSuccessful();

@@ -36,7 +36,7 @@ describe('PushFilesCommand', function () {
 
         $this->artisan('remote-sync:push-files', ['remote' => 'production'])
             ->assertFailed()
-            ->expectsOutputToContain("Push is not allowed for remote [production]");
+            ->expectsOutputToContain('Push is not allowed for remote [production]');
     });
 
     it('warns when no paths are configured', function () {

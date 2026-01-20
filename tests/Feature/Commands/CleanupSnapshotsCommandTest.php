@@ -2,7 +2,6 @@
 
 use Illuminate\Contracts\Process\ProcessResult;
 use Illuminate\Support\Facades\Process;
-use Laravel\Prompts\Prompt;
 use Noo\LaravelRemoteSync\Data\RemoteConfig;
 use Noo\LaravelRemoteSync\RemoteSyncService;
 

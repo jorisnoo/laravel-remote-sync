@@ -31,6 +31,6 @@ describe('PushRemoteCommand', function () {
 
         $this->artisan('remote-sync:push', ['remote' => 'production'])
             ->assertFailed()
-            ->expectsOutputToContain("Push is not allowed for remote [production]");
+            ->expectsOutputToContain('Push is not allowed for remote [production]');
     });
 });

@@ -31,7 +31,7 @@ describe('PushDatabaseCommand', function () {
 
         $this->artisan('remote-sync:push-database', ['remote' => 'production'])
             ->assertFailed()
-            ->expectsOutputToContain("Push is not allowed for remote [production]");
+            ->expectsOutputToContain('Push is not allowed for remote [production]');
     });
 
     it('requires push_allowed to be true', function () {
@@ -45,7 +45,7 @@ describe('PushDatabaseCommand', function () {
 
         $this->artisan('remote-sync:push-database', ['remote' => 'staging'])
             ->assertFailed()
-            ->expectsOutputToContain("Push is not allowed for remote [staging]");
+            ->expectsOutputToContain('Push is not allowed for remote [staging]');
     });
 
     it('warns when database driver cannot be detected but proceeds', function () {
