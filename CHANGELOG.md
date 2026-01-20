@@ -2,7 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.1.0](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.1.0) (2026-01-19)
+## [0.2.0](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/0.2.0) (2026-01-20)
+
+### Features
+
+- Auto-detect atomic deployments (Envoyer, Deployer, etc.)
+- Update default excluded tables
+
+### Changed
+
+- Rename commands to `remote-sync` namespace (`remote-sync:sync`, `remote-sync:database`, `remote-sync:files`)
+
+## [0.1.0](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/0.1.0) (2026-01-19)
 
 Initial release.
 
