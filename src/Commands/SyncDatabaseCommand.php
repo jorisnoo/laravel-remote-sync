@@ -139,11 +139,22 @@ class SyncDatabaseCommand extends Command
 
         $this->dropNonExcludedTables();
 
-        $exitCode = $this->call(SnapshotLoad::class, [
-            'name' => $this->snapshotName,
-            '--force' => true,
-            '--drop-tables' => 0,
-        ]);
+        // Disable query logging to prevent memory exhaustion on large snapshots
+        $connection = DB::connection();
+        $wasLogging = $connection->logging();
+        $connection->disableQueryLog();
+
+        try {
+            $exitCode = $this->call(SnapshotLoad::class, [
+                'name' => $this->snapshotName,
+                '--force' => true,
+                '--drop-tables' => 0,
+            ]);
+        } finally {
+            if ($wasLogging) {
+                $connection->enableQueryLog();
+            }
+        }
 
         if ($exitCode !== 0) {
             $this->components->error('Failed to load snapshot.');
