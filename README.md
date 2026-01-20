@@ -77,33 +77,43 @@ return [
 
 ## Usage
 
-### Interactive Sync
+### Interactive Pull
 
 ```bash
-php artisan sync:remote
+php artisan remote-sync:pull
 ```
 
-Prompts you to select a remote and what to sync (database, files, or both).
+Prompts you to select a remote and what to pull (database, files, or both).
 
-### Sync Database Only
+### Pull Database Only
 
 ```bash
-php artisan sync:database production
+php artisan remote-sync:pull-database production
 ```
 
 Options:
 - `--no-backup` - Skip creating a local backup before syncing
 - `--keep-snapshot` - Keep the downloaded snapshot file after loading
 
-### Sync Files Only
+### Pull Files Only
 
 ```bash
-php artisan sync:files production
+php artisan remote-sync:pull-files production
 ```
 
 Options:
 - `--path=app/uploads` - Sync only a specific path
 - `--delete` - Delete local files that don't exist on remote
+
+### Push Commands
+
+Push local data to a remote (requires `push_allowed: true` in config):
+
+```bash
+php artisan remote-sync:push              # Interactive
+php artisan remote-sync:push-database     # Database only
+php artisan remote-sync:push-files        # Files only
+```
 
 ## Atomic Deployments
 

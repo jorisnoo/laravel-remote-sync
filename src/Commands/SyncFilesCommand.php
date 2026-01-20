@@ -9,7 +9,7 @@ class SyncFilesCommand extends Command
 {
     use InteractsWithRemote;
 
-    protected $signature = 'sync:files
+    protected $signature = 'remote-sync:pull-files
         {remote? : The remote environment to sync from}
         {--path= : Sync only a specific path (relative to storage/)}
         {--delete : Delete local files that do not exist on remote}';

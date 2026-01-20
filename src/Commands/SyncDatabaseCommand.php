@@ -14,7 +14,7 @@ class SyncDatabaseCommand extends Command
 {
     use InteractsWithRemote;
 
-    protected $signature = 'sync:database
+    protected $signature = 'remote-sync:pull-database
         {remote? : The remote environment to sync from}
         {--no-backup : Skip creating a local backup before syncing}
         {--keep-snapshot : Keep the downloaded snapshot file after loading}';

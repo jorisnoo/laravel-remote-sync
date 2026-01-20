@@ -9,7 +9,7 @@ class PushFilesCommand extends Command
 {
     use InteractsWithRemote;
 
-    protected $signature = 'push:files
+    protected $signature = 'remote-sync:push-files
         {remote? : The remote environment to push to}
         {--path= : Push only a specific path (relative to storage/)}
         {--delete : Delete remote files that do not exist locally}

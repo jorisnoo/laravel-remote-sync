@@ -12,7 +12,7 @@ class PushRemoteCommand extends Command
 {
     use InteractsWithRemote;
 
-    protected $signature = 'push:remote
+    protected $signature = 'remote-sync:push
         {remote? : The remote environment to push to}';
 
     protected $description = 'Push database and/or files to a remote environment';
