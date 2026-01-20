@@ -16,7 +16,8 @@ class SyncRemoteCommand extends Command
     protected $signature = 'remote-sync:pull
         {remote? : The remote environment to sync from}
         {--no-backup : Skip creating a local backup before syncing database}
-        {--keep-snapshot : Keep the downloaded snapshot file after loading}';
+        {--keep-snapshot : Keep the downloaded snapshot file after loading}
+        {--full : Include all tables (no exclusions) and drop tables before loading}';
 
     protected $description = 'Sync database and/or files from a remote environment';
 
@@ -116,6 +117,10 @@ class SyncRemoteCommand extends Command
 
         if ($this->option('keep-snapshot')) {
             $options['--keep-snapshot'] = true;
+        }
+
+        if ($this->option('full')) {
+            $options['--full'] = true;
         }
 
         return $this->call(SyncDatabaseCommand::class, $options);

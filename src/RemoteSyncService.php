@@ -103,12 +103,16 @@ class RemoteSyncService
         return trim($result->output()) ?: null;
     }
 
-    public function createRemoteSnapshot(RemoteConfig $remote, string $snapshotName): ProcessResult
+    public function createRemoteSnapshot(RemoteConfig $remote, string $snapshotName, bool $full = false): ProcessResult
     {
-        $excludeTables = config('remote-sync.exclude_tables', []);
-        $excludeFlags = collect($excludeTables)
-            ->map(fn (string $table) => "--exclude={$table}")
-            ->implode(' ');
+        $excludeFlags = '';
+
+        if (! $full) {
+            $excludeTables = config('remote-sync.exclude_tables', []);
+            $excludeFlags = collect($excludeTables)
+                ->map(fn (string $table) => "--exclude={$table}")
+                ->implode(' ');
+        }
 
         $command = "cd {$remote->workingPath()} && php artisan snapshot:create {$snapshotName} {$excludeFlags} --compress";
         $timeout = config('remote-sync.timeouts.snapshot_create', 300);

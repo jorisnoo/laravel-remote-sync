@@ -17,7 +17,8 @@ class SyncDatabaseCommand extends Command
     protected $signature = 'remote-sync:pull-database
         {remote? : The remote environment to sync from}
         {--no-backup : Skip creating a local backup before syncing}
-        {--keep-snapshot : Keep the downloaded snapshot file after loading}';
+        {--keep-snapshot : Keep the downloaded snapshot file after loading}
+        {--full : Include all tables (no exclusions) and drop tables before loading}';
 
     protected $description = 'Sync the database from a remote environment';
 
@@ -97,8 +98,10 @@ class SyncDatabaseCommand extends Command
 
     protected function createRemoteSnapshot(): bool
     {
+        $full = $this->option('full');
+
         $result = spin(
-            callback: fn () => $this->syncService->createRemoteSnapshot($this->remote, $this->snapshotName),
+            callback: fn () => $this->syncService->createRemoteSnapshot($this->remote, $this->snapshotName, $full),
             message: "Creating snapshot on [{$this->remote->name}]..."
         );
 
@@ -139,12 +142,14 @@ class SyncDatabaseCommand extends Command
 
     protected function loadSnapshot(): bool
     {
+        $full = $this->option('full');
+
         $this->components->info('Loading snapshot into database...');
 
         $exitCode = $this->call(SnapshotLoad::class, [
             'name' => $this->snapshotName,
             '--force' => true,
-            '--drop-tables' => 0,
+            '--drop-tables' => $full ? 1 : 0,
         ]);
 
         if ($exitCode !== 0) {
@@ -155,7 +160,9 @@ class SyncDatabaseCommand extends Command
 
         $this->components->info('Snapshot loaded.');
 
-        $this->truncateExcludedTables();
+        if (! $full) {
+            $this->truncateExcludedTables();
+        }
 
         return true;
     }
