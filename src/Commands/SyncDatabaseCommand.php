@@ -39,6 +39,10 @@ class SyncDatabaseCommand extends Command
             return self::FAILURE;
         }
 
+        if (! $this->validateDatabaseCompatibility()) {
+            return self::FAILURE;
+        }
+
         $this->snapshotName = $this->generateSnapshotName();
 
         if (! $this->confirmSync('database')) {
@@ -136,6 +140,9 @@ class SyncDatabaseCommand extends Command
     protected function loadSnapshot(): bool
     {
         $this->components->info('Loading snapshot into database...');
+
+        // Run migrate:fresh to ensure all table structures exist (including excluded tables)
+        $this->call('migrate:fresh', ['--force' => true]);
 
         $this->dropNonExcludedTables();
 
@@ -250,5 +257,45 @@ class SyncDatabaseCommand extends Command
         if (! $result->successful()) {
             $this->components->warn("Failed to delete remote snapshot. You may need to manually clean up: {$this->snapshotName}");
         }
+    }
+
+    protected function validateDatabaseCompatibility(): bool
+    {
+        $localDriver = config('database.connections.'.config('database.default').'.driver');
+
+        $remoteDriver = spin(
+            callback: fn () => $this->syncService->getRemoteDatabaseDriver($this->remote),
+            message: 'Detecting remote database driver...'
+        );
+
+        if ($remoteDriver === null) {
+            $this->components->warn('Could not detect remote database driver. Proceeding anyway...');
+
+            return true;
+        }
+
+        $normalizedLocal = $this->normalizeDriver($localDriver);
+        $normalizedRemote = $this->normalizeDriver($remoteDriver);
+
+        if ($normalizedLocal !== $normalizedRemote) {
+            $this->components->error(
+                "Database driver mismatch: remote uses [{$remoteDriver}] but local uses [{$localDriver}]."
+            );
+            $this->components->error(
+                'Cross-database sync is not supported. Both environments must use the same database driver.'
+            );
+
+            return false;
+        }
+
+        return true;
+    }
+
+    protected function normalizeDriver(string $driver): string
+    {
+        return match (strtolower($driver)) {
+            'mariadb' => 'mysql',
+            default => strtolower($driver),
+        };
     }
 }

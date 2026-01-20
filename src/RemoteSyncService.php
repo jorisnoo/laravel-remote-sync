@@ -90,6 +90,19 @@ class RemoteSyncService
             ->run(array_merge(['rsync'], $options, [$source, $destinationPath]));
     }
 
+    public function getRemoteDatabaseDriver(RemoteConfig $remote): ?string
+    {
+        $command = "cd {$remote->workingPath()} && php artisan tinker --execute=\"echo config('database.connections.' . config('database.default') . '.driver');\"";
+
+        $result = $this->executeRemoteCommand($remote, $command, 30);
+
+        if (! $result->successful()) {
+            return null;
+        }
+
+        return trim($result->output()) ?: null;
+    }
+
     public function createRemoteSnapshot(RemoteConfig $remote, string $snapshotName): ProcessResult
     {
         $excludeTables = config('remote-sync.exclude_tables', []);
