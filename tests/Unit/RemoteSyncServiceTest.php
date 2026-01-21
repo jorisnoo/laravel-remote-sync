@@ -191,7 +191,7 @@ describe('RemoteSyncService', function () {
                 return $process->command === [
                     'ssh',
                     'user@example.com',
-                    "test -d /var/www/app/current && echo 'yes' || echo 'no'",
+                    "test -d '/var/www/app/current' && echo 'yes' || echo 'no'",
                 ];
             });
         });
@@ -261,7 +261,7 @@ describe('RemoteSyncService', function () {
             $this->service->getRemoteDatabaseDriver($remote);
 
             Process::assertRan(function ($process) {
-                return str_contains($process->command[2], 'cd /var/www/app/current');
+                return str_contains($process->command[2], "cd '/var/www/app/current'");
             });
         });
     });
@@ -283,7 +283,7 @@ describe('RemoteSyncService', function () {
             Process::assertRan(function ($process) {
                 $command = $process->command[2];
 
-                return str_contains($command, 'snapshot:create test-snapshot')
+                return str_contains($command, "snapshot:create 'test-snapshot'")
                     && str_contains($command, '--compress')
                     && ! str_contains($command, '--exclude');
             });
@@ -305,8 +305,8 @@ describe('RemoteSyncService', function () {
             Process::assertRan(function ($process) {
                 $command = $process->command[2];
 
-                return str_contains($command, '--exclude=sessions')
-                    && str_contains($command, '--exclude=cache');
+                return str_contains($command, "--exclude='sessions'")
+                    && str_contains($command, "--exclude='cache'");
             });
         });
     });
@@ -324,7 +324,7 @@ describe('RemoteSyncService', function () {
             $this->service->deleteRemoteSnapshot($remote, 'test-snapshot');
 
             Process::assertRan(function ($process) {
-                return str_contains($process->command[2], 'snapshot:delete test-snapshot --no-interaction');
+                return str_contains($process->command[2], "snapshot:delete 'test-snapshot' --no-interaction");
             });
         });
     });
@@ -343,7 +343,7 @@ describe('RemoteSyncService', function () {
 
             Process::assertRan(function ($process) {
                 return str_contains($process->command[2], "stat -c '%Y %n'")
-                    && str_contains($process->command[2], '/var/www/app/storage/snapshots/*.sql.gz');
+                    && str_contains($process->command[2], "'/var/www/app/storage/snapshots'/*.sql.gz");
             });
         });
     });
@@ -388,7 +388,7 @@ describe('RemoteSyncService', function () {
             $this->service->loadRemoteSnapshot($remote, 'test-snapshot');
 
             Process::assertRan(function ($process) {
-                return str_contains($process->command[2], 'snapshot:load test-snapshot --force');
+                return str_contains($process->command[2], "snapshot:load 'test-snapshot' --force");
             });
         });
     });
@@ -410,9 +410,9 @@ describe('RemoteSyncService', function () {
             Process::assertRan(function ($process) {
                 $command = $process->command[2];
 
-                return str_contains($command, 'snapshot:create backup-name')
-                    && str_contains($command, '--exclude=sessions')
-                    && str_contains($command, '--exclude=cache')
+                return str_contains($command, "snapshot:create 'backup-name'")
+                    && str_contains($command, "--exclude='sessions'")
+                    && str_contains($command, "--exclude='cache'")
                     && str_contains($command, '--compress');
             });
         });

@@ -27,6 +27,9 @@ return [
         'failed_dry_run' => 'Dry run failed for :path: :error',
         'failed_list_snapshots' => 'Failed to list remote snapshots: :error',
         'failed_delete_snapshot' => 'Failed to delete remote snapshot: :name',
+        'invalid_path' => 'Invalid path: :path',
+        'storage_not_accessible' => 'Storage directory is not accessible.',
+        'path_traversal' => 'Path traversal detected: :path must be within the storage directory.',
     ],
 
     /*

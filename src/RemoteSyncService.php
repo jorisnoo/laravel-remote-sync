@@ -80,9 +80,11 @@ class RemoteSyncService
 
     public function isAtomicDeployment(RemoteConfig $remote): bool
     {
+        $escapedPath = escapeshellarg("{$remote->path}/current");
+
         $result = $this->executeRemoteCommand(
             $remote,
-            "test -d {$remote->path}/current && echo 'yes' || echo 'no'",
+            "test -d {$escapedPath} && echo 'yes' || echo 'no'",
             10
         );
 
@@ -102,7 +104,7 @@ class RemoteSyncService
 
         $excludePaths = config('remote-sync.exclude_paths', []);
         $excludeOptions = collect($excludePaths)
-            ->map(fn (string $pattern) => "--exclude={$pattern}")
+            ->map(fn (string $pattern) => '--exclude='.escapeshellarg($pattern))
             ->all();
 
         $options = array_merge($defaultOptions, $excludeOptions, $options);
@@ -116,7 +118,8 @@ class RemoteSyncService
 
     public function getRemoteDatabaseDriver(RemoteConfig $remote): ?string
     {
-        $command = "cd {$remote->workingPath()} && php artisan tinker --execute=\"echo config('database.connections.' . config('database.default') . '.driver');\"";
+        $escapedPath = escapeshellarg($remote->workingPath());
+        $command = "cd {$escapedPath} && php artisan tinker --execute=\"echo config('database.connections.' . config('database.default') . '.driver');\"";
 
         $result = $this->executeRemoteCommand($remote, $command, 30);
 
@@ -134,11 +137,13 @@ class RemoteSyncService
         if (! $full) {
             $excludeTables = config('remote-sync.exclude_tables', []);
             $excludeFlags = collect($excludeTables)
-                ->map(fn (string $table) => "--exclude={$table}")
+                ->map(fn (string $table) => '--exclude='.escapeshellarg($table))
                 ->implode(' ');
         }
 
-        $command = "cd {$remote->workingPath()} && php artisan snapshot:create {$snapshotName} {$excludeFlags} --compress";
+        $escapedPath = escapeshellarg($remote->workingPath());
+        $escapedSnapshotName = escapeshellarg($snapshotName);
+        $command = "cd {$escapedPath} && php artisan snapshot:create {$escapedSnapshotName} {$excludeFlags} --compress";
         $timeout = config('remote-sync.timeouts.snapshot_create', 300);
 
         return $this->executeRemoteCommand($remote, $command, $timeout);
@@ -169,7 +174,9 @@ class RemoteSyncService
 
     public function deleteRemoteSnapshot(RemoteConfig $remote, string $snapshotName): ProcessResult
     {
-        $command = "cd {$remote->workingPath()} && php artisan snapshot:delete {$snapshotName} --no-interaction";
+        $escapedPath = escapeshellarg($remote->workingPath());
+        $escapedSnapshotName = escapeshellarg($snapshotName);
+        $command = "cd {$escapedPath} && php artisan snapshot:delete {$escapedSnapshotName} --no-interaction";
         $timeout = config('remote-sync.timeouts.snapshot_cleanup', 60);
 
         return $this->executeRemoteCommand($remote, $command, $timeout);
@@ -179,7 +186,8 @@ class RemoteSyncService
     {
         $subdir = $this->getSnapshotSubdirectory();
         $snapshotPath = "{$remote->storagePath()}/{$subdir}";
-        $command = "stat -c '%Y %n' {$snapshotPath}/*.sql.gz 2>/dev/null | sort -rn || true";
+        $escapedSnapshotPath = escapeshellarg($snapshotPath);
+        $command = "stat -c '%Y %n' {$escapedSnapshotPath}/*.sql.gz 2>/dev/null | sort -rn || true";
         $timeout = config('remote-sync.timeouts.snapshot_cleanup', 60);
 
         return $this->executeRemoteCommand($remote, $command, $timeout);
@@ -198,7 +206,7 @@ class RemoteSyncService
 
         $excludePaths = config('remote-sync.exclude_paths', []);
         $excludeOptions = collect($excludePaths)
-            ->map(fn (string $pattern) => "--exclude={$pattern}")
+            ->map(fn (string $pattern) => '--exclude='.escapeshellarg($pattern))
             ->all();
 
         $options = array_merge($defaultOptions, $excludeOptions, $options);
@@ -231,7 +239,9 @@ class RemoteSyncService
 
     public function loadRemoteSnapshot(RemoteConfig $remote, string $snapshotName): ProcessResult
     {
-        $command = "cd {$remote->workingPath()} && php artisan snapshot:load {$snapshotName} --force";
+        $escapedPath = escapeshellarg($remote->workingPath());
+        $escapedSnapshotName = escapeshellarg($snapshotName);
+        $command = "cd {$escapedPath} && php artisan snapshot:load {$escapedSnapshotName} --force";
         $timeout = config('remote-sync.timeouts.snapshot_create', 300);
 
         return $this->executeRemoteCommand($remote, $command, $timeout);
@@ -241,10 +251,12 @@ class RemoteSyncService
     {
         $excludeTables = config('remote-sync.exclude_tables', []);
         $excludeFlags = collect($excludeTables)
-            ->map(fn (string $table) => "--exclude={$table}")
+            ->map(fn (string $table) => '--exclude='.escapeshellarg($table))
             ->implode(' ');
 
-        $command = "cd {$remote->workingPath()} && php artisan snapshot:create {$backupName} {$excludeFlags} --compress";
+        $escapedPath = escapeshellarg($remote->workingPath());
+        $escapedBackupName = escapeshellarg($backupName);
+        $command = "cd {$escapedPath} && php artisan snapshot:create {$escapedBackupName} {$excludeFlags} --compress";
         $timeout = config('remote-sync.timeouts.snapshot_create', 300);
 
         return $this->executeRemoteCommand($remote, $command, $timeout);

@@ -106,6 +106,14 @@ class PushFilesCommand extends Command
     protected function performDryRun(array $paths): int
     {
         foreach ($paths as $path) {
+            $validationError = $this->validateStoragePath($path);
+
+            if ($validationError !== null) {
+                $this->components->error($validationError);
+
+                return self::FAILURE;
+            }
+
             $localPath = storage_path($path);
 
             if (! is_dir($localPath)) {
@@ -144,6 +152,14 @@ class PushFilesCommand extends Command
 
     protected function pushPath(string $path): bool
     {
+        $validationError = $this->validateStoragePath($path);
+
+        if ($validationError !== null) {
+            $this->components->error($validationError);
+
+            return false;
+        }
+
         $localPath = storage_path($path);
 
         if (! is_dir($localPath)) {

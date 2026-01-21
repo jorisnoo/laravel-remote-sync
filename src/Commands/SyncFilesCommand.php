@@ -75,6 +75,14 @@ class SyncFilesCommand extends Command
 
     protected function syncPath(string $path): bool
     {
+        $validationError = $this->validateStoragePath($path);
+
+        if ($validationError !== null) {
+            $this->components->error($validationError);
+
+            return false;
+        }
+
         $remotePath = "{$this->remote->storagePath()}/{$path}/";
         $localPath = storage_path($path);
 

@@ -226,6 +226,39 @@ trait InteractsWithRemote
 
     protected function generateSnapshotName(): string
     {
-        return 'remote-sync-'.date('Y-m-d-H-i-s');
+        return 'remote-sync-'.date('Y-m-d-H-i-s').'-'.bin2hex(random_bytes(4));
+    }
+
+    protected function validateStoragePath(string $path): ?string
+    {
+        $storagePath = storage_path();
+
+        $normalizedPath = str_replace(['../', '..\\'], '', $path);
+        $normalizedPath = ltrim($normalizedPath, '/\\');
+
+        $fullPath = $storagePath.DIRECTORY_SEPARATOR.$normalizedPath;
+        $realPath = realpath(dirname($fullPath));
+
+        if ($realPath === false) {
+            $parentPath = dirname($normalizedPath);
+
+            if ($parentPath !== '.' && $parentPath !== '') {
+                return __('remote-sync::messages.errors.invalid_path', ['path' => $path]);
+            }
+
+            return null;
+        }
+
+        $realStoragePath = realpath($storagePath);
+
+        if ($realStoragePath === false) {
+            return __('remote-sync::messages.errors.storage_not_accessible');
+        }
+
+        if (! str_starts_with($realPath, $realStoragePath)) {
+            return __('remote-sync::messages.errors.path_traversal', ['path' => $path]);
+        }
+
+        return null;
     }
 }
