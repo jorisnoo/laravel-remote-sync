@@ -98,7 +98,7 @@ class RemoteSyncService
     ): ProcessResult {
         $timeout ??= config('remote-sync.timeouts.file_sync', 1800);
 
-        $defaultOptions = ['-avz', '--progress'];
+        $defaultOptions = ['-avz', '--progress', '--exclude=.*'];
 
         $excludePaths = config('remote-sync.exclude_paths', []);
         $excludeOptions = collect($excludePaths)
@@ -194,7 +194,7 @@ class RemoteSyncService
     ): ProcessResult {
         $timeout ??= config('remote-sync.timeouts.file_sync', 1800);
 
-        $defaultOptions = ['-avz', '--progress'];
+        $defaultOptions = ['-avz', '--progress', '--exclude=.*'];
 
         $excludePaths = config('remote-sync.exclude_paths', []);
         $excludeOptions = collect($excludePaths)
