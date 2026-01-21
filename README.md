@@ -120,7 +120,7 @@ Options:
 ### Pull Database Only
 
 ```bash
-php artisan remote-sync:pull-database production
+php artisan remote-sync:pull-db production
 ```
 
 Options:
@@ -144,7 +144,7 @@ Push local data to a remote (requires `push_allowed: true` in config):
 
 ```bash
 php artisan remote-sync:push              # Interactive
-php artisan remote-sync:push-database     # Database only
+php artisan remote-sync:push-db     # Database only
 php artisan remote-sync:push-files        # Files only
 ```
 

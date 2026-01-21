@@ -16,7 +16,7 @@ describe('PushDatabaseCommand', function () {
         app()->detectEnvironment(fn () => 'production');
         $this->setUpStagingRemote();
 
-        $this->artisan('remote-sync:push-database', ['remote' => 'staging'])
+        $this->artisan('remote-sync:push-db', ['remote' => 'staging'])
             ->assertFailed()
             ->expectsOutputToContain('This command cannot be run in production');
     });
@@ -24,7 +24,7 @@ describe('PushDatabaseCommand', function () {
     it('fails when remote is not configured', function () {
         config()->set('remote-sync.remotes', []);
 
-        $this->artisan('remote-sync:push-database', ['remote' => 'nonexistent'])
+        $this->artisan('remote-sync:push-db', ['remote' => 'nonexistent'])
             ->assertFailed()
             ->expectsOutputToContain("Remote 'nonexistent' is not configured");
     });
@@ -32,7 +32,7 @@ describe('PushDatabaseCommand', function () {
     it('fails when push is not allowed for remote', function () {
         $this->setUpProductionRemote();
 
-        $this->artisan('remote-sync:push-database', ['remote' => 'production'])
+        $this->artisan('remote-sync:push-db', ['remote' => 'production'])
             ->assertFailed()
             ->expectsOutputToContain('Push is not allowed for remote [production]');
     });
@@ -46,7 +46,7 @@ describe('PushDatabaseCommand', function () {
             ],
         ]);
 
-        $this->artisan('remote-sync:push-database', ['remote' => 'staging'])
+        $this->artisan('remote-sync:push-db', ['remote' => 'staging'])
             ->assertFailed()
             ->expectsOutputToContain('Push is not allowed for remote [staging]');
     });
@@ -94,7 +94,7 @@ describe('PushDatabaseCommand', function () {
                 ->andReturn($mockProcessResult);
         });
 
-        $this->artisan('remote-sync:push-database', [
+        $this->artisan('remote-sync:push-db', [
             'remote' => 'staging',
             '--force' => true,
         ])
@@ -124,7 +124,7 @@ describe('PushDatabaseCommand', function () {
                 ->andReturn('mysql');
         });
 
-        $this->artisan('remote-sync:push-database', ['remote' => 'staging'])
+        $this->artisan('remote-sync:push-db', ['remote' => 'staging'])
             ->assertFailed()
             ->expectsOutputToContain('Database driver mismatch');
     });
@@ -171,7 +171,7 @@ describe('PushDatabaseCommand', function () {
                 ->andReturn($mockProcessResult);
         });
 
-        $this->artisan('remote-sync:push-database', [
+        $this->artisan('remote-sync:push-db', [
             'remote' => 'staging',
             '--force' => true,
         ])
@@ -224,7 +224,7 @@ describe('PushDatabaseCommand', function () {
                 ->andReturn($mockProcessResult);
         });
 
-        $this->artisan('remote-sync:push-database', [
+        $this->artisan('remote-sync:push-db', [
             'remote' => 'staging',
             '--force' => true,
         ])
@@ -280,7 +280,7 @@ describe('PushDatabaseCommand', function () {
                 ->andReturn($mockProcessResult);
         });
 
-        $this->artisan('remote-sync:push-database', ['--force' => true])
+        $this->artisan('remote-sync:push-db', ['--force' => true])
             ->assertSuccessful();
     });
 
@@ -335,7 +335,7 @@ describe('PushDatabaseCommand', function () {
                 ->andReturn($mockProcessResult);
         });
 
-        $this->artisan('remote-sync:push-database', [
+        $this->artisan('remote-sync:push-db', [
             'remote' => 'staging',
             '--force' => true,
         ])

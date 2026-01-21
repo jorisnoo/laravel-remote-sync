@@ -16,8 +16,7 @@ changelog:
   includeDate: true
   includeAuthor: false
 version:
-  files:
-    - package.json
+  files: []
   tagPrefix: ""
   tagMessage: Release {version}
   commitMessage: "release: {version}"
@@ -28,4 +27,4 @@ git:
   push: true
   pushTags: true
   signTags: true
-  signCommits: false
+  signCommits: true
