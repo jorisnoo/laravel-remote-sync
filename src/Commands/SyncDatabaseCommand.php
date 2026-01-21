@@ -68,11 +68,13 @@ class SyncDatabaseCommand extends Command
             return self::SUCCESS;
         }
 
-        $this->trap([SIGTERM, SIGINT], function () {
-            $this->components->warn(__('remote-sync::messages.warnings.interrupt_cleanup'));
-            $this->cleanupRemoteSnapshot();
-            exit(1);
-        });
+        if (defined('SIGTERM') && defined('SIGINT')) {
+            $this->trap([SIGTERM, SIGINT], function () {
+                $this->components->warn(__('remote-sync::messages.warnings.interrupt_cleanup'));
+                $this->cleanupRemoteSnapshot();
+                exit(1);
+            });
+        }
 
         if ($this->shouldBackup) {
             $this->createLocalBackup();
