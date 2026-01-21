@@ -14,13 +14,13 @@ return [
 
     'remotes' => [
         'production' => [
-            'host' => env('REMOTE_SYNC_PRODUCTION_HOST'),
-            'path' => env('REMOTE_SYNC_PRODUCTION_PATH'),
+            'host' => env('REMOTE_SYNC_PRODUCTION_HOST', 'forge@your-server'),
+            'path' => env('REMOTE_SYNC_PRODUCTION_PATH', '/home/forge/www.example.com'),
             'push_allowed' => env('REMOTE_SYNC_PRODUCTION_PUSH_ALLOWED', false),
         ],
         'staging' => [
-            'host' => env('REMOTE_SYNC_STAGING_HOST'),
-            'path' => env('REMOTE_SYNC_STAGING_PATH'),
+            'host' => env('REMOTE_SYNC_STAGING_HOST', 'forge@your-server'),
+            'path' => env('REMOTE_SYNC_STAGING_PATH', '/home/forge/www.example.com'),
             'push_allowed' => env('REMOTE_SYNC_STAGING_PUSH_ALLOWED', true),
         ],
     ],
