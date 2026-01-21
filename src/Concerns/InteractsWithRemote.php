@@ -28,7 +28,7 @@ trait InteractsWithRemote
     protected function ensureNotProduction(): bool
     {
         if (app()->isProduction()) {
-            $this->components->error('This command cannot be run in production.');
+            $this->components->error(__('remote-sync::messages.errors.production_not_allowed'));
 
             return false;
         }
@@ -39,14 +39,14 @@ trait InteractsWithRemote
     protected function confirmSync(string $operation): bool
     {
         return $this->confirmWithTypedYes(
-            "This will replace your local {$operation} with data from [{$this->remote->name}]. Type \"yes\" to continue"
+            __('remote-sync::prompts.confirm.sync', ['operation' => $operation, 'name' => $this->remote->name])
         );
     }
 
     protected function ensurePushAllowed(): bool
     {
         if (! $this->remote->pushAllowed) {
-            $this->components->error("Push is not allowed for remote [{$this->remote->name}]. Set 'push_allowed' to true in config to enable.");
+            $this->components->error(__('remote-sync::messages.errors.push_not_allowed', ['name' => $this->remote->name]));
 
             return false;
         }
@@ -56,10 +56,10 @@ trait InteractsWithRemote
 
     protected function confirmPush(string $operation): bool
     {
-        $this->components->warn("You are about to push local {$operation} to [{$this->remote->name}]. This will OVERWRITE remote data.");
+        $this->components->warn(__('remote-sync::messages.push.overwrite_warning', ['operation' => $operation, 'name' => $this->remote->name]));
 
         return $this->confirmWithTypedYes(
-            "Are you SURE you want to push to [{$this->remote->name}]? Type \"yes\" to continue"
+            __('remote-sync::prompts.confirm.push', ['name' => $this->remote->name])
         );
     }
 
@@ -71,7 +71,7 @@ trait InteractsWithRemote
             required: true,
             validate: function (string $value) {
                 if ($value !== 'yes') {
-                    return 'Type "yes" to confirm';
+                    return __('remote-sync::prompts.confirm.validation');
                 }
 
                 return null;
@@ -106,10 +106,10 @@ trait InteractsWithRemote
         }
 
         $choice = select(
-            label: 'Create a local backup before syncing?',
+            label: __('remote-sync::prompts.backup.label'),
             options: [
-                'yes' => 'Yes (recommended)',
-                'no' => 'No',
+                'yes' => __('remote-sync::prompts.backup.yes'),
+                'no' => __('remote-sync::prompts.backup.no'),
             ],
             default: 'yes',
         );
@@ -124,10 +124,10 @@ trait InteractsWithRemote
         }
 
         $choice = select(
-            label: 'Import mode',
+            label: __('remote-sync::prompts.import_mode.label'),
             options: [
-                'standard' => 'Standard - excludes cache/session tables',
-                'full' => 'Full - all tables, drops existing tables first',
+                'standard' => __('remote-sync::prompts.import_mode.standard'),
+                'full' => __('remote-sync::prompts.import_mode.full'),
             ],
             default: 'standard',
         );
@@ -142,10 +142,10 @@ trait InteractsWithRemote
         }
 
         $choice = select(
-            label: 'Keep snapshot file after import?',
+            label: __('remote-sync::prompts.keep_snapshot.label'),
             options: [
-                'no' => 'No (recommended)',
-                'yes' => 'Yes - keep for debugging',
+                'no' => __('remote-sync::prompts.keep_snapshot.no'),
+                'yes' => __('remote-sync::prompts.keep_snapshot.yes'),
             ],
             default: 'no',
         );
@@ -160,16 +160,16 @@ trait InteractsWithRemote
         }
 
         $label = $context === 'local'
-            ? 'Delete local files not on remote?'
-            : 'Delete remote files not present locally?';
+            ? __('remote-sync::prompts.delete.local_label')
+            : __('remote-sync::prompts.delete.remote_label');
 
         $choice = select(
             label: $label,
             options: [
-                'no' => 'No - keep extra files (recommended)',
-                'yes' => 'Yes - mirror exactly',
+                'yes' => __('remote-sync::prompts.delete.yes'),
+                'no' => __('remote-sync::prompts.delete.no'),
             ],
-            default: 'no',
+            default: 'yes',
         );
 
         return $choice === 'yes';
@@ -182,10 +182,10 @@ trait InteractsWithRemote
         }
 
         $choice = select(
-            label: 'Preview changes first?',
+            label: __('remote-sync::prompts.dry_run.label'),
             options: [
-                'no' => 'No - proceed directly',
-                'yes' => 'Yes - dry run first',
+                'no' => __('remote-sync::prompts.dry_run.no'),
+                'yes' => __('remote-sync::prompts.dry_run.yes'),
             ],
             default: 'no',
         );
@@ -205,18 +205,18 @@ trait InteractsWithRemote
         $pathsDisplay = implode(', ', $configuredPaths) ?: 'none configured';
 
         $choice = select(
-            label: 'Which paths to sync?',
+            label: __('remote-sync::prompts.paths.label'),
             options: [
-                'all' => "All configured paths ({$pathsDisplay})",
-                'specific' => 'Specific path only',
+                'all' => __('remote-sync::prompts.paths.all', ['paths' => $pathsDisplay]),
+                'specific' => __('remote-sync::prompts.paths.specific'),
             ],
             default: 'all',
         );
 
         if ($choice === 'specific') {
             return text(
-                label: 'Enter path (relative to storage/)',
-                placeholder: 'app/public',
+                label: __('remote-sync::prompts.paths.enter_label'),
+                placeholder: __('remote-sync::prompts.paths.placeholder'),
                 required: true,
             );
         }

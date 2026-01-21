@@ -39,7 +39,7 @@ class SyncFilesCommand extends Command
         $paths = $this->getPathsToSync();
 
         if (empty($paths)) {
-            $this->components->warn('No paths configured for syncing.');
+            $this->components->warn(__('remote-sync::messages.warnings.no_paths_sync'));
 
             return self::SUCCESS;
         }
@@ -47,7 +47,7 @@ class SyncFilesCommand extends Command
         $this->shouldDelete = $this->promptDeleteOption('local');
 
         if (! $this->option('force') && ! $this->confirmSync('files')) {
-            $this->components->info('Operation cancelled.');
+            $this->components->info(__('remote-sync::messages.info.operation_cancelled'));
 
             return self::SUCCESS;
         }
@@ -58,7 +58,7 @@ class SyncFilesCommand extends Command
             }
         }
 
-        $this->components->success("Files synced from [{$this->remote->name}].");
+        $this->components->success(__('remote-sync::messages.success.files_synced', ['name' => $this->remote->name]));
 
         return self::SUCCESS;
     }
@@ -83,7 +83,7 @@ class SyncFilesCommand extends Command
 
         $localPath = rtrim($localPath, '/').'/';
 
-        $this->components->info("Syncing: {$path}");
+        $this->components->info(__('remote-sync::messages.info.syncing_path', ['path' => $path]));
 
         $options = ['--partial', '--info=progress2'];
 
@@ -99,7 +99,7 @@ class SyncFilesCommand extends Command
         );
 
         if (! $result->successful()) {
-            $this->components->error("Failed to sync {$path}: {$result->errorOutput()}");
+            $this->components->error(__('remote-sync::messages.errors.failed_sync_path', ['path' => $path, 'error' => $result->errorOutput()]));
 
             return false;
         }

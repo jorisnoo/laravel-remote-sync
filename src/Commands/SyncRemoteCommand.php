@@ -40,7 +40,7 @@ class SyncRemoteCommand extends Command
         $remoteName = $this->argument('remote') ?? $this->selectRemote();
 
         if (! $remoteName) {
-            $this->components->error('No remote environment selected.');
+            $this->components->error(__('remote-sync::messages.errors.no_remote_selected'));
 
             return self::FAILURE;
         }
@@ -56,7 +56,7 @@ class SyncRemoteCommand extends Command
         $operations = $this->selectOperations();
 
         if (empty($operations)) {
-            $this->components->info('No operations selected.');
+            $this->components->info(__('remote-sync::messages.info.no_operations_selected'));
 
             return self::SUCCESS;
         }
@@ -75,7 +75,7 @@ class SyncRemoteCommand extends Command
         }
 
         if (! $this->option('force') && ! $this->confirmSync($this->getOperationsSummary($syncDatabase, $syncFiles))) {
-            $this->components->info('Operation cancelled.');
+            $this->components->info(__('remote-sync::messages.info.operation_cancelled'));
 
             return self::SUCCESS;
         }
@@ -110,7 +110,7 @@ class SyncRemoteCommand extends Command
         }
 
         return select(
-            label: 'Select remote environment',
+            label: __('remote-sync::prompts.remote.label'),
             options: $remotes,
             default: config('remote-sync.default'),
         );
@@ -119,15 +119,15 @@ class SyncRemoteCommand extends Command
     protected function selectOperations(): array
     {
         $options = [
-            'database' => 'Database',
+            'database' => __('remote-sync::prompts.operations.database'),
         ];
 
         if (! empty(config('remote-sync.paths', []))) {
-            $options['files'] = 'Files';
+            $options['files'] = __('remote-sync::prompts.operations.files');
         }
 
         return multiselect(
-            label: 'What would you like to sync?',
+            label: __('remote-sync::prompts.operations.sync_label'),
             options: $options,
             default: array_keys($options),
             required: true,

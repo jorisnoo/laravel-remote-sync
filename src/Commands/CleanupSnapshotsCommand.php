@@ -41,7 +41,7 @@ class CleanupSnapshotsCommand extends Command
         $this->shouldCleanupRemote = in_array('remote', $targets);
 
         if (! $this->shouldCleanupLocal && ! $this->shouldCleanupRemote) {
-            $this->components->info('No cleanup targets selected.');
+            $this->components->info(__('remote-sync::messages.info.no_cleanup_targets'));
 
             return self::SUCCESS;
         }
@@ -50,7 +50,7 @@ class CleanupSnapshotsCommand extends Command
             $remoteName = $this->argument('remote') ?? $this->selectRemote();
 
             if (! $remoteName) {
-                $this->components->error('No remote environment selected.');
+                $this->components->error(__('remote-sync::messages.errors.no_remote_selected'));
 
                 return self::FAILURE;
             }
@@ -83,7 +83,7 @@ class CleanupSnapshotsCommand extends Command
         }
 
         if (empty($localToDelete) && empty($remoteToDelete)) {
-            $this->components->info('No snapshots to cleanup.');
+            $this->components->info(__('remote-sync::messages.info.no_snapshots_to_cleanup'));
 
             return self::SUCCESS;
         }
@@ -91,13 +91,13 @@ class CleanupSnapshotsCommand extends Command
         $this->displaySnapshotsToDelete($localToDelete, $remoteToDelete, $this->keep);
 
         if ($this->isDryRun) {
-            $this->components->warn('Dry run mode - no files were deleted.');
+            $this->components->warn(__('remote-sync::messages.warnings.dry_run_no_delete'));
 
             return self::SUCCESS;
         }
 
         if (! $this->option('force') && ! $this->confirmCleanup(count($localToDelete), count($remoteToDelete))) {
-            $this->components->info('Cleanup cancelled.');
+            $this->components->info(__('remote-sync::messages.info.cleanup_cancelled'));
 
             return self::SUCCESS;
         }
@@ -152,10 +152,10 @@ class CleanupSnapshotsCommand extends Command
         }
 
         return multiselect(
-            label: 'Which snapshots to cleanup?',
+            label: __('remote-sync::prompts.cleanup_targets.label'),
             options: [
-                'local' => 'Local snapshots',
-                'remote' => 'Remote snapshots',
+                'local' => __('remote-sync::prompts.cleanup_targets.local'),
+                'remote' => __('remote-sync::prompts.cleanup_targets.remote'),
             ],
             default: ['local', 'remote'],
             required: true,
@@ -169,12 +169,12 @@ class CleanupSnapshotsCommand extends Command
         }
 
         $value = text(
-            label: 'How many recent snapshots to keep?',
+            label: __('remote-sync::prompts.keep_count.label'),
             default: '5',
             required: true,
             validate: function (string $value) {
                 if (! is_numeric($value) || (int) $value < 0) {
-                    return 'Please enter a valid non-negative number';
+                    return __('remote-sync::prompts.keep_count.validation');
                 }
 
                 return null;
@@ -191,10 +191,10 @@ class CleanupSnapshotsCommand extends Command
         }
 
         $choice = select(
-            label: 'Preview before deleting?',
+            label: __('remote-sync::prompts.preview.label'),
             options: [
-                'yes' => 'Yes - show what will be deleted (recommended)',
-                'no' => 'No - delete immediately',
+                'yes' => __('remote-sync::prompts.preview.yes'),
+                'no' => __('remote-sync::prompts.preview.no'),
             ],
             default: 'yes',
         );
@@ -215,7 +215,7 @@ class CleanupSnapshotsCommand extends Command
         }
 
         return select(
-            label: 'Select remote environment',
+            label: __('remote-sync::prompts.remote.label'),
             options: $remotes,
             default: config('remote-sync.default'),
         );
@@ -252,7 +252,7 @@ class CleanupSnapshotsCommand extends Command
         $result = $this->syncService->listRemoteSnapshots($this->remote);
 
         if (! $result->successful()) {
-            $this->components->warn('Failed to list remote snapshots: '.$result->errorOutput());
+            $this->components->warn(__('remote-sync::messages.errors.failed_list_snapshots', ['error' => $result->errorOutput()]));
 
             return [];
         }
@@ -304,7 +304,7 @@ class CleanupSnapshotsCommand extends Command
     protected function displaySnapshotsToDelete(array $localSnapshots, array $remoteSnapshots, int $keep): void
     {
         if (! empty($localSnapshots)) {
-            $this->components->info("Local snapshots to delete (keeping {$keep} most recent):");
+            $this->components->info(__('remote-sync::messages.info.local_snapshots_to_delete', ['count' => $keep]));
 
             foreach ($localSnapshots as $snapshot) {
                 $date = date('Y-m-d H:i:s', $snapshot['mtime']);
@@ -315,7 +315,7 @@ class CleanupSnapshotsCommand extends Command
         }
 
         if (! empty($remoteSnapshots)) {
-            $this->components->info("Remote snapshots to delete from [{$this->remote->name}] (keeping {$keep} most recent):");
+            $this->components->info(__('remote-sync::messages.info.remote_snapshots_to_delete', ['name' => $this->remote->name, 'count' => $keep]));
 
             foreach ($remoteSnapshots as $snapshot) {
                 $date = date('Y-m-d H:i:s', $snapshot['mtime']);
@@ -331,16 +331,16 @@ class CleanupSnapshotsCommand extends Command
         $parts = [];
 
         if ($localCount > 0) {
-            $parts[] = "{$localCount} local snapshot".($localCount > 1 ? 's' : '');
+            $parts[] = trans_choice('remote-sync::messages.info.deleted_local_snapshots', $localCount, ['count' => $localCount]);
         }
 
         if ($remoteCount > 0) {
-            $parts[] = "{$remoteCount} remote snapshot".($remoteCount > 1 ? 's' : '');
+            $parts[] = trans_choice('remote-sync::messages.info.deleted_remote_snapshots', $remoteCount, ['count' => $remoteCount]);
         }
 
         $summary = implode(' and ', $parts);
 
-        return $this->confirmWithTypedYes("Delete {$summary}? Type \"yes\" to continue");
+        return $this->confirmWithTypedYes(__('remote-sync::prompts.confirm.cleanup', ['summary' => $summary]));
     }
 
     /**
@@ -348,7 +348,7 @@ class CleanupSnapshotsCommand extends Command
      */
     protected function cleanupLocalSnapshots(array $snapshots): int
     {
-        $this->components->task('Cleaning up local snapshots', function () use ($snapshots) {
+        $this->components->task(__('remote-sync::messages.cleanup.cleaning_local'), function () use ($snapshots) {
             foreach ($snapshots as $snapshot) {
                 if (file_exists($snapshot['path'])) {
                     unlink($snapshot['path']);
@@ -358,7 +358,7 @@ class CleanupSnapshotsCommand extends Command
             return true;
         });
 
-        $this->components->info('Deleted '.count($snapshots).' local snapshot'.(count($snapshots) > 1 ? 's' : '').'.');
+        $this->components->info(trans_choice('remote-sync::messages.info.deleted_local_snapshots', count($snapshots), ['count' => count($snapshots)]));
 
         return self::SUCCESS;
     }
@@ -374,7 +374,7 @@ class CleanupSnapshotsCommand extends Command
             $result = $this->syncService->deleteRemoteSnapshot($this->remote, $snapshot['name']);
 
             if (! $result->successful()) {
-                $this->components->warn("Failed to delete remote snapshot: {$snapshot['name']}");
+                $this->components->warn(__('remote-sync::messages.errors.failed_delete_snapshot', ['name' => $snapshot['name']]));
                 $failed++;
             }
         }
@@ -382,7 +382,7 @@ class CleanupSnapshotsCommand extends Command
         $deleted = count($snapshots) - $failed;
 
         if ($deleted > 0) {
-            $this->components->info("Deleted {$deleted} remote snapshot".($deleted > 1 ? 's' : '').'.');
+            $this->components->info(trans_choice('remote-sync::messages.info.deleted_remote_snapshots', $deleted, ['count' => $deleted]));
         }
 
         return $failed > 0 ? self::FAILURE : self::SUCCESS;

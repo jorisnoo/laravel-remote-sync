@@ -46,7 +46,7 @@ class PushFilesCommand extends Command
         $paths = $this->getPathsToPush();
 
         if (empty($paths)) {
-            $this->components->warn('No paths configured for pushing.');
+            $this->components->warn(__('remote-sync::messages.warnings.no_paths_push'));
 
             return self::SUCCESS;
         }
@@ -55,7 +55,7 @@ class PushFilesCommand extends Command
         $this->shouldDelete = $this->promptDeleteOption('remote');
 
         if ($this->isDryRun) {
-            $this->components->info('Dry run mode - no changes will be made.');
+            $this->components->info(__('remote-sync::messages.info.dry_run_mode'));
 
             return $this->performDryRun($paths);
         }
@@ -63,12 +63,12 @@ class PushFilesCommand extends Command
         if (! $this->option('force')) {
             if ($this->shouldDelete) {
                 if (! $this->confirmDeleteOnRemote()) {
-                    $this->components->info('Operation cancelled.');
+                    $this->components->info(__('remote-sync::messages.info.operation_cancelled'));
 
                     return self::SUCCESS;
                 }
             } elseif (! $this->confirmPush('files')) {
-                $this->components->info('Operation cancelled.');
+                $this->components->info(__('remote-sync::messages.info.operation_cancelled'));
 
                 return self::SUCCESS;
             }
@@ -80,7 +80,7 @@ class PushFilesCommand extends Command
             }
         }
 
-        $this->components->success("Files pushed to [{$this->remote->name}].");
+        $this->components->success(__('remote-sync::messages.success.files_pushed', ['name' => $this->remote->name]));
 
         return self::SUCCESS;
     }
@@ -96,10 +96,10 @@ class PushFilesCommand extends Command
 
     protected function confirmDeleteOnRemote(): bool
     {
-        $this->components->warn("WARNING: Files on [{$this->remote->name}] that don't exist locally will be DELETED.");
+        $this->components->warn(__('remote-sync::messages.warnings.delete_warning', ['name' => $this->remote->name]));
 
         return $this->confirmWithTypedYes(
-            "Push local files to [{$this->remote->name}] with deletion? Type \"yes\" to continue"
+            __('remote-sync::prompts.confirm.delete_remote', ['name' => $this->remote->name])
         );
     }
 
@@ -109,7 +109,7 @@ class PushFilesCommand extends Command
             $localPath = storage_path($path);
 
             if (! is_dir($localPath)) {
-                $this->components->warn("Local path does not exist: {$path}");
+                $this->components->warn(__('remote-sync::messages.warnings.local_path_not_exists', ['path' => $path]));
 
                 continue;
             }
@@ -117,7 +117,7 @@ class PushFilesCommand extends Command
             $localPath = rtrim($localPath, '/').'/';
             $remotePath = "{$this->remote->storagePath()}/{$path}/";
 
-            $this->components->info("Would sync: {$path}");
+            $this->components->info(__('remote-sync::messages.info.would_sync_path', ['path' => $path]));
 
             $options = ['--partial', '--info=progress2', '--dry-run'];
 
@@ -133,7 +133,7 @@ class PushFilesCommand extends Command
             );
 
             if (! $result->successful()) {
-                $this->components->error("Dry run failed for {$path}: {$result->errorOutput()}");
+                $this->components->error(__('remote-sync::messages.errors.failed_dry_run', ['path' => $path, 'error' => $result->errorOutput()]));
 
                 return self::FAILURE;
             }
@@ -147,7 +147,7 @@ class PushFilesCommand extends Command
         $localPath = storage_path($path);
 
         if (! is_dir($localPath)) {
-            $this->components->warn("Local path does not exist: {$path}");
+            $this->components->warn(__('remote-sync::messages.warnings.local_path_not_exists', ['path' => $path]));
 
             return true;
         }
@@ -155,7 +155,7 @@ class PushFilesCommand extends Command
         $localPath = rtrim($localPath, '/').'/';
         $remotePath = "{$this->remote->storagePath()}/{$path}/";
 
-        $this->components->info("Pushing: {$path}");
+        $this->components->info(__('remote-sync::messages.info.pushing_path', ['path' => $path]));
 
         $options = ['--partial', '--info=progress2'];
 
@@ -171,7 +171,7 @@ class PushFilesCommand extends Command
         );
 
         if (! $result->successful()) {
-            $this->components->error("Failed to push {$path}: {$result->errorOutput()}");
+            $this->components->error(__('remote-sync::messages.errors.failed_push_path', ['path' => $path, 'error' => $result->errorOutput()]));
 
             return false;
         }

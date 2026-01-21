@@ -19,6 +19,7 @@ class LaravelRemoteSyncServiceProvider extends PackageServiceProvider
         $package
             ->name('remote-sync')
             ->hasConfigFile()
+            ->hasTranslations()
             ->hasCommands([
                 SyncRemoteCommand::class,
                 SyncDatabaseCommand::class,

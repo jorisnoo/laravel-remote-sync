@@ -58,13 +58,13 @@ class SyncDatabaseCommand extends Command
         $this->keepSnapshot = $this->promptKeepSnapshot();
 
         if (! $this->option('force') && ! $this->confirmSync('database')) {
-            $this->components->info('Operation cancelled.');
+            $this->components->info(__('remote-sync::messages.info.operation_cancelled'));
 
             return self::SUCCESS;
         }
 
         $this->trap([SIGTERM, SIGINT], function () {
-            $this->components->warn('Received interrupt signal, cleaning up...');
+            $this->components->warn(__('remote-sync::messages.warnings.interrupt_cleanup'));
             $this->cleanupRemoteSnapshot();
             exit(1);
         });
@@ -95,7 +95,7 @@ class SyncDatabaseCommand extends Command
 
         $this->cleanupRemoteSnapshot();
 
-        $this->components->success("Database synced from [{$this->remote->name}].");
+        $this->components->success(__('remote-sync::messages.success.database_synced', ['name' => $this->remote->name]));
 
         return self::SUCCESS;
     }
@@ -103,7 +103,7 @@ class SyncDatabaseCommand extends Command
     protected function createLocalBackup(): void
     {
         $backupName = 'local-before-sync-'.date('Y-m-d-H-i-s');
-        $this->components->info("Creating local backup: {$backupName}");
+        $this->components->info(__('remote-sync::messages.info.creating_local_backup', ['name' => $backupName]));
         $this->call(SnapshotCreate::class, ['name' => $backupName]);
     }
 
@@ -111,17 +111,17 @@ class SyncDatabaseCommand extends Command
     {
         $result = spin(
             callback: fn () => $this->syncService->createRemoteSnapshot($this->remote, $this->snapshotName, $this->fullImport),
-            message: "Creating snapshot on [{$this->remote->name}]..."
+            message: __('remote-sync::messages.spinners.creating_remote_snapshot', ['name' => $this->remote->name])
         );
 
         if (! $result->successful()) {
-            $this->components->error("Failed to create remote snapshot: {$result->errorOutput()}");
+            $this->components->error(__('remote-sync::messages.errors.failed_remote_snapshot', ['error' => $result->errorOutput()]));
 
             return false;
         }
 
         $this->remoteSnapshotCreated = true;
-        $this->components->info('Remote snapshot created.');
+        $this->components->info(__('remote-sync::messages.info.remote_snapshot_created'));
 
         return true;
     }
@@ -134,24 +134,24 @@ class SyncDatabaseCommand extends Command
             mkdir($localPath, 0755, true);
         }
 
-        $this->components->info("Downloading snapshot from [{$this->remote->name}]...");
+        $this->components->info(__('remote-sync::messages.info.downloading_snapshot', ['name' => $this->remote->name]));
 
         $result = $this->syncService->downloadSnapshot($this->remote, $this->snapshotName, $localPath);
 
         if (! $result->successful()) {
-            $this->components->error("Failed to download snapshot: {$result->errorOutput()}");
+            $this->components->error(__('remote-sync::messages.errors.failed_download_snapshot', ['error' => $result->errorOutput()]));
 
             return false;
         }
 
-        $this->components->info('Snapshot downloaded.');
+        $this->components->info(__('remote-sync::messages.info.snapshot_downloaded'));
 
         return true;
     }
 
     protected function loadSnapshot(): bool
     {
-        $this->components->info('Loading snapshot into database...');
+        $this->components->info(__('remote-sync::messages.info.loading_snapshot'));
 
         $exitCode = $this->call(SnapshotLoad::class, [
             'name' => $this->snapshotName,
@@ -160,12 +160,12 @@ class SyncDatabaseCommand extends Command
         ]);
 
         if ($exitCode !== 0) {
-            $this->components->error('Failed to load snapshot.');
+            $this->components->error(__('remote-sync::messages.errors.failed_load_snapshot'));
 
             return false;
         }
 
-        $this->components->info('Snapshot loaded.');
+        $this->components->info(__('remote-sync::messages.info.snapshot_loaded'));
 
         if (! $this->fullImport) {
             $this->truncateExcludedTables();
@@ -210,7 +210,7 @@ class SyncDatabaseCommand extends Command
 
         if (file_exists($snapshotPath)) {
             unlink($snapshotPath);
-            $this->components->info('Local snapshot file removed.');
+            $this->components->info(__('remote-sync::messages.info.local_snapshot_removed'));
         }
     }
 
@@ -222,11 +222,11 @@ class SyncDatabaseCommand extends Command
 
         $result = spin(
             callback: fn () => $this->syncService->deleteRemoteSnapshot($this->remote, $this->snapshotName),
-            message: 'Cleaning up remote snapshot...'
+            message: __('remote-sync::messages.spinners.cleaning_remote_snapshot')
         );
 
         if (! $result->successful()) {
-            $this->components->warn("Failed to delete remote snapshot. You may need to manually clean up: {$this->snapshotName}");
+            $this->components->warn(__('remote-sync::messages.warnings.manual_cleanup_needed', ['name' => $this->snapshotName]));
         }
     }
 
@@ -236,11 +236,11 @@ class SyncDatabaseCommand extends Command
 
         $remoteDriver = spin(
             callback: fn () => $this->syncService->getRemoteDatabaseDriver($this->remote),
-            message: 'Detecting remote database driver...'
+            message: __('remote-sync::messages.spinners.detecting_driver')
         );
 
         if ($remoteDriver === null) {
-            $this->components->warn('Could not detect remote database driver. Proceeding anyway...');
+            $this->components->warn(__('remote-sync::messages.warnings.driver_detection_failed'));
 
             return true;
         }
@@ -250,10 +250,10 @@ class SyncDatabaseCommand extends Command
 
         if ($normalizedLocal !== $normalizedRemote) {
             $this->components->error(
-                "Database driver mismatch: remote uses [{$remoteDriver}] but local uses [{$localDriver}]."
+                __('remote-sync::messages.errors.driver_mismatch_sync', ['remote' => $remoteDriver, 'local' => $localDriver])
             );
             $this->components->error(
-                'Cross-database sync is not supported. Both environments must use the same database driver.'
+                __('remote-sync::messages.errors.cross_database_not_supported')
             );
 
             return false;
