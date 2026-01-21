@@ -3,10 +3,15 @@
     "description": "Sync database and files from remote Laravel hosts using laravel-db-snapshots and rsync",
     "homepage": "https://github.com/jorisnoo/laravel-remote-sync",
     "license": "MIT",
+    "support": {
+        "source": "https://github.com/jorisnoo/laravel-remote-sync",
+        "issues": "https://github.com/jorisnoo/laravel-remote-sync/issues"
+    },
     "authors": [
         {
             "name": "Joris Noordermeer",
             "email": "contact@noordermeer.ch",
+            "homepage": "https://github.com/jorisnoo",
             "role": "Developer"
         }
     ],
