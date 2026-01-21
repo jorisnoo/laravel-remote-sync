@@ -13,6 +13,7 @@ class SyncFilesCommand extends Command
         {remote? : The remote environment to sync from}
         {--path= : Sync only a specific path (relative to storage/)}
         {--delete : Delete local files that do not exist on remote}
+        {--dry-run : Show what would be transferred without making changes}
         {--force : Skip confirmation prompt}';
 
     protected $description = 'Sync storage files from a remote environment';
@@ -89,6 +90,10 @@ class SyncFilesCommand extends Command
 
         if ($this->shouldDelete) {
             $options[] = '--delete';
+        }
+
+        if ($this->option('dry-run')) {
+            $options[] = '--dry-run';
         }
 
         $result = $this->syncService->rsync(
