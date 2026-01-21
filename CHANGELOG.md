@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.1](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.3.1) (2026-01-21)
+
+### Features
+
+- add empty database check with migration prompt for standard import ([9c17379](https://github.com/jorisnoo/laravel-remote-sync/commit/9c17379c9a4249fa0e402dd9256d965abc80195b))
+- ignore dotfiles when syncing ([c66f351](https://github.com/jorisnoo/laravel-remote-sync/commit/c66f3510e4df56b15c3ca01e6f593079921eef96))
+
+### Bug Fixes
+
+- drop Windows from test matrix due to sqlite3 unavailability ([d293a02](https://github.com/jorisnoo/laravel-remote-sync/commit/d293a0233b1e56f4dbb3717fab46251f09df85b8))
+- add Windows compatibility for signal constants ([22ea864](https://github.com/jorisnoo/laravel-remote-sync/commit/22ea8647bed6901292b99b75ab63b96df79b7eb1))
+- add security hardening for command injection and path traversal ([3759ef7](https://github.com/jorisnoo/laravel-remote-sync/commit/3759ef7cc02467a8c2e78e9d4b3f7c7cd2c184de))
+- tests ([26bc901](https://github.com/jorisnoo/laravel-remote-sync/commit/26bc901c86a577de951f0e74cce99165d42276c0))
+
+### Build System
+
+- link to changelog in release file ([43d966a](https://github.com/jorisnoo/laravel-remote-sync/commit/43d966ab8d199a7f93c58bdb59cafa1131a27e95))
+- update release workflow ([c574102](https://github.com/jorisnoo/laravel-remote-sync/commit/c5741024883a2876b1b03dd37194f0d99ba2f596))
 ## [0.3.0](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.3.0) (2026-01-21)
 
 ### Features
