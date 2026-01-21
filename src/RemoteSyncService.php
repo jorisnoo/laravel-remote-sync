@@ -29,6 +29,7 @@ class RemoteSyncService
             host: $remote['host'],
             path: $remote['path'],
             pushAllowed: $remote['push_allowed'] ?? false,
+            isAtomic: str_ends_with($remote['path'], '/current') ? true : null,
         );
     }
 

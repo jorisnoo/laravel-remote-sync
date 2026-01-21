@@ -14,7 +14,7 @@ readonly class RemoteConfig
 
     public function workingPath(): string
     {
-        if ($this->isAtomic === true) {
+        if ($this->isAtomic === true && ! str_ends_with($this->path, '/current')) {
             return "{$this->path}/current";
         }
 

@@ -19,9 +19,7 @@ trait InteractsWithRemote
         $this->syncService = app(RemoteSyncService::class);
         $this->remote = $this->syncService->getRemote($remoteName);
 
-        if (str_ends_with($this->remote->path, '/current')) {
-            $this->remote = $this->remote->withAtomicDetection(true);
-        } else {
+        if ($this->remote->isAtomic === null) {
             $isAtomic = $this->syncService->isAtomicDeployment($this->remote);
             $this->remote = $this->remote->withAtomicDetection($isAtomic);
         }
