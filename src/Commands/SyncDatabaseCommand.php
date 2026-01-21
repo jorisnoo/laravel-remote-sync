@@ -8,6 +8,7 @@ use Noo\LaravelRemoteSync\Concerns\InteractsWithRemote;
 use Spatie\DbSnapshots\Commands\Create as SnapshotCreate;
 use Spatie\DbSnapshots\Commands\Load as SnapshotLoad;
 
+use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\spin;
 
 class SyncDatabaseCommand extends Command
@@ -56,6 +57,10 @@ class SyncDatabaseCommand extends Command
         $this->shouldBackup = $this->promptBackupOption();
         $this->fullImport = $this->promptImportMode();
         $this->keepSnapshot = $this->promptKeepSnapshot();
+
+        if (! $this->checkEmptyDatabaseAndOfferMigrations()) {
+            return self::FAILURE;
+        }
 
         if (! $this->option('force') && ! $this->confirmSync('database')) {
             $this->components->info(__('remote-sync::messages.info.operation_cancelled'));
@@ -202,6 +207,48 @@ class SyncDatabaseCommand extends Command
         }
 
         $schemaBuilder->enableForeignKeyConstraints();
+    }
+
+    protected function checkEmptyDatabaseAndOfferMigrations(): bool
+    {
+        if ($this->fullImport) {
+            return true;
+        }
+
+        if ($this->shouldSkipPrompts()) {
+            return true;
+        }
+
+        $schemaBuilder = DB::connection()->getSchemaBuilder();
+        $existingTables = $schemaBuilder->getTableListing();
+
+        if (! empty($existingTables)) {
+            return true;
+        }
+
+        $runMigrations = confirm(
+            label: __('remote-sync::prompts.empty_database.label'),
+            default: true,
+            hint: __('remote-sync::prompts.empty_database.hint'),
+        );
+
+        if (! $runMigrations) {
+            return true;
+        }
+
+        $this->components->info(__('remote-sync::messages.info.running_migrations'));
+
+        $exitCode = $this->call('migrate', ['--force' => true]);
+
+        if ($exitCode !== 0) {
+            $this->components->error(__('remote-sync::messages.errors.migrations_failed'));
+
+            return false;
+        }
+
+        $this->components->info(__('remote-sync::messages.info.migrations_completed'));
+
+        return true;
     }
 
     protected function cleanupLocalSnapshot(): void

@@ -30,6 +30,7 @@ return [
         'invalid_path' => 'Invalid path: :path',
         'storage_not_accessible' => 'Storage directory is not accessible.',
         'path_traversal' => 'Path traversal detected: :path must be within the storage directory.',
+        'migrations_failed' => 'Migrations failed. Aborting sync.',
     ],
 
     /*
@@ -60,6 +61,8 @@ return [
         'would_sync_path' => 'Would sync: :path',
         'no_cleanup_targets' => 'No cleanup targets selected.',
         'no_snapshots_to_cleanup' => 'No snapshots to cleanup.',
+        'running_migrations' => 'Running migrations...',
+        'migrations_completed' => 'Migrations completed.',
         'local_snapshots_to_delete' => 'Local snapshots to delete (keeping :count most recent):',
         'remote_snapshots_to_delete' => 'Remote snapshots to delete from [:name] (keeping :count most recent):',
         'cleanup_cancelled' => 'Cleanup cancelled.',
