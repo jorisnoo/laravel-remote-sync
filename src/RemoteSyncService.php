@@ -99,7 +99,13 @@ class RemoteSyncService
         $timeout ??= config('remote-sync.timeouts.file_sync', 1800);
 
         $defaultOptions = ['-avz', '--progress'];
-        $options = array_merge($defaultOptions, $options);
+
+        $excludePaths = config('remote-sync.exclude_paths', []);
+        $excludeOptions = collect($excludePaths)
+            ->map(fn (string $pattern) => "--exclude={$pattern}")
+            ->all();
+
+        $options = array_merge($defaultOptions, $excludeOptions, $options);
 
         $source = "{$remote->host}:{$sourcePath}";
 
@@ -189,7 +195,13 @@ class RemoteSyncService
         $timeout ??= config('remote-sync.timeouts.file_sync', 1800);
 
         $defaultOptions = ['-avz', '--progress'];
-        $options = array_merge($defaultOptions, $options);
+
+        $excludePaths = config('remote-sync.exclude_paths', []);
+        $excludeOptions = collect($excludePaths)
+            ->map(fn (string $pattern) => "--exclude={$pattern}")
+            ->all();
+
+        $options = array_merge($defaultOptions, $excludeOptions, $options);
 
         $destination = "{$remote->host}:{$destinationPath}";
 
