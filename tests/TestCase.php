@@ -34,6 +34,11 @@ class TestCase extends Orchestra
             'database' => ':memory:',
             'prefix' => '',
         ]);
+
+        config()->set('filesystems.disks.snapshots', [
+            'driver' => 'local',
+            'root' => storage_path('snapshots'),
+        ]);
     }
 
     protected function setUpRemoteConfig(array $remotes = [], ?string $default = null): void

@@ -13,7 +13,8 @@ class PushDatabaseCommand extends Command
     use InteractsWithRemote;
 
     protected $signature = 'remote-sync:push-database
-        {remote? : The remote environment to push to}';
+        {remote? : The remote environment to push to}
+        {--force : Skip confirmation prompt}';
 
     protected $description = 'Push the local database to a remote environment';
 
@@ -45,7 +46,7 @@ class PushDatabaseCommand extends Command
 
         $this->snapshotName = $this->generateSnapshotName();
 
-        if (! $this->confirmPush('database')) {
+        if (! $this->option('force') && ! $this->confirmPush('database')) {
             $this->components->info('Operation cancelled.');
 
             return self::SUCCESS;
@@ -109,18 +110,10 @@ class PushDatabaseCommand extends Command
     {
         $this->components->info("Creating local snapshot: {$this->snapshotName}");
 
-        $excludeTables = config('remote-sync.exclude_tables', []);
-        $excludeFlags = collect($excludeTables)
-            ->map(fn (string $table) => "--exclude={$table}")
-            ->toArray();
-
-        $arguments = array_merge(
-            ['name' => $this->snapshotName],
-            array_fill_keys($excludeFlags, true),
-            ['--compress' => true]
-        );
-
-        $exitCode = $this->call(SnapshotCreate::class, $arguments);
+        $exitCode = $this->call(SnapshotCreate::class, [
+            'name' => $this->snapshotName,
+            '--compress' => true,
+        ]);
 
         if ($exitCode !== 0) {
             $this->components->error('Failed to create local snapshot.');

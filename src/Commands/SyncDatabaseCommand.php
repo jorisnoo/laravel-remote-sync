@@ -18,13 +18,20 @@ class SyncDatabaseCommand extends Command
         {remote? : The remote environment to sync from}
         {--no-backup : Skip creating a local backup before syncing}
         {--keep-snapshot : Keep the downloaded snapshot file after loading}
-        {--full : Include all tables (no exclusions) and drop tables before loading}';
+        {--full : Include all tables (no exclusions) and drop tables before loading}
+        {--force : Skip confirmation prompt}';
 
     protected $description = 'Sync the database from a remote environment';
 
     protected string $snapshotName;
 
     protected bool $remoteSnapshotCreated = false;
+
+    protected bool $shouldBackup;
+
+    protected bool $fullImport;
+
+    protected bool $keepSnapshot;
 
     public function handle(): int
     {
@@ -46,7 +53,11 @@ class SyncDatabaseCommand extends Command
 
         $this->snapshotName = $this->generateSnapshotName();
 
-        if (! $this->confirmSync('database')) {
+        $this->shouldBackup = $this->promptBackupOption();
+        $this->fullImport = $this->promptImportMode();
+        $this->keepSnapshot = $this->promptKeepSnapshot();
+
+        if (! $this->option('force') && ! $this->confirmSync('database')) {
             $this->components->info('Operation cancelled.');
 
             return self::SUCCESS;
@@ -58,7 +69,7 @@ class SyncDatabaseCommand extends Command
             exit(1);
         });
 
-        if (! $this->option('no-backup')) {
+        if ($this->shouldBackup) {
             $this->createLocalBackup();
         }
 
@@ -78,7 +89,7 @@ class SyncDatabaseCommand extends Command
             return self::FAILURE;
         }
 
-        if (! $this->option('keep-snapshot')) {
+        if (! $this->keepSnapshot) {
             $this->cleanupLocalSnapshot();
         }
 
@@ -98,10 +109,8 @@ class SyncDatabaseCommand extends Command
 
     protected function createRemoteSnapshot(): bool
     {
-        $full = $this->option('full');
-
         $result = spin(
-            callback: fn () => $this->syncService->createRemoteSnapshot($this->remote, $this->snapshotName, $full),
+            callback: fn () => $this->syncService->createRemoteSnapshot($this->remote, $this->snapshotName, $this->fullImport),
             message: "Creating snapshot on [{$this->remote->name}]..."
         );
 
@@ -142,14 +151,12 @@ class SyncDatabaseCommand extends Command
 
     protected function loadSnapshot(): bool
     {
-        $full = $this->option('full');
-
         $this->components->info('Loading snapshot into database...');
 
         $exitCode = $this->call(SnapshotLoad::class, [
             'name' => $this->snapshotName,
             '--force' => true,
-            '--drop-tables' => $full ? 1 : 0,
+            '--drop-tables' => $this->fullImport ? 1 : 0,
         ]);
 
         if ($exitCode !== 0) {
@@ -160,7 +167,7 @@ class SyncDatabaseCommand extends Command
 
         $this->components->info('Snapshot loaded.');
 
-        if (! $full) {
+        if (! $this->fullImport) {
             $this->truncateExcludedTables();
         }
 
@@ -170,6 +177,11 @@ class SyncDatabaseCommand extends Command
     protected function truncateExcludedTables(): void
     {
         $excludedTables = config('remote-sync.exclude_tables', []);
+
+        if (empty($excludedTables)) {
+            return;
+        }
+
         $schemaBuilder = DB::connection()->getSchemaBuilder();
 
         $existingTables = $schemaBuilder->getTableListing();

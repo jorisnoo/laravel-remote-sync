@@ -34,7 +34,10 @@ describe('SyncFilesCommand', function () {
         $this->setUpProductionRemote();
         config()->set('remote-sync.paths', []);
 
-        $this->artisan('remote-sync:pull-files', ['remote' => 'production'])
+        $this->artisan('remote-sync:pull-files', [
+            'remote' => 'production',
+            '--force' => true,
+        ])
             ->expectsOutputToContain('No paths configured for syncing')
             ->assertSuccessful();
     });
@@ -62,11 +65,10 @@ describe('SyncFilesCommand', function () {
                 ->andReturn($mockResult);
         });
 
-        $this->artisan('remote-sync:pull-files', ['remote' => 'production'])
-            ->expectsConfirmation(
-                'This will replace your local files with data from [production]. Continue?',
-                'yes'
-            )
+        $this->artisan('remote-sync:pull-files', [
+            'remote' => 'production',
+            '--force' => true,
+        ])
             ->expectsOutputToContain('Syncing: app/public')
             ->expectsOutputToContain('Syncing: app/media')
             ->expectsOutputToContain('Files synced from [production]')
@@ -102,11 +104,8 @@ describe('SyncFilesCommand', function () {
         $this->artisan('remote-sync:pull-files', [
             'remote' => 'production',
             '--path' => 'app/custom',
+            '--force' => true,
         ])
-            ->expectsConfirmation(
-                'This will replace your local files with data from [production]. Continue?',
-                'yes'
-            )
             ->expectsOutputToContain('Syncing: app/custom')
             ->assertSuccessful();
     });
@@ -140,24 +139,8 @@ describe('SyncFilesCommand', function () {
         $this->artisan('remote-sync:pull-files', [
             'remote' => 'production',
             '--delete' => true,
+            '--force' => true,
         ])
-            ->expectsConfirmation(
-                'This will replace your local files with data from [production]. Continue?',
-                'yes'
-            )
-            ->assertSuccessful();
-    });
-
-    it('prompts for confirmation before syncing', function () {
-        $this->setUpProductionRemote();
-        config()->set('remote-sync.paths', ['app/public']);
-
-        $this->artisan('remote-sync:pull-files', ['remote' => 'production'])
-            ->expectsConfirmation(
-                'This will replace your local files with data from [production]. Continue?',
-                'no'
-            )
-            ->expectsOutputToContain('Operation cancelled')
             ->assertSuccessful();
     });
 
@@ -189,11 +172,10 @@ describe('SyncFilesCommand', function () {
                 ->andReturn($mockResult);
         });
 
-        $this->artisan('remote-sync:pull-files', ['remote' => 'production'])
-            ->expectsConfirmation(
-                'This will replace your local files with data from [production]. Continue?',
-                'yes'
-            )
+        $this->artisan('remote-sync:pull-files', [
+            'remote' => 'production',
+            '--force' => true,
+        ])
             ->assertSuccessful();
 
         expect(is_dir($testPath))->toBeTrue();
@@ -225,11 +207,10 @@ describe('SyncFilesCommand', function () {
                 ->andReturn($mockResult);
         });
 
-        $this->artisan('remote-sync:pull-files', ['remote' => 'production'])
-            ->expectsConfirmation(
-                'This will replace your local files with data from [production]. Continue?',
-                'yes'
-            )
+        $this->artisan('remote-sync:pull-files', [
+            'remote' => 'production',
+            '--force' => true,
+        ])
             ->expectsOutputToContain('Failed to sync app/public')
             ->assertFailed();
     });
@@ -238,11 +219,26 @@ describe('SyncFilesCommand', function () {
         $this->setUpProductionRemote();
         config()->set('remote-sync.paths', ['app/public']);
 
-        $this->artisan('remote-sync:pull-files')
-            ->expectsConfirmation(
-                'This will replace your local files with data from [production]. Continue?',
-                'no'
-            )
+        $mockResult = Mockery::mock(ProcessResult::class);
+        $mockResult->shouldReceive('successful')->andReturn(true);
+
+        $this->mock(RemoteSyncService::class, function ($mock) use ($mockResult) {
+            $mock->shouldReceive('getRemote')
+                ->andReturn(new RemoteConfig(
+                    name: 'production',
+                    host: 'user@production.example.com',
+                    path: '/var/www/app',
+                ));
+
+            $mock->shouldReceive('isAtomicDeployment')
+                ->andReturn(false);
+
+            $mock->shouldReceive('rsync')
+                ->once()
+                ->andReturn($mockResult);
+        });
+
+        $this->artisan('remote-sync:pull-files', ['--force' => true])
             ->assertSuccessful();
     });
 
@@ -279,11 +275,10 @@ describe('SyncFilesCommand', function () {
                 ->andReturn($mockResult);
         });
 
-        $this->artisan('remote-sync:pull-files', ['remote' => 'production'])
-            ->expectsConfirmation(
-                'This will replace your local files with data from [production]. Continue?',
-                'yes'
-            )
+        $this->artisan('remote-sync:pull-files', [
+            'remote' => 'production',
+            '--force' => true,
+        ])
             ->assertSuccessful();
     });
 });

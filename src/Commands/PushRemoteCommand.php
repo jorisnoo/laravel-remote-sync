@@ -14,9 +14,15 @@ class PushRemoteCommand extends Command
     use InteractsWithRemote;
 
     protected $signature = 'remote-sync:push
-        {remote? : The remote environment to push to}';
+        {remote? : The remote environment to push to}
+        {--dry-run : Show what would be synced without making changes}
+        {--delete : Delete remote files that do not exist locally}';
 
     protected $description = 'Push database and/or files to a remote environment';
+
+    protected bool $isDryRun;
+
+    protected bool $shouldDelete;
 
     public function handle(): int
     {
@@ -52,9 +58,17 @@ class PushRemoteCommand extends Command
             return self::SUCCESS;
         }
 
+        $pushDatabase = in_array('database', $operations);
+        $pushFiles = in_array('files', $operations);
+
+        if ($pushFiles) {
+            $this->isDryRun = $this->promptDryRunOption();
+            $this->shouldDelete = $this->promptDeleteOption('remote');
+        }
+
         $exitCode = self::SUCCESS;
 
-        if (in_array('database', $operations)) {
+        if ($pushDatabase) {
             $exitCode = $this->pushDatabase();
 
             if ($exitCode !== self::SUCCESS) {
@@ -62,7 +76,7 @@ class PushRemoteCommand extends Command
             }
         }
 
-        if (in_array('files', $operations)) {
+        if ($pushFiles) {
             $exitCode = $this->pushFiles();
         }
 
@@ -117,6 +131,9 @@ class PushRemoteCommand extends Command
     {
         return $this->call(PushFilesCommand::class, [
             'remote' => $this->remote->name,
+            '--dry-run' => $this->isDryRun,
+            '--delete' => $this->shouldDelete,
+            '--force' => true,
         ]);
     }
 }

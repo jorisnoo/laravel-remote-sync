@@ -12,9 +12,14 @@ class SyncFilesCommand extends Command
     protected $signature = 'remote-sync:pull-files
         {remote? : The remote environment to sync from}
         {--path= : Sync only a specific path (relative to storage/)}
-        {--delete : Delete local files that do not exist on remote}';
+        {--delete : Delete local files that do not exist on remote}
+        {--force : Skip confirmation prompt}';
 
     protected $description = 'Sync storage files from a remote environment';
+
+    protected ?string $specificPath = null;
+
+    protected bool $shouldDelete;
 
     public function handle(): int
     {
@@ -30,6 +35,7 @@ class SyncFilesCommand extends Command
             return self::FAILURE;
         }
 
+        $this->specificPath = $this->promptPathSelection();
         $paths = $this->getPathsToSync();
 
         if (empty($paths)) {
@@ -38,7 +44,9 @@ class SyncFilesCommand extends Command
             return self::SUCCESS;
         }
 
-        if (! $this->confirmSync('files')) {
+        $this->shouldDelete = $this->promptDeleteOption('local');
+
+        if (! $this->option('force') && ! $this->confirmSync('files')) {
             $this->components->info('Operation cancelled.');
 
             return self::SUCCESS;
@@ -57,8 +65,8 @@ class SyncFilesCommand extends Command
 
     protected function getPathsToSync(): array
     {
-        if ($specificPath = $this->option('path')) {
-            return [$specificPath];
+        if ($this->specificPath !== null) {
+            return [$this->specificPath];
         }
 
         return config('remote-sync.paths', []);
@@ -79,7 +87,7 @@ class SyncFilesCommand extends Command
 
         $options = ['--partial', '--info=progress2'];
 
-        if ($this->option('delete')) {
+        if ($this->shouldDelete) {
             $options[] = '--delete';
         }
 

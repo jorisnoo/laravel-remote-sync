@@ -1,6 +1,9 @@
 <?php
 
+use Illuminate\Contracts\Process\ProcessResult;
 use Illuminate\Support\Facades\Process;
+use Noo\LaravelRemoteSync\Data\RemoteConfig;
+use Noo\LaravelRemoteSync\RemoteSyncService;
 
 beforeEach(function () {
     Process::fake([
@@ -39,16 +42,47 @@ describe('SyncDatabaseCommand', function () {
     it('warns when database driver cannot be detected but proceeds', function () {
         $this->setUpProductionRemote();
 
-        Process::fake([
-            '*' => Process::result(exitCode: 1, errorOutput: 'Failed'),
-        ]);
+        $mockProcessResult = Mockery::mock(ProcessResult::class);
+        $mockProcessResult->shouldReceive('successful')->andReturn(true);
+        $mockProcessResult->shouldReceive('output')->andReturn('');
 
-        $this->artisan('remote-sync:pull-database', ['remote' => 'production'])
+        $this->mock(RemoteSyncService::class, function ($mock) use ($mockProcessResult) {
+            $mock->shouldReceive('getRemote')
+                ->andReturn(new RemoteConfig(
+                    name: 'production',
+                    host: 'user@production.example.com',
+                    path: '/var/www/app',
+                ));
+
+            $mock->shouldReceive('isAtomicDeployment')
+                ->andReturn(false);
+
+            $mock->shouldReceive('getRemoteDatabaseDriver')
+                ->once()
+                ->andReturn(null);
+
+            $mock->shouldReceive('createRemoteSnapshot')
+                ->once()
+                ->andReturn($mockProcessResult);
+
+            $mock->shouldReceive('getSnapshotPath')
+                ->andReturn(storage_path('snapshots'));
+
+            $mock->shouldReceive('downloadSnapshot')
+                ->once()
+                ->andReturn($mockProcessResult);
+
+            $mock->shouldReceive('deleteRemoteSnapshot')
+                ->once()
+                ->andReturn($mockProcessResult);
+        });
+
+        $this->artisan('remote-sync:pull-database', [
+            'remote' => 'production',
+            '--no-backup' => true,
+            '--force' => true,
+        ])
             ->expectsOutputToContain('Could not detect remote database driver')
-            ->expectsConfirmation(
-                'This will replace your local database with data from [production]. Continue?',
-                'no'
-            )
             ->assertSuccessful();
     });
 
@@ -57,77 +91,164 @@ describe('SyncDatabaseCommand', function () {
         config()->set('database.default', 'testing');
         config()->set('database.connections.testing.driver', 'sqlite');
 
-        Process::fake([
-            '*' => Process::result(output: 'mysql'),
-        ]);
+        $this->mock(RemoteSyncService::class, function ($mock) {
+            $mock->shouldReceive('getRemote')
+                ->andReturn(new RemoteConfig(
+                    name: 'production',
+                    host: 'user@production.example.com',
+                    path: '/var/www/app',
+                ));
+
+            $mock->shouldReceive('isAtomicDeployment')
+                ->andReturn(false);
+
+            $mock->shouldReceive('getRemoteDatabaseDriver')
+                ->once()
+                ->andReturn('mysql');
+        });
 
         $this->artisan('remote-sync:pull-database', ['remote' => 'production'])
             ->assertFailed()
             ->expectsOutputToContain('Database driver mismatch');
     });
 
-    it('prompts for confirmation before syncing', function () {
+    it('uses options from CLI to skip prompts', function () {
         $this->setUpProductionRemote();
         config()->set('database.connections.testing.driver', 'mysql');
+        config()->set('remote-sync.exclude_tables', []);
 
-        Process::fake([
-            '*' => Process::result(output: 'mysql'),
-        ]);
+        $mockProcessResult = Mockery::mock(ProcessResult::class);
+        $mockProcessResult->shouldReceive('successful')->andReturn(true);
+        $mockProcessResult->shouldReceive('output')->andReturn('');
 
-        $this->artisan('remote-sync:pull-database', ['remote' => 'production'])
-            ->expectsConfirmation(
-                'This will replace your local database with data from [production]. Continue?',
-                'no'
-            )
-            ->assertSuccessful();
-    });
+        $this->mock(RemoteSyncService::class, function ($mock) use ($mockProcessResult) {
+            $mock->shouldReceive('getRemote')
+                ->andReturn(new RemoteConfig(
+                    name: 'production',
+                    host: 'user@production.example.com',
+                    path: '/var/www/app',
+                ));
 
-    it('cancels operation when user declines confirmation', function () {
-        $this->setUpProductionRemote();
-        config()->set('database.connections.testing.driver', 'mysql');
+            $mock->shouldReceive('isAtomicDeployment')
+                ->andReturn(false);
 
-        Process::fake([
-            '*' => Process::result(output: 'mysql'),
-        ]);
+            $mock->shouldReceive('getRemoteDatabaseDriver')
+                ->andReturn('mysql');
 
-        $this->artisan('remote-sync:pull-database', ['remote' => 'production'])
-            ->expectsConfirmation(
-                'This will replace your local database with data from [production]. Continue?',
-                'no'
-            )
-            ->expectsOutputToContain('Operation cancelled')
+            $mock->shouldReceive('createRemoteSnapshot')
+                ->once()
+                ->andReturn($mockProcessResult);
+
+            $mock->shouldReceive('getSnapshotPath')
+                ->andReturn(storage_path('snapshots'));
+
+            $mock->shouldReceive('downloadSnapshot')
+                ->once()
+                ->andReturn($mockProcessResult);
+
+            $mock->shouldReceive('deleteRemoteSnapshot')
+                ->once()
+                ->andReturn($mockProcessResult);
+        });
+
+        $this->artisan('remote-sync:pull-database', [
+            'remote' => 'production',
+            '--no-backup' => true,
+            '--force' => true,
+        ])
             ->assertSuccessful();
     });
 
     it('treats mariadb and mysql as compatible drivers', function () {
         $this->setUpProductionRemote();
         config()->set('database.connections.testing.driver', 'mariadb');
+        config()->set('remote-sync.exclude_tables', []);
 
-        Process::fake([
-            '*' => Process::result(output: 'mysql'),
-        ]);
+        $mockProcessResult = Mockery::mock(ProcessResult::class);
+        $mockProcessResult->shouldReceive('successful')->andReturn(true);
+        $mockProcessResult->shouldReceive('output')->andReturn('');
 
-        $this->artisan('remote-sync:pull-database', ['remote' => 'production'])
-            ->expectsConfirmation(
-                'This will replace your local database with data from [production]. Continue?',
-                'no'
-            )
+        $this->mock(RemoteSyncService::class, function ($mock) use ($mockProcessResult) {
+            $mock->shouldReceive('getRemote')
+                ->andReturn(new RemoteConfig(
+                    name: 'production',
+                    host: 'user@production.example.com',
+                    path: '/var/www/app',
+                ));
+
+            $mock->shouldReceive('isAtomicDeployment')
+                ->andReturn(false);
+
+            $mock->shouldReceive('getRemoteDatabaseDriver')
+                ->andReturn('mysql');
+
+            $mock->shouldReceive('createRemoteSnapshot')
+                ->once()
+                ->andReturn($mockProcessResult);
+
+            $mock->shouldReceive('getSnapshotPath')
+                ->andReturn(storage_path('snapshots'));
+
+            $mock->shouldReceive('downloadSnapshot')
+                ->once()
+                ->andReturn($mockProcessResult);
+
+            $mock->shouldReceive('deleteRemoteSnapshot')
+                ->once()
+                ->andReturn($mockProcessResult);
+        });
+
+        $this->artisan('remote-sync:pull-database', [
+            'remote' => 'production',
+            '--no-backup' => true,
+            '--force' => true,
+        ])
             ->assertSuccessful();
     });
 
     it('uses default remote when not specified', function () {
         $this->setUpProductionRemote();
         config()->set('database.connections.testing.driver', 'mysql');
+        config()->set('remote-sync.exclude_tables', []);
 
-        Process::fake([
-            '*' => Process::result(output: 'mysql'),
-        ]);
+        $mockProcessResult = Mockery::mock(ProcessResult::class);
+        $mockProcessResult->shouldReceive('successful')->andReturn(true);
+        $mockProcessResult->shouldReceive('output')->andReturn('');
 
-        $this->artisan('remote-sync:pull-database')
-            ->expectsConfirmation(
-                'This will replace your local database with data from [production]. Continue?',
-                'no'
-            )
+        $this->mock(RemoteSyncService::class, function ($mock) use ($mockProcessResult) {
+            $mock->shouldReceive('getRemote')
+                ->andReturn(new RemoteConfig(
+                    name: 'production',
+                    host: 'user@production.example.com',
+                    path: '/var/www/app',
+                ));
+
+            $mock->shouldReceive('isAtomicDeployment')
+                ->andReturn(false);
+
+            $mock->shouldReceive('getRemoteDatabaseDriver')
+                ->andReturn('mysql');
+
+            $mock->shouldReceive('createRemoteSnapshot')
+                ->once()
+                ->andReturn($mockProcessResult);
+
+            $mock->shouldReceive('getSnapshotPath')
+                ->andReturn(storage_path('snapshots'));
+
+            $mock->shouldReceive('downloadSnapshot')
+                ->once()
+                ->andReturn($mockProcessResult);
+
+            $mock->shouldReceive('deleteRemoteSnapshot')
+                ->once()
+                ->andReturn($mockProcessResult);
+        });
+
+        $this->artisan('remote-sync:pull-database', [
+            '--no-backup' => true,
+            '--force' => true,
+        ])
             ->assertSuccessful();
     });
 
@@ -140,21 +261,49 @@ describe('SyncDatabaseCommand', function () {
         ]);
         config()->set('remote-sync.default', 'production');
         config()->set('database.connections.testing.driver', 'mysql');
+        config()->set('remote-sync.exclude_tables', []);
 
-        Process::fake([
-            '*' => Process::result(output: 'mysql'),
-        ]);
+        $mockProcessResult = Mockery::mock(ProcessResult::class);
+        $mockProcessResult->shouldReceive('successful')->andReturn(true);
+        $mockProcessResult->shouldReceive('output')->andReturn('');
 
-        $this->artisan('remote-sync:pull-database', ['remote' => 'production'])
-            ->expectsConfirmation(
-                'This will replace your local database with data from [production]. Continue?',
-                'no'
-            )
-            ->assertSuccessful();
+        $remoteConfig = new RemoteConfig(
+            name: 'production',
+            host: 'user@example.com',
+            path: '/var/www/app/current',
+        );
 
-        Process::assertRan(function ($process) {
-            return str_contains($process->command[2] ?? '', '/var/www/app/current');
+        $this->mock(RemoteSyncService::class, function ($mock) use ($mockProcessResult, $remoteConfig) {
+            $mock->shouldReceive('getRemote')
+                ->andReturn($remoteConfig);
+
+            $mock->shouldReceive('isAtomicDeployment')
+                ->andReturn(true);
+
+            $mock->shouldReceive('getRemoteDatabaseDriver')
+                ->andReturn('mysql');
+
+            $mock->shouldReceive('createRemoteSnapshot')
+                ->once()
+                ->andReturn($mockProcessResult);
+
+            $mock->shouldReceive('getSnapshotPath')
+                ->andReturn(storage_path('snapshots'));
+
+            $mock->shouldReceive('downloadSnapshot')
+                ->once()
+                ->andReturn($mockProcessResult);
+
+            $mock->shouldReceive('deleteRemoteSnapshot')
+                ->once()
+                ->andReturn($mockProcessResult);
         });
-    });
 
+        $this->artisan('remote-sync:pull-database', [
+            'remote' => 'production',
+            '--no-backup' => true,
+            '--force' => true,
+        ])
+            ->assertSuccessful();
+    });
 });

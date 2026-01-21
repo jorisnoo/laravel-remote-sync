@@ -6,8 +6,9 @@ use Illuminate\Console\Command;
 use Noo\LaravelRemoteSync\Concerns\InteractsWithRemote;
 use Noo\LaravelRemoteSync\RemoteSyncService;
 
-use function Laravel\Prompts\confirm;
+use function Laravel\Prompts\multiselect;
 use function Laravel\Prompts\select;
+use function Laravel\Prompts\text;
 
 class CleanupSnapshotsCommand extends Command
 {
@@ -23,17 +24,29 @@ class CleanupSnapshotsCommand extends Command
 
     protected $description = 'Cleanup old database snapshots from local and/or remote storage';
 
+    protected bool $shouldCleanupLocal;
+
+    protected bool $shouldCleanupRemote;
+
+    protected int $keep;
+
+    protected bool $isDryRun;
+
     public function handle(): int
     {
-        $shouldCleanupLocal = $this->shouldCleanupLocal();
-        $shouldCleanupRemote = $this->shouldCleanupRemote();
-        $keep = (int) $this->option('keep');
-        $isDryRun = $this->option('dry-run');
-        $force = $this->option('force');
-
         $this->syncService = app(RemoteSyncService::class);
 
-        if ($shouldCleanupRemote) {
+        $targets = $this->promptCleanupTargets();
+        $this->shouldCleanupLocal = in_array('local', $targets);
+        $this->shouldCleanupRemote = in_array('remote', $targets);
+
+        if (! $this->shouldCleanupLocal && ! $this->shouldCleanupRemote) {
+            $this->components->info('No cleanup targets selected.');
+
+            return self::SUCCESS;
+        }
+
+        if ($this->shouldCleanupRemote) {
             $remoteName = $this->argument('remote') ?? $this->selectRemote();
 
             if (! $remoteName) {
@@ -51,19 +64,22 @@ class CleanupSnapshotsCommand extends Command
             }
         }
 
+        $this->keep = $this->promptKeepCount();
+        $this->isDryRun = $this->promptPreviewOption();
+
         $localSnapshots = [];
         $remoteSnapshots = [];
         $localToDelete = [];
         $remoteToDelete = [];
 
-        if ($shouldCleanupLocal) {
+        if ($this->shouldCleanupLocal) {
             $localSnapshots = $this->getLocalSnapshots();
-            $localToDelete = $this->filterSnapshotsToDelete($localSnapshots, $keep);
+            $localToDelete = $this->filterSnapshotsToDelete($localSnapshots, $this->keep);
         }
 
-        if ($shouldCleanupRemote) {
+        if ($this->shouldCleanupRemote) {
             $remoteSnapshots = $this->getRemoteSnapshots();
-            $remoteToDelete = $this->filterSnapshotsToDelete($remoteSnapshots, $keep);
+            $remoteToDelete = $this->filterSnapshotsToDelete($remoteSnapshots, $this->keep);
         }
 
         if (empty($localToDelete) && empty($remoteToDelete)) {
@@ -72,15 +88,15 @@ class CleanupSnapshotsCommand extends Command
             return self::SUCCESS;
         }
 
-        $this->displaySnapshotsToDelete($localToDelete, $remoteToDelete, $keep);
+        $this->displaySnapshotsToDelete($localToDelete, $remoteToDelete, $this->keep);
 
-        if ($isDryRun) {
+        if ($this->isDryRun) {
             $this->components->warn('Dry run mode - no files were deleted.');
 
             return self::SUCCESS;
         }
 
-        if (! $force && ! $this->confirmCleanup(count($localToDelete), count($remoteToDelete))) {
+        if (! $this->option('force') && ! $this->confirmCleanup(count($localToDelete), count($remoteToDelete))) {
             $this->components->info('Cleanup cancelled.');
 
             return self::SUCCESS;
@@ -107,30 +123,83 @@ class CleanupSnapshotsCommand extends Command
         return $exitCode;
     }
 
-    protected function shouldCleanupLocal(): bool
+    protected function shouldSkipPrompts(): bool
     {
-        if ($this->option('local') && $this->option('remote')) {
-            return true;
-        }
-
-        if ($this->option('remote')) {
-            return false;
-        }
-
-        return true;
+        return $this->option('force') === true
+            || $this->option('dry-run') === true
+            || $this->option('local')
+            || $this->option('remote');
     }
 
-    protected function shouldCleanupRemote(): bool
+    protected function promptCleanupTargets(): array
     {
-        if ($this->option('local') && $this->option('remote')) {
-            return true;
+        if ($this->shouldSkipPrompts()) {
+            $targets = [];
+
+            if ($this->option('local')) {
+                $targets[] = 'local';
+            }
+
+            if ($this->option('remote')) {
+                $targets[] = 'remote';
+            }
+
+            if (empty($targets)) {
+                $targets = ['local', 'remote'];
+            }
+
+            return $targets;
         }
 
-        if ($this->option('local')) {
-            return false;
+        return multiselect(
+            label: 'Which snapshots to cleanup?',
+            options: [
+                'local' => 'Local snapshots',
+                'remote' => 'Remote snapshots',
+            ],
+            default: ['local', 'remote'],
+            required: true,
+        );
+    }
+
+    protected function promptKeepCount(): int
+    {
+        if ($this->shouldSkipPrompts()) {
+            return (int) $this->option('keep');
         }
 
-        return true;
+        $value = text(
+            label: 'How many recent snapshots to keep?',
+            default: '5',
+            required: true,
+            validate: function (string $value) {
+                if (! is_numeric($value) || (int) $value < 0) {
+                    return 'Please enter a valid non-negative number';
+                }
+
+                return null;
+            }
+        );
+
+        return (int) $value;
+    }
+
+    protected function promptPreviewOption(): bool
+    {
+        if ($this->shouldSkipPrompts()) {
+            return (bool) $this->option('dry-run');
+        }
+
+        $choice = select(
+            label: 'Preview before deleting?',
+            options: [
+                'yes' => 'Yes - show what will be deleted (recommended)',
+                'no' => 'No - delete immediately',
+            ],
+            default: 'yes',
+        );
+
+        return $choice === 'yes';
     }
 
     protected function selectRemote(): ?string
@@ -259,7 +328,6 @@ class CleanupSnapshotsCommand extends Command
 
     protected function confirmCleanup(int $localCount, int $remoteCount): bool
     {
-        $message = 'Delete ';
         $parts = [];
 
         if ($localCount > 0) {
@@ -270,9 +338,9 @@ class CleanupSnapshotsCommand extends Command
             $parts[] = "{$remoteCount} remote snapshot".($remoteCount > 1 ? 's' : '');
         }
 
-        $message .= implode(' and ', $parts).'?';
+        $summary = implode(' and ', $parts);
 
-        return confirm($message, default: false);
+        return $this->confirmWithTypedYes("Delete {$summary}? Type \"yes\" to continue");
     }
 
     /**

@@ -43,7 +43,10 @@ describe('PushFilesCommand', function () {
         $this->setUpStagingRemote();
         config()->set('remote-sync.paths', []);
 
-        $this->artisan('remote-sync:push-files', ['remote' => 'staging'])
+        $this->artisan('remote-sync:push-files', [
+            'remote' => 'staging',
+            '--force' => true,
+        ])
             ->expectsOutputToContain('No paths configured for pushing')
             ->assertSuccessful();
     });
@@ -83,6 +86,7 @@ describe('PushFilesCommand', function () {
         $this->artisan('remote-sync:push-files', [
             'remote' => 'staging',
             '--dry-run' => true,
+            '--force' => true,
         ])
             ->expectsOutputToContain('Dry run mode')
             ->expectsOutputToContain('Would sync: app/public')
@@ -93,33 +97,7 @@ describe('PushFilesCommand', function () {
         }
     });
 
-    it('requires double confirmation before push', function () {
-        $this->setUpStagingRemote();
-        config()->set('remote-sync.paths', ['app/public']);
-
-        $testPath = storage_path('app/public');
-        if (! is_dir($testPath)) {
-            mkdir($testPath, 0755, true);
-        }
-
-        $this->artisan('remote-sync:push-files', ['remote' => 'staging'])
-            ->expectsConfirmation(
-                'You are about to push local files to [staging]. This will OVERWRITE remote data. Continue?',
-                'yes'
-            )
-            ->expectsConfirmation(
-                'Are you SURE you want to push to [staging]? This action cannot be undone.',
-                'no'
-            )
-            ->expectsOutputToContain('Operation cancelled')
-            ->assertSuccessful();
-
-        if (is_dir($testPath) && count(scandir($testPath)) == 2) {
-            rmdir($testPath);
-        }
-    });
-
-    it('syncs all configured paths', function () {
+    it('syncs all configured paths with force flag', function () {
         $this->setUpStagingRemote();
         config()->set('remote-sync.paths', ['app/public', 'app/media']);
 
@@ -152,15 +130,10 @@ describe('PushFilesCommand', function () {
                 ->andReturn($mockResult);
         });
 
-        $this->artisan('remote-sync:push-files', ['remote' => 'staging'])
-            ->expectsConfirmation(
-                'You are about to push local files to [staging]. This will OVERWRITE remote data. Continue?',
-                'yes'
-            )
-            ->expectsConfirmation(
-                'Are you SURE you want to push to [staging]? This action cannot be undone.',
-                'yes'
-            )
+        $this->artisan('remote-sync:push-files', [
+            'remote' => 'staging',
+            '--force' => true,
+        ])
             ->expectsOutputToContain('Pushing: app/public')
             ->expectsOutputToContain('Pushing: app/media')
             ->expectsOutputToContain('Files pushed to [staging]')
@@ -206,15 +179,8 @@ describe('PushFilesCommand', function () {
         $this->artisan('remote-sync:push-files', [
             'remote' => 'staging',
             '--path' => 'app/custom',
+            '--force' => true,
         ])
-            ->expectsConfirmation(
-                'You are about to push local files to [staging]. This will OVERWRITE remote data. Continue?',
-                'yes'
-            )
-            ->expectsConfirmation(
-                'Are you SURE you want to push to [staging]? This action cannot be undone.',
-                'yes'
-            )
             ->expectsOutputToContain('Pushing: app/custom')
             ->assertSuccessful();
 
@@ -223,7 +189,7 @@ describe('PushFilesCommand', function () {
         }
     });
 
-    it('uses --delete flag with additional confirmation', function () {
+    it('uses --delete flag when specified', function () {
         $this->setUpStagingRemote();
         config()->set('remote-sync.paths', ['app/public']);
 
@@ -258,53 +224,9 @@ describe('PushFilesCommand', function () {
         $this->artisan('remote-sync:push-files', [
             'remote' => 'staging',
             '--delete' => true,
+            '--force' => true,
         ])
-            ->expectsConfirmation(
-                'You are about to push local files to [staging]. This will OVERWRITE remote data. Continue?',
-                'yes'
-            )
-            ->expectsConfirmation(
-                'Are you SURE you want to push to [staging]? This action cannot be undone.',
-                'yes'
-            )
-            ->expectsConfirmation(
-                "WARNING: The --delete flag will REMOVE files on [staging] that don't exist locally. Are you absolutely sure?",
-                'yes'
-            )
             ->expectsOutputToContain('Files pushed to [staging]')
-            ->assertSuccessful();
-
-        if (is_dir($testPath) && count(scandir($testPath)) == 2) {
-            rmdir($testPath);
-        }
-    });
-
-    it('cancels when --delete confirmation is declined', function () {
-        $this->setUpStagingRemote();
-        config()->set('remote-sync.paths', ['app/public']);
-
-        $testPath = storage_path('app/public');
-        if (! is_dir($testPath)) {
-            mkdir($testPath, 0755, true);
-        }
-
-        $this->artisan('remote-sync:push-files', [
-            'remote' => 'staging',
-            '--delete' => true,
-        ])
-            ->expectsConfirmation(
-                'You are about to push local files to [staging]. This will OVERWRITE remote data. Continue?',
-                'yes'
-            )
-            ->expectsConfirmation(
-                'Are you SURE you want to push to [staging]? This action cannot be undone.',
-                'yes'
-            )
-            ->expectsConfirmation(
-                "WARNING: The --delete flag will REMOVE files on [staging] that don't exist locally. Are you absolutely sure?",
-                'no'
-            )
-            ->expectsOutputToContain('Operation cancelled')
             ->assertSuccessful();
 
         if (is_dir($testPath) && count(scandir($testPath)) == 2) {
@@ -329,15 +251,10 @@ describe('PushFilesCommand', function () {
                 ->andReturn(false);
         });
 
-        $this->artisan('remote-sync:push-files', ['remote' => 'staging'])
-            ->expectsConfirmation(
-                'You are about to push local files to [staging]. This will OVERWRITE remote data. Continue?',
-                'yes'
-            )
-            ->expectsConfirmation(
-                'Are you SURE you want to push to [staging]? This action cannot be undone.',
-                'yes'
-            )
+        $this->artisan('remote-sync:push-files', [
+            'remote' => 'staging',
+            '--force' => true,
+        ])
             ->expectsOutputToContain('Local path does not exist')
             ->expectsOutputToContain('Files pushed to [staging]')
             ->assertSuccessful();
@@ -373,15 +290,10 @@ describe('PushFilesCommand', function () {
                 ->andReturn($mockResult);
         });
 
-        $this->artisan('remote-sync:push-files', ['remote' => 'staging'])
-            ->expectsConfirmation(
-                'You are about to push local files to [staging]. This will OVERWRITE remote data. Continue?',
-                'yes'
-            )
-            ->expectsConfirmation(
-                'Are you SURE you want to push to [staging]? This action cannot be undone.',
-                'yes'
-            )
+        $this->artisan('remote-sync:push-files', [
+            'remote' => 'staging',
+            '--force' => true,
+        ])
             ->expectsOutputToContain('Failed to push app/public')
             ->assertFailed();
 

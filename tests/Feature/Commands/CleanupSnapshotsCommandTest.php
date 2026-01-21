@@ -34,7 +34,13 @@ describe('CleanupSnapshotsCommand', function () {
             '*' => Process::result(output: ''),
         ]);
 
-        $this->artisan('remote-sync:cleanup-snapshots', ['remote' => 'production'])
+        $this->artisan('remote-sync:cleanup-snapshots', [
+            'remote' => 'production',
+            '--local' => true,
+            '--remote' => true,
+            '--keep' => 5,
+            '--dry-run' => true,
+        ])
             ->expectsOutputToContain('No snapshots to cleanup')
             ->assertSuccessful();
     });
@@ -271,6 +277,7 @@ describe('CleanupSnapshotsCommand', function () {
         $this->artisan('remote-sync:cleanup-snapshots', [
             'remote' => 'production',
             '--local' => true,
+            '--keep' => 5,
             '--force' => true,
         ])
             ->expectsOutputToContain('Deleted 2 local snapshots')
@@ -284,7 +291,12 @@ describe('CleanupSnapshotsCommand', function () {
             '*' => Process::result(output: ''),
         ]);
 
-        $this->artisan('remote-sync:cleanup-snapshots')
+        $this->artisan('remote-sync:cleanup-snapshots', [
+            '--local' => true,
+            '--remote' => true,
+            '--keep' => 5,
+            '--dry-run' => true,
+        ])
             ->expectsOutputToContain('No snapshots to cleanup')
             ->assertSuccessful();
     });
@@ -303,6 +315,8 @@ describe('CleanupSnapshotsCommand', function () {
 
         $this->artisan('remote-sync:cleanup-snapshots', [
             'remote' => 'production',
+            '--local' => true,
+            '--remote' => true,
             '--keep' => 1,
             '--force' => true,
         ])

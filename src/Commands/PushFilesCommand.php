@@ -13,9 +13,16 @@ class PushFilesCommand extends Command
         {remote? : The remote environment to push to}
         {--path= : Push only a specific path (relative to storage/)}
         {--delete : Delete remote files that do not exist locally}
-        {--dry-run : Show what would be synced without making changes}';
+        {--dry-run : Show what would be synced without making changes}
+        {--force : Skip confirmation prompt}';
 
     protected $description = 'Push storage files to a remote environment';
+
+    protected ?string $specificPath = null;
+
+    protected bool $isDryRun;
+
+    protected bool $shouldDelete;
 
     public function handle(): int
     {
@@ -35,6 +42,7 @@ class PushFilesCommand extends Command
             return self::FAILURE;
         }
 
+        $this->specificPath = $this->promptPathSelection();
         $paths = $this->getPathsToPush();
 
         if (empty($paths)) {
@@ -43,22 +51,27 @@ class PushFilesCommand extends Command
             return self::SUCCESS;
         }
 
-        if ($this->option('dry-run')) {
+        $this->isDryRun = $this->promptDryRunOption();
+        $this->shouldDelete = $this->promptDeleteOption('remote');
+
+        if ($this->isDryRun) {
             $this->components->info('Dry run mode - no changes will be made.');
 
             return $this->performDryRun($paths);
         }
 
-        if (! $this->confirmPush('files')) {
-            $this->components->info('Operation cancelled.');
+        if (! $this->option('force')) {
+            if ($this->shouldDelete) {
+                if (! $this->confirmDeleteOnRemote()) {
+                    $this->components->info('Operation cancelled.');
 
-            return self::SUCCESS;
-        }
+                    return self::SUCCESS;
+                }
+            } elseif (! $this->confirmPush('files')) {
+                $this->components->info('Operation cancelled.');
 
-        if ($this->option('delete') && ! $this->confirmDeleteOnRemote()) {
-            $this->components->info('Operation cancelled.');
-
-            return self::SUCCESS;
+                return self::SUCCESS;
+            }
         }
 
         foreach ($paths as $path) {
@@ -74,8 +87,8 @@ class PushFilesCommand extends Command
 
     protected function getPathsToPush(): array
     {
-        if ($specificPath = $this->option('path')) {
-            return [$specificPath];
+        if ($this->specificPath !== null) {
+            return [$this->specificPath];
         }
 
         return config('remote-sync.paths', []);
@@ -83,9 +96,10 @@ class PushFilesCommand extends Command
 
     protected function confirmDeleteOnRemote(): bool
     {
-        return $this->components->confirm(
-            "WARNING: The --delete flag will REMOVE files on [{$this->remote->name}] that don't exist locally. Are you absolutely sure?",
-            false
+        $this->components->warn("WARNING: Files on [{$this->remote->name}] that don't exist locally will be DELETED.");
+
+        return $this->confirmWithTypedYes(
+            "Push local files to [{$this->remote->name}] with deletion? Type \"yes\" to continue"
         );
     }
 
@@ -107,7 +121,7 @@ class PushFilesCommand extends Command
 
             $options = ['--partial', '--info=progress2', '--dry-run'];
 
-            if ($this->option('delete')) {
+            if ($this->shouldDelete) {
                 $options[] = '--delete';
             }
 
@@ -145,7 +159,7 @@ class PushFilesCommand extends Command
 
         $options = ['--partial', '--info=progress2'];
 
-        if ($this->option('delete')) {
+        if ($this->shouldDelete) {
             $options[] = '--delete';
         }
 
