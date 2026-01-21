@@ -12,7 +12,7 @@ class PushDatabaseCommand extends Command
 {
     use InteractsWithRemote;
 
-    protected $signature = 'remote-sync:push-database
+    protected $signature = 'remote-sync:push-db
         {remote? : The remote environment to push to}
         {--force : Skip confirmation prompt}';
 

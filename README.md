@@ -14,6 +14,33 @@ Sync database and storage files from remote Laravel environments to your local m
 - `rsync` installed locally and on remote
 - Remote server must have `spatie/laravel-db-snapshots` installed
 
+## Snapshot Configuration
+
+This package relies on [spatie/laravel-db-snapshots](https://github.com/spatie/laravel-db-snapshots) for database operations. You need to configure it on both local and remote environments.
+
+### 1. Configure the snapshots disk
+
+Add a disk for storing snapshots in `config/filesystems.php`:
+
+```php
+'disks' => [
+    'snapshots' => [
+        'driver' => 'local',
+        'root' => database_path('snapshots'),
+    ],
+],
+```
+
+### 2. Publish the db-snapshots config
+
+```bash
+php artisan vendor:publish --provider="Spatie\DbSnapshots\DbSnapshotsServiceProvider"
+```
+
+### 3. Ensure config parity
+
+> **Important:** The snapshot filesystem configuration must be identical on both local and remote environments. This package uses your local `db-snapshots.disk` configuration to determine where snapshots are stored on the remote server. If the remote has a different snapshot path configured, sync operations will fail.
+
 ## Installation
 
 ```bash
