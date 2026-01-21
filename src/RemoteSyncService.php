@@ -49,6 +49,23 @@ class RemoteSyncService
         return storage_path('snapshots');
     }
 
+    public function getSnapshotSubdirectory(): string
+    {
+        $diskName = config('db-snapshots.disk', 'snapshots');
+        $diskConfig = config("filesystems.disks.{$diskName}");
+
+        if ($diskConfig && isset($diskConfig['root'])) {
+            $root = $diskConfig['root'];
+            $storagePath = storage_path();
+
+            if (str_starts_with($root, $storagePath)) {
+                return ltrim(substr($root, strlen($storagePath)), '/');
+            }
+        }
+
+        return 'snapshots';
+    }
+
     public function executeRemoteCommand(RemoteConfig $remote, string $command, ?int $timeout = null): ProcessResult
     {
         $timeout ??= 120;
@@ -122,7 +139,9 @@ class RemoteSyncService
 
     public function getRemoteSnapshotPath(RemoteConfig $remote, string $snapshotName): string
     {
-        return "{$remote->storagePath()}/snapshots/{$snapshotName}.sql.gz";
+        $subdir = $this->getSnapshotSubdirectory();
+
+        return "{$remote->storagePath()}/{$subdir}/{$snapshotName}.sql.gz";
     }
 
     public function downloadSnapshot(RemoteConfig $remote, string $snapshotName, string $localPath): ProcessResult
@@ -151,7 +170,8 @@ class RemoteSyncService
 
     public function listRemoteSnapshots(RemoteConfig $remote): ProcessResult
     {
-        $snapshotPath = "{$remote->storagePath()}/snapshots";
+        $subdir = $this->getSnapshotSubdirectory();
+        $snapshotPath = "{$remote->storagePath()}/{$subdir}";
         $command = "stat -c '%Y %n' {$snapshotPath}/*.sql.gz 2>/dev/null | sort -rn || true";
         $timeout = config('remote-sync.timeouts.snapshot_cleanup', 60);
 
@@ -179,7 +199,8 @@ class RemoteSyncService
 
     public function uploadSnapshot(RemoteConfig $remote, string $snapshotName, string $localPath): ProcessResult
     {
-        $remotePath = "{$remote->storagePath()}/snapshots/";
+        $subdir = $this->getSnapshotSubdirectory();
+        $remotePath = "{$remote->storagePath()}/{$subdir}/";
         $localFile = "{$localPath}/{$snapshotName}.sql.gz";
         $timeout = config('remote-sync.timeouts.snapshot_upload', 600);
 
