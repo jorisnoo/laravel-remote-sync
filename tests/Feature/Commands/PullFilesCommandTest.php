@@ -11,7 +11,7 @@ beforeEach(function () {
     ]);
 });
 
-describe('SyncFilesCommand', function () {
+describe('PullFilesCommand', function () {
     it('refuses to run in production environment', function () {
         app()->detectEnvironment(fn () => 'production');
         $this->setUpProductionRemote();
@@ -38,7 +38,7 @@ describe('SyncFilesCommand', function () {
             'remote' => 'production',
             '--force' => true,
         ])
-            ->expectsOutputToContain('No paths configured for syncing')
+            ->expectsOutputToContain('No paths configured for pulling')
             ->assertSuccessful();
     });
 
@@ -48,6 +48,7 @@ describe('SyncFilesCommand', function () {
 
         $mockResult = Mockery::mock(ProcessResult::class);
         $mockResult->shouldReceive('successful')->andReturn(true);
+        $mockResult->shouldReceive('output')->andReturn('');
 
         $this->mock(RemoteSyncService::class, function ($mock) use ($mockResult) {
             $mock->shouldReceive('getRemote')
@@ -59,6 +60,9 @@ describe('SyncFilesCommand', function () {
 
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
+
+            $mock->shouldReceive('rsyncDryRun')
+                ->andReturn($mockResult);
 
             $mock->shouldReceive('rsync')
                 ->twice()
@@ -69,9 +73,9 @@ describe('SyncFilesCommand', function () {
             'remote' => 'production',
             '--force' => true,
         ])
-            ->expectsOutputToContain('Syncing: app/public')
-            ->expectsOutputToContain('Syncing: app/media')
-            ->expectsOutputToContain('Files synced from [production]')
+            ->expectsOutputToContain('Pulling: app/public')
+            ->expectsOutputToContain('Pulling: app/media')
+            ->expectsOutputToContain('Files pulled from [production]')
             ->assertSuccessful();
     });
 
@@ -81,6 +85,7 @@ describe('SyncFilesCommand', function () {
 
         $mockResult = Mockery::mock(ProcessResult::class);
         $mockResult->shouldReceive('successful')->andReturn(true);
+        $mockResult->shouldReceive('output')->andReturn('');
 
         $this->mock(RemoteSyncService::class, function ($mock) use ($mockResult) {
             $mock->shouldReceive('getRemote')
@@ -92,6 +97,9 @@ describe('SyncFilesCommand', function () {
 
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
+
+            $mock->shouldReceive('rsyncDryRun')
+                ->andReturn($mockResult);
 
             $mock->shouldReceive('rsync')
                 ->once()
@@ -106,7 +114,7 @@ describe('SyncFilesCommand', function () {
             '--path' => 'app/custom',
             '--force' => true,
         ])
-            ->expectsOutputToContain('Syncing: app/custom')
+            ->expectsOutputToContain('Pulling: app/custom')
             ->assertSuccessful();
     });
 
@@ -116,6 +124,7 @@ describe('SyncFilesCommand', function () {
 
         $mockResult = Mockery::mock(ProcessResult::class);
         $mockResult->shouldReceive('successful')->andReturn(true);
+        $mockResult->shouldReceive('output')->andReturn('');
 
         $this->mock(RemoteSyncService::class, function ($mock) use ($mockResult) {
             $mock->shouldReceive('getRemote')
@@ -127,6 +136,9 @@ describe('SyncFilesCommand', function () {
 
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
+
+            $mock->shouldReceive('rsyncDryRun')
+                ->andReturn($mockResult);
 
             $mock->shouldReceive('rsync')
                 ->once()
@@ -155,6 +167,7 @@ describe('SyncFilesCommand', function () {
 
         $mockResult = Mockery::mock(ProcessResult::class);
         $mockResult->shouldReceive('successful')->andReturn(true);
+        $mockResult->shouldReceive('output')->andReturn('');
 
         $this->mock(RemoteSyncService::class, function ($mock) use ($mockResult) {
             $mock->shouldReceive('getRemote')
@@ -166,6 +179,9 @@ describe('SyncFilesCommand', function () {
 
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
+
+            $mock->shouldReceive('rsyncDryRun')
+                ->andReturn($mockResult);
 
             $mock->shouldReceive('rsync')
                 ->once()
@@ -187,11 +203,15 @@ describe('SyncFilesCommand', function () {
         $this->setUpProductionRemote();
         config()->set('remote-sync.paths', ['app/public']);
 
+        $mockDryRunResult = Mockery::mock(ProcessResult::class);
+        $mockDryRunResult->shouldReceive('successful')->andReturn(true);
+        $mockDryRunResult->shouldReceive('output')->andReturn('');
+
         $mockResult = Mockery::mock(ProcessResult::class);
         $mockResult->shouldReceive('successful')->andReturn(false);
         $mockResult->shouldReceive('errorOutput')->andReturn('Connection refused');
 
-        $this->mock(RemoteSyncService::class, function ($mock) use ($mockResult) {
+        $this->mock(RemoteSyncService::class, function ($mock) use ($mockDryRunResult, $mockResult) {
             $mock->shouldReceive('getRemote')
                 ->andReturn(new RemoteConfig(
                     name: 'production',
@@ -201,6 +221,9 @@ describe('SyncFilesCommand', function () {
 
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
+
+            $mock->shouldReceive('rsyncDryRun')
+                ->andReturn($mockDryRunResult);
 
             $mock->shouldReceive('rsync')
                 ->once()
@@ -211,7 +234,7 @@ describe('SyncFilesCommand', function () {
             'remote' => 'production',
             '--force' => true,
         ])
-            ->expectsOutputToContain('Failed to sync app/public')
+            ->expectsOutputToContain('Failed to pull app/public')
             ->assertFailed();
     });
 
@@ -221,6 +244,7 @@ describe('SyncFilesCommand', function () {
 
         $mockResult = Mockery::mock(ProcessResult::class);
         $mockResult->shouldReceive('successful')->andReturn(true);
+        $mockResult->shouldReceive('output')->andReturn('');
 
         $this->mock(RemoteSyncService::class, function ($mock) use ($mockResult) {
             $mock->shouldReceive('getRemote')
@@ -232,6 +256,9 @@ describe('SyncFilesCommand', function () {
 
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
+
+            $mock->shouldReceive('rsyncDryRun')
+                ->andReturn($mockResult);
 
             $mock->shouldReceive('rsync')
                 ->once()
@@ -254,6 +281,7 @@ describe('SyncFilesCommand', function () {
 
         $mockResult = Mockery::mock(ProcessResult::class);
         $mockResult->shouldReceive('successful')->andReturn(true);
+        $mockResult->shouldReceive('output')->andReturn('');
 
         $this->mock(RemoteSyncService::class, function ($mock) use ($mockResult) {
             $mock->shouldReceive('getRemote')
@@ -266,6 +294,9 @@ describe('SyncFilesCommand', function () {
 
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(true);
+
+            $mock->shouldReceive('rsyncDryRun')
+                ->andReturn($mockResult);
 
             $mock->shouldReceive('rsync')
                 ->once()

@@ -19,10 +19,10 @@ return [
         'failed_local_snapshot' => 'Failed to create local snapshot.',
         'failed_upload_snapshot' => 'Failed to upload snapshot: :error',
         'failed_remote_load' => 'Failed to load snapshot on remote: :error',
-        'driver_mismatch_sync' => 'Database driver mismatch: remote uses [:remote] but local uses [:local].',
+        'driver_mismatch_pull' => 'Database driver mismatch: remote uses [:remote] but local uses [:local].',
         'driver_mismatch_push' => 'Database driver mismatch: local uses [:local] but remote uses [:remote].',
-        'cross_database_not_supported' => 'Cross-database sync is not supported. Both environments must use the same database driver.',
-        'failed_sync_path' => 'Failed to sync :path: :error',
+        'cross_database_not_supported' => 'Cross-database pull is not supported. Both environments must use the same database driver.',
+        'failed_pull_path' => 'Failed to pull :path: :error',
         'failed_push_path' => 'Failed to push :path: :error',
         'failed_dry_run' => 'Dry run failed for :path: :error',
         'failed_list_snapshots' => 'Failed to list remote snapshots: :error',
@@ -30,7 +30,7 @@ return [
         'invalid_path' => 'Invalid path: :path',
         'storage_not_accessible' => 'Storage directory is not accessible.',
         'path_traversal' => 'Path traversal detected: :path must be within the storage directory.',
-        'migrations_failed' => 'Migrations failed. Aborting sync.',
+        'migrations_failed' => 'Migrations failed. Aborting pull.',
     ],
 
     /*
@@ -54,7 +54,7 @@ return [
         'uploading_snapshot' => 'Uploading snapshot to [:name]...',
         'snapshot_uploaded' => 'Snapshot uploaded.',
         'remote_snapshot_loaded' => 'Snapshot loaded on remote.',
-        'syncing_path' => 'Syncing: :path',
+        'pulling_path' => 'Pulling: :path',
         'pushing_path' => 'Pushing: :path',
         'no_operations_selected' => 'No operations selected.',
         'dry_run_mode' => 'Dry run mode - no changes will be made.',
@@ -80,7 +80,7 @@ return [
         'interrupt_cleanup' => 'Received interrupt signal, cleaning up...',
         'manual_cleanup_needed' => 'Failed to delete remote snapshot. You may need to manually clean up: :name',
         'driver_detection_failed' => 'Could not detect remote database driver. Proceeding anyway...',
-        'no_paths_sync' => 'No paths configured for syncing.',
+        'no_paths_pull' => 'No paths configured for pulling.',
         'no_paths_push' => 'No paths configured for pushing.',
         'delete_warning' => "WARNING: Files on [:name] that don't exist locally will be DELETED.",
         'dry_run_no_delete' => 'Dry run mode - no files were deleted.',
@@ -94,9 +94,9 @@ return [
     */
 
     'success' => [
-        'database_synced' => 'Database synced from [:name].',
+        'database_pulled' => 'Database pulled from [:name].',
         'database_pushed' => 'Database pushed to [:name].',
-        'files_synced' => 'Files synced from [:name].',
+        'files_pulled' => 'Files pulled from [:name].',
         'files_pushed' => 'Files pushed to [:name].',
     ],
 
@@ -112,6 +112,25 @@ return [
         'detecting_driver' => 'Detecting remote database driver...',
         'creating_remote_backup' => 'Creating backup on [:name]...',
         'loading_remote_snapshot' => 'Loading snapshot on [:name]...',
+        'fetching_remote_table_info' => 'Fetching remote table info...',
+        'analyzing_files_to_pull' => 'Analyzing files to pull...',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Preview Messages
+    |--------------------------------------------------------------------------
+    */
+
+    'preview' => [
+        'database_header' => 'Database pull preview:',
+        'tables_to_pull' => 'Tables to pull',
+        'source_rows' => 'Source rows (approx)',
+        'target_rows' => 'Target rows to replace',
+        'tables_to_truncate_header' => 'Tables that will be truncated (excluded from pull):',
+        'files_header' => 'Files pull preview:',
+        'files_to_transfer' => 'Files to transfer',
+        'files_to_delete' => 'Files to delete',
     ],
 
     /*

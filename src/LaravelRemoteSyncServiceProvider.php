@@ -6,9 +6,9 @@ use Noo\LaravelRemoteSync\Commands\CleanupSnapshotsCommand;
 use Noo\LaravelRemoteSync\Commands\PushDatabaseCommand;
 use Noo\LaravelRemoteSync\Commands\PushFilesCommand;
 use Noo\LaravelRemoteSync\Commands\PushRemoteCommand;
-use Noo\LaravelRemoteSync\Commands\SyncDatabaseCommand;
-use Noo\LaravelRemoteSync\Commands\SyncFilesCommand;
-use Noo\LaravelRemoteSync\Commands\SyncRemoteCommand;
+use Noo\LaravelRemoteSync\Commands\PullDatabaseCommand;
+use Noo\LaravelRemoteSync\Commands\PullFilesCommand;
+use Noo\LaravelRemoteSync\Commands\PullRemoteCommand;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 
@@ -21,9 +21,9 @@ class LaravelRemoteSyncServiceProvider extends PackageServiceProvider
             ->hasConfigFile()
             ->hasTranslations()
             ->hasCommands([
-                SyncRemoteCommand::class,
-                SyncDatabaseCommand::class,
-                SyncFilesCommand::class,
+                PullRemoteCommand::class,
+                PullDatabaseCommand::class,
+                PullFilesCommand::class,
                 PushRemoteCommand::class,
                 PushDatabaseCommand::class,
                 PushFilesCommand::class,

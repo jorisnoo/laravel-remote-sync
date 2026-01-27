@@ -4,7 +4,7 @@
 [![GitHub Tests Action Status](https://img.shields.io/github/actions/workflow/status/jorisnoo/laravel-remote-sync/run-tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/jorisnoo/laravel-remote-sync/actions?query=workflow%3Arun-tests+branch%3Amain)
 [![Total Downloads](https://img.shields.io/packagist/dt/jorisnoo/laravel-remote-sync.svg?style=flat-square)](https://packagist.org/packages/jorisnoo/laravel-remote-sync)
 
-Sync database and storage files from remote Laravel environments to your local machine. Uses [spatie/laravel-db-snapshots](https://github.com/spatie/laravel-db-snapshots) for database syncing and rsync for file transfers.
+Pull database and storage files from remote Laravel environments to your local machine. Uses [spatie/laravel-db-snapshots](https://github.com/spatie/laravel-db-snapshots) for database operations and rsync for file transfers.
 
 ## Requirements
 
@@ -39,7 +39,7 @@ php artisan vendor:publish --provider="Spatie\DbSnapshots\DbSnapshotsServiceProv
 
 ### 3. Ensure config parity
 
-> **Important:** The snapshot filesystem configuration must be identical on both local and remote environments. This package uses your local `db-snapshots.disk` configuration to determine where snapshots are stored on the remote server. If the remote has a different snapshot path configured, sync operations will fail.
+> **Important:** The snapshot filesystem configuration must be identical on both local and remote environments. This package uses your local `db-snapshots.disk` configuration to determine where snapshots are stored on the remote server. If the remote has a different snapshot path configured, pull operations will fail.
 
 ## Installation
 
@@ -113,7 +113,7 @@ php artisan remote-sync:pull
 Prompts you to select a remote and what to pull (database, files, or both).
 
 Options:
-- `--no-backup` - Skip creating a local backup before syncing
+- `--no-backup` - Skip creating a local backup before pulling
 - `--keep-snapshot` - Keep the downloaded snapshot file after loading
 - `--full` - Include all tables (ignores `exclude_tables` config) and drops all local tables before loading
 
@@ -124,7 +124,7 @@ php artisan remote-sync:pull-db production
 ```
 
 Options:
-- `--no-backup` - Skip creating a local backup before syncing
+- `--no-backup` - Skip creating a local backup before pulling
 - `--keep-snapshot` - Keep the downloaded snapshot file after loading
 - `--full` - Include all tables (ignores `exclude_tables` config) and drops all local tables before loading
 
@@ -195,7 +195,7 @@ If your path already ends in `/current`, detection is skipped and atomic mode is
 
 - Commands refuse to run in production environment
 - Confirmation prompt before syncing
-- Local database backup created before sync (unless `--no-backup`)
+- Local database backup created before pulling (unless `--no-backup`)
 - Graceful cleanup on interrupt (Ctrl+C)
 
 ## Testing

@@ -11,18 +11,18 @@ use Spatie\DbSnapshots\Commands\Load as SnapshotLoad;
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\spin;
 
-class SyncDatabaseCommand extends Command
+class PullDatabaseCommand extends Command
 {
     use InteractsWithRemote;
 
     protected $signature = 'remote-sync:pull-db
-        {remote? : The remote environment to sync from}
-        {--no-backup : Skip creating a local backup before syncing}
+        {remote? : The remote environment to pull from}
+        {--no-backup : Skip creating a local backup before pulling}
         {--keep-snapshot : Keep the downloaded snapshot file after loading}
         {--full : Include all tables (no exclusions) and drop tables before loading}
         {--force : Skip confirmation prompt}';
 
-    protected $description = 'Sync the database from a remote environment';
+    protected $description = 'Pull the database from a remote environment';
 
     protected string $snapshotName;
 
@@ -33,6 +33,12 @@ class SyncDatabaseCommand extends Command
     protected bool $fullImport;
 
     protected bool $keepSnapshot;
+
+    /** @var array<string, int> */
+    protected array $remoteTableInfo = [];
+
+    /** @var array<string, int> */
+    protected array $localTableInfo = [];
 
     public function handle(): int
     {
@@ -62,7 +68,9 @@ class SyncDatabaseCommand extends Command
             return self::FAILURE;
         }
 
-        if (! $this->option('force') && ! $this->confirmSync('database')) {
+        $this->fetchAndDisplayPreview();
+
+        if (! $this->option('force') && ! $this->confirmPull('database')) {
             $this->components->info(__('remote-sync::messages.info.operation_cancelled'));
 
             return self::SUCCESS;
@@ -100,9 +108,28 @@ class SyncDatabaseCommand extends Command
 
         $this->cleanupRemoteSnapshot();
 
-        $this->components->success(__('remote-sync::messages.success.database_synced', ['name' => $this->remote->name]));
+        $this->components->success(__('remote-sync::messages.success.database_pulled', ['name' => $this->remote->name]));
 
         return self::SUCCESS;
+    }
+
+    protected function fetchAndDisplayPreview(): void
+    {
+        $this->remoteTableInfo = spin(
+            callback: fn () => $this->syncService->getRemoteTableInfo($this->remote),
+            message: __('remote-sync::messages.spinners.fetching_remote_table_info')
+        );
+
+        $this->localTableInfo = $this->syncService->getLocalTableInfo();
+
+        $excludedTables = config('remote-sync.exclude_tables', []);
+
+        $this->displayDatabasePreview(
+            $this->remoteTableInfo,
+            $this->localTableInfo,
+            $excludedTables,
+            $this->fullImport
+        );
     }
 
     protected function createLocalBackup(): void
@@ -297,7 +324,7 @@ class SyncDatabaseCommand extends Command
 
         if ($normalizedLocal !== $normalizedRemote) {
             $this->components->error(
-                __('remote-sync::messages.errors.driver_mismatch_sync', ['remote' => $remoteDriver, 'local' => $localDriver])
+                __('remote-sync::messages.errors.driver_mismatch_pull', ['remote' => $remoteDriver, 'local' => $localDriver])
             );
             $this->components->error(
                 __('remote-sync::messages.errors.cross_database_not_supported')

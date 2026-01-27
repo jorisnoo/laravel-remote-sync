@@ -9,7 +9,7 @@ return [
     */
 
     'confirm' => [
-        'sync' => 'This will replace your local :operation with data from [:name]. Type "yes" to continue',
+        'pull' => 'This will replace your local :operation with data from [:name]. Type "yes" to continue',
         'push' => 'Are you SURE you want to push to [:name]? Type "yes" to continue',
         'delete_remote' => 'Push local files to [:name] with deletion? Type "yes" to continue',
         'cleanup' => 'Delete :summary? Type "yes" to continue',
@@ -23,7 +23,7 @@ return [
     */
 
     'backup' => [
-        'label' => 'Database: Create a local backup before syncing?',
+        'label' => 'Database: Create a local backup before pulling?',
         'yes' => 'Yes (recommended)',
         'no' => 'No',
     ],
@@ -95,7 +95,7 @@ return [
     */
 
     'paths' => [
-        'label' => 'Files: Which paths to sync?',
+        'label' => 'Files: Which paths to pull?',
         'all' => 'All configured paths (:paths)',
         'specific' => 'Specific path only',
         'enter_label' => 'Files: Enter path (relative to storage/)',
@@ -120,7 +120,7 @@ return [
     */
 
     'operations' => [
-        'sync_label' => 'What would you like to sync?',
+        'pull_label' => 'What would you like to pull?',
         'push_label' => 'What would you like to push?',
         'database' => 'Database',
         'files' => 'Files',

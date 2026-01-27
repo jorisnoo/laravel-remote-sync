@@ -8,7 +8,7 @@ beforeEach(function () {
     ]);
 });
 
-describe('SyncRemoteCommand', function () {
+describe('PullRemoteCommand', function () {
     it('refuses to run in production environment', function () {
         app()->detectEnvironment(fn () => 'production');
         $this->setUpProductionRemote();

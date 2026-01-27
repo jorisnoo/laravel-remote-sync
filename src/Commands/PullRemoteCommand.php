@@ -9,19 +9,19 @@ use Noo\LaravelRemoteSync\RemoteSyncService;
 use function Laravel\Prompts\multiselect;
 use function Laravel\Prompts\select;
 
-class SyncRemoteCommand extends Command
+class PullRemoteCommand extends Command
 {
     use InteractsWithRemote;
 
     protected $signature = 'remote-sync:pull
-        {remote? : The remote environment to sync from}
-        {--no-backup : Skip creating a local backup before syncing database}
+        {remote? : The remote environment to pull from}
+        {--no-backup : Skip creating a local backup before pulling database}
         {--keep-snapshot : Keep the downloaded snapshot file after loading}
         {--full : Include all tables (no exclusions) and drop tables before loading}
         {--delete : Delete local files that do not exist on remote}
         {--force : Skip confirmation prompt}';
 
-    protected $description = 'Sync database and/or files from a remote environment';
+    protected $description = 'Pull database and/or files from a remote environment';
 
     protected bool $shouldBackup;
 
@@ -61,20 +61,20 @@ class SyncRemoteCommand extends Command
             return self::SUCCESS;
         }
 
-        $syncDatabase = in_array('database', $operations);
-        $syncFiles = in_array('files', $operations);
+        $pullDatabase = in_array('database', $operations);
+        $pullFiles = in_array('files', $operations);
 
-        if ($syncDatabase) {
+        if ($pullDatabase) {
             $this->shouldBackup = $this->promptBackupOption();
             $this->fullImport = $this->promptImportMode();
             $this->keepSnapshot = $this->promptKeepSnapshot();
         }
 
-        if ($syncFiles) {
+        if ($pullFiles) {
             $this->shouldDelete = $this->promptDeleteOption('local');
         }
 
-        if (! $this->option('force') && ! $this->confirmSync($this->getOperationsSummary($syncDatabase, $syncFiles))) {
+        if (! $this->option('force') && ! $this->confirmPull($this->getOperationsSummary($pullDatabase, $pullFiles))) {
             $this->components->info(__('remote-sync::messages.info.operation_cancelled'));
 
             return self::SUCCESS;
@@ -82,16 +82,16 @@ class SyncRemoteCommand extends Command
 
         $exitCode = self::SUCCESS;
 
-        if ($syncDatabase) {
-            $exitCode = $this->syncDatabase();
+        if ($pullDatabase) {
+            $exitCode = $this->pullDatabase();
 
             if ($exitCode !== self::SUCCESS) {
                 return $exitCode;
             }
         }
 
-        if ($syncFiles) {
-            $exitCode = $this->syncFiles();
+        if ($pullFiles) {
+            $exitCode = $this->pullFiles();
         }
 
         return $exitCode;
@@ -127,7 +127,7 @@ class SyncRemoteCommand extends Command
         }
 
         return multiselect(
-            label: __('remote-sync::prompts.operations.sync_label'),
+            label: __('remote-sync::prompts.operations.pull_label'),
             options: $options,
             default: array_keys($options),
             required: true,
@@ -149,7 +149,7 @@ class SyncRemoteCommand extends Command
         return implode(' and ', $parts);
     }
 
-    protected function syncDatabase(): int
+    protected function pullDatabase(): int
     {
         $options = [
             'remote' => $this->remote->name,
@@ -159,12 +159,12 @@ class SyncRemoteCommand extends Command
             '--force' => true,
         ];
 
-        return $this->call(SyncDatabaseCommand::class, $options);
+        return $this->call(PullDatabaseCommand::class, $options);
     }
 
-    protected function syncFiles(): int
+    protected function pullFiles(): int
     {
-        return $this->call(SyncFilesCommand::class, [
+        return $this->call(PullFilesCommand::class, [
             'remote' => $this->remote->name,
             '--delete' => $this->shouldDelete,
             '--force' => true,

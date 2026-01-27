@@ -11,7 +11,7 @@ beforeEach(function () {
     ]);
 });
 
-describe('SyncDatabaseCommand', function () {
+describe('PullDatabaseCommand', function () {
     it('refuses to run in production environment', function () {
         app()->detectEnvironment(fn () => 'production');
         $this->setUpProductionRemote();
@@ -60,6 +60,12 @@ describe('SyncDatabaseCommand', function () {
             $mock->shouldReceive('getRemoteDatabaseDriver')
                 ->once()
                 ->andReturn(null);
+
+            $mock->shouldReceive('getRemoteTableInfo')
+                ->andReturn([]);
+
+            $mock->shouldReceive('getLocalTableInfo')
+                ->andReturn([]);
 
             $mock->shouldReceive('createRemoteSnapshot')
                 ->once()
@@ -135,6 +141,12 @@ describe('SyncDatabaseCommand', function () {
             $mock->shouldReceive('getRemoteDatabaseDriver')
                 ->andReturn('mysql');
 
+            $mock->shouldReceive('getRemoteTableInfo')
+                ->andReturn([]);
+
+            $mock->shouldReceive('getLocalTableInfo')
+                ->andReturn([]);
+
             $mock->shouldReceive('createRemoteSnapshot')
                 ->once()
                 ->andReturn($mockProcessResult);
@@ -182,6 +194,12 @@ describe('SyncDatabaseCommand', function () {
             $mock->shouldReceive('getRemoteDatabaseDriver')
                 ->andReturn('mysql');
 
+            $mock->shouldReceive('getRemoteTableInfo')
+                ->andReturn([]);
+
+            $mock->shouldReceive('getLocalTableInfo')
+                ->andReturn([]);
+
             $mock->shouldReceive('createRemoteSnapshot')
                 ->once()
                 ->andReturn($mockProcessResult);
@@ -228,6 +246,12 @@ describe('SyncDatabaseCommand', function () {
 
             $mock->shouldReceive('getRemoteDatabaseDriver')
                 ->andReturn('mysql');
+
+            $mock->shouldReceive('getRemoteTableInfo')
+                ->andReturn([]);
+
+            $mock->shouldReceive('getLocalTableInfo')
+                ->andReturn([]);
 
             $mock->shouldReceive('createRemoteSnapshot')
                 ->once()
@@ -282,6 +306,12 @@ describe('SyncDatabaseCommand', function () {
 
             $mock->shouldReceive('getRemoteDatabaseDriver')
                 ->andReturn('mysql');
+
+            $mock->shouldReceive('getRemoteTableInfo')
+                ->andReturn([]);
+
+            $mock->shouldReceive('getLocalTableInfo')
+                ->andReturn([]);
 
             $mock->shouldReceive('createRemoteSnapshot')
                 ->once()

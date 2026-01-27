@@ -36,10 +36,10 @@ trait InteractsWithRemote
         return true;
     }
 
-    protected function confirmSync(string $operation): bool
+    protected function confirmPull(string $operation): bool
     {
         return $this->confirmWithTypedYes(
-            __('remote-sync::prompts.confirm.sync', ['operation' => $operation, 'name' => $this->remote->name])
+            __('remote-sync::prompts.confirm.pull', ['operation' => $operation, 'name' => $this->remote->name])
         );
     }
 
@@ -227,6 +227,123 @@ trait InteractsWithRemote
     protected function generateSnapshotName(): string
     {
         return 'remote-sync-'.date('Y-m-d-H-i-s').'-'.bin2hex(random_bytes(4));
+    }
+
+    /**
+     * Display a database sync preview.
+     *
+     * @param array<string, int> $sourceInfo
+     * @param array<string, int> $targetInfo
+     * @param array<int, string> $excludedTables
+     */
+    protected function displayDatabasePreview(
+        array $sourceInfo,
+        array $targetInfo,
+        array $excludedTables,
+        bool $fullMode
+    ): void {
+        $this->newLine();
+        $this->components->info(__('remote-sync::messages.preview.database_header'));
+
+        $tablesToSync = $fullMode
+            ? array_keys($sourceInfo)
+            : array_diff(array_keys($sourceInfo), $excludedTables);
+
+        $sourceRowCount = 0;
+        $targetRowCount = 0;
+
+        foreach ($tablesToSync as $table) {
+            $sourceRowCount += $sourceInfo[$table] ?? 0;
+            $targetRowCount += $targetInfo[$table] ?? 0;
+        }
+
+        $this->components->twoColumnDetail(
+            __('remote-sync::messages.preview.tables_to_pull'),
+            count($tablesToSync).' '.trans_choice('table|tables', count($tablesToSync))
+        );
+
+        $this->components->twoColumnDetail(
+            __('remote-sync::messages.preview.source_rows'),
+            number_format($sourceRowCount)
+        );
+
+        $this->components->twoColumnDetail(
+            __('remote-sync::messages.preview.target_rows'),
+            number_format($targetRowCount)
+        );
+
+        if (! $fullMode && ! empty($excludedTables)) {
+            $existingExcluded = array_filter(
+                $excludedTables,
+                fn (string $table) => isset($targetInfo[$table])
+            );
+
+            if (! empty($existingExcluded)) {
+                $this->newLine();
+                $this->line('  '.__('remote-sync::messages.preview.tables_to_truncate_header'));
+
+                foreach ($existingExcluded as $table) {
+                    $this->line("  • {$table}");
+                }
+            }
+        }
+
+        $this->newLine();
+    }
+
+    /**
+     * Display a files sync preview.
+     */
+    protected function displayFilesPreview(int $filesToTransfer, int $filesToDelete): void
+    {
+        $this->newLine();
+        $this->components->info(__('remote-sync::messages.preview.files_header'));
+
+        $this->components->twoColumnDetail(
+            __('remote-sync::messages.preview.files_to_transfer'),
+            (string) $filesToTransfer
+        );
+
+        $this->components->twoColumnDetail(
+            __('remote-sync::messages.preview.files_to_delete'),
+            (string) $filesToDelete
+        );
+
+        $this->newLine();
+    }
+
+    /**
+     * Parse rsync dry-run output with itemize-changes to count files.
+     *
+     * @return array{transfer: int, delete: int}
+     */
+    protected function parseRsyncDryRunOutput(string $output): array
+    {
+        $lines = explode("\n", $output);
+        $transfer = 0;
+        $delete = 0;
+
+        foreach ($lines as $line) {
+            $line = trim($line);
+
+            if ($line === '' || str_starts_with($line, 'sending') || str_starts_with($line, 'receiving')) {
+                continue;
+            }
+
+            if (str_starts_with($line, '*deleting')) {
+                $delete++;
+
+                continue;
+            }
+
+            if (preg_match('/^[<>ch.][fdLDS]/', $line)) {
+                if (! str_ends_with($line, '/')) {
+                    $transfer++;
+                }
+            }
+        }
+
+        return ['transfer' => $transfer, 'delete' => $delete];
     }
 
     protected function validateStoragePath(string $path): ?string
