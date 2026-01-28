@@ -232,9 +232,9 @@ trait InteractsWithRemote
     /**
      * Display a database sync preview.
      *
-     * @param array<string, int> $sourceInfo
-     * @param array<string, int> $targetInfo
-     * @param array<int, string> $excludedTables
+     * @param  array<string, int>  $sourceInfo
+     * @param  array<string, int>  $targetInfo
+     * @param  array<int, string>  $excludedTables
      */
     protected function displayDatabasePreview(
         array $sourceInfo,

@@ -3,6 +3,7 @@
 namespace Noo\LaravelRemoteSync;
 
 use Illuminate\Contracts\Process\ProcessResult;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
 use InvalidArgumentException;
 use Noo\LaravelRemoteSync\Data\RemoteConfig;
@@ -261,4 +262,115 @@ class RemoteSyncService
 
         return $this->executeRemoteCommand($remote, $command, $timeout);
     }
+
+    /**
+     * Run rsync in dry-run mode for download and return output for analysis.
+     */
+    public function rsyncDryRun(
+        RemoteConfig $remote,
+        string $sourcePath,
+        string $destinationPath,
+        array $options = []
+    ): ProcessResult {
+        $defaultOptions = ['-avz', '--dry-run', '--itemize-changes'];
+
+        $excludePaths = config('remote-sync.exclude_paths', []);
+        $excludeOptions = collect($excludePaths)
+            ->map(fn (string $pattern) => '--exclude='.escapeshellarg($pattern))
+            ->all();
+
+        $options = array_merge($defaultOptions, $excludeOptions, $options);
+
+        $source = "{$remote->host}:{$sourcePath}";
+
+        return Process::timeout(120)
+            ->run(array_merge(['rsync'], $options, [$source, $destinationPath]));
+    }
+
+    /**
+     * Run rsync in dry-run mode for upload and return output for analysis.
+     */
+    public function rsyncUploadDryRun(
+        RemoteConfig $remote,
+        string $sourcePath,
+        string $destinationPath,
+        array $options = []
+    ): ProcessResult {
+        $defaultOptions = ['-avz', '--dry-run', '--itemize-changes'];
+
+        $excludePaths = config('remote-sync.exclude_paths', []);
+        $excludeOptions = collect($excludePaths)
+            ->map(fn (string $pattern) => '--exclude='.escapeshellarg($pattern))
+            ->all();
+
+        $options = array_merge($defaultOptions, $excludeOptions, $options);
+
+        $destination = "{$remote->host}:{$destinationPath}";
+
+        return Process::timeout(120)
+            ->run(array_merge(['rsync'], $options, [$sourcePath, $destination]));
+    }
+
+    /**
+     * Get table names and row counts from a remote database.
+     *
+     * @return array<string, int>
+     */
+    public function getRemoteTableInfo(RemoteConfig $remote): array
+    {
+        $escapedPath = escapeshellarg($remote->workingPath());
+        $code = <<<'PHP'
+$tables = DB::connection()->getSchemaBuilder()->getTableListing();
+$info = [];
+foreach ($tables as $table) {
+    try {
+        $info[$table] = DB::table($table)->count();
+    } catch (\Throwable $e) {
+        $info[$table] = 0;
+    }
+}
+echo json_encode($info);
+PHP;
+
+        $escapedCode = escapeshellarg($code);
+        $command = "cd {$escapedPath} && php artisan tinker --execute={$escapedCode}";
+
+        $result = $this->executeRemoteCommand($remote, $command, 60);
+
+        if (! $result->successful()) {
+            return [];
+        }
+
+        $output = trim($result->output());
+
+        $decoded = json_decode($output, true);
+
+        if (! is_array($decoded)) {
+            return [];
+        }
+
+        return $decoded;
+    }
+
+    /**
+     * Get table names and row counts from the local database.
+     *
+     * @return array<string, int>
+     */
+    public function getLocalTableInfo(): array
+    {
+        $tables = DB::connection()->getSchemaBuilder()->getTableListing();
+        $info = [];
+
+        foreach ($tables as $table) {
+            try {
+                $info[$table] = DB::table($table)->count();
+            } catch (\Throwable $e) {
+                $info[$table] = 0;
+            }
+        }
+
+        return $info;
+    }
+
 }

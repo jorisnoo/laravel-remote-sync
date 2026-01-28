@@ -74,6 +74,12 @@ describe('PushDatabaseCommand', function () {
                 ->once()
                 ->andReturn(null);
 
+            $mock->shouldReceive('getLocalTableInfo')
+                ->andReturn([]);
+
+            $mock->shouldReceive('getRemoteTableInfo')
+                ->andReturn([]);
+
             $mock->shouldReceive('createRemoteBackup')
                 ->once()
                 ->andReturn($mockProcessResult);
@@ -151,6 +157,12 @@ describe('PushDatabaseCommand', function () {
             $mock->shouldReceive('getRemoteDatabaseDriver')
                 ->andReturn('sqlite');
 
+            $mock->shouldReceive('getLocalTableInfo')
+                ->andReturn([]);
+
+            $mock->shouldReceive('getRemoteTableInfo')
+                ->andReturn([]);
+
             $mock->shouldReceive('createRemoteBackup')
                 ->once()
                 ->andReturn($mockProcessResult);
@@ -203,6 +215,12 @@ describe('PushDatabaseCommand', function () {
 
             $mock->shouldReceive('getRemoteDatabaseDriver')
                 ->andReturn('sqlite');
+
+            $mock->shouldReceive('getLocalTableInfo')
+                ->andReturn([]);
+
+            $mock->shouldReceive('getRemoteTableInfo')
+                ->andReturn([]);
 
             $mock->shouldReceive('createRemoteBackup')
                 ->once()
@@ -260,6 +278,12 @@ describe('PushDatabaseCommand', function () {
             $mock->shouldReceive('getRemoteDatabaseDriver')
                 ->andReturn('sqlite');
 
+            $mock->shouldReceive('getLocalTableInfo')
+                ->andReturn([]);
+
+            $mock->shouldReceive('getRemoteTableInfo')
+                ->andReturn([]);
+
             $mock->shouldReceive('createRemoteBackup')
                 ->once()
                 ->andReturn($mockProcessResult);
@@ -314,6 +338,12 @@ describe('PushDatabaseCommand', function () {
 
             $mock->shouldReceive('getRemoteDatabaseDriver')
                 ->andReturn('sqlite');
+
+            $mock->shouldReceive('getLocalTableInfo')
+                ->andReturn([]);
+
+            $mock->shouldReceive('getRemoteTableInfo')
+                ->andReturn([]);
 
             $mock->shouldReceive('createRemoteBackup')
                 ->once()

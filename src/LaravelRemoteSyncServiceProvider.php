@@ -3,12 +3,12 @@
 namespace Noo\LaravelRemoteSync;
 
 use Noo\LaravelRemoteSync\Commands\CleanupSnapshotsCommand;
-use Noo\LaravelRemoteSync\Commands\PushDatabaseCommand;
-use Noo\LaravelRemoteSync\Commands\PushFilesCommand;
-use Noo\LaravelRemoteSync\Commands\PushRemoteCommand;
 use Noo\LaravelRemoteSync\Commands\PullDatabaseCommand;
 use Noo\LaravelRemoteSync\Commands\PullFilesCommand;
 use Noo\LaravelRemoteSync\Commands\PullRemoteCommand;
+use Noo\LaravelRemoteSync\Commands\PushDatabaseCommand;
+use Noo\LaravelRemoteSync\Commands\PushFilesCommand;
+use Noo\LaravelRemoteSync\Commands\PushRemoteCommand;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 

@@ -22,6 +22,12 @@ class PushDatabaseCommand extends Command
 
     protected bool $localSnapshotCreated = false;
 
+    /** @var array<string, int> */
+    protected array $localTableInfo = [];
+
+    /** @var array<string, int> */
+    protected array $remoteTableInfo = [];
+
     public function handle(): int
     {
         if (! $this->ensureNotProduction()) {
@@ -45,6 +51,8 @@ class PushDatabaseCommand extends Command
         }
 
         $this->snapshotName = $this->generateSnapshotName();
+
+        $this->fetchAndDisplayPreview();
 
         if (! $this->option('force') && ! $this->confirmPush('database')) {
             $this->components->info(__('remote-sync::messages.info.operation_cancelled'));
@@ -84,6 +92,23 @@ class PushDatabaseCommand extends Command
         $this->components->success(__('remote-sync::messages.success.database_pushed', ['name' => $this->remote->name]));
 
         return self::SUCCESS;
+    }
+
+    protected function fetchAndDisplayPreview(): void
+    {
+        $this->localTableInfo = $this->syncService->getLocalTableInfo();
+
+        $this->remoteTableInfo = spin(
+            callback: fn () => $this->syncService->getRemoteTableInfo($this->remote),
+            message: __('remote-sync::messages.spinners.fetching_remote_table_info')
+        );
+
+        $this->displayDatabasePreview(
+            $this->localTableInfo,
+            $this->remoteTableInfo,
+            [],
+            true
+        );
     }
 
     protected function createRemoteBackup(): bool

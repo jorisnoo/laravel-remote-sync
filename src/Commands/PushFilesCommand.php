@@ -5,6 +5,8 @@ namespace Noo\LaravelRemoteSync\Commands;
 use Illuminate\Console\Command;
 use Noo\LaravelRemoteSync\Concerns\InteractsWithRemote;
 
+use function Laravel\Prompts\spin;
+
 class PushFilesCommand extends Command
 {
     use InteractsWithRemote;
@@ -23,6 +25,10 @@ class PushFilesCommand extends Command
     protected bool $isDryRun;
 
     protected bool $shouldDelete;
+
+    protected int $filesToTransfer = 0;
+
+    protected int $filesToDelete = 0;
 
     public function handle(): int
     {
@@ -54,10 +60,12 @@ class PushFilesCommand extends Command
         $this->isDryRun = $this->promptDryRunOption();
         $this->shouldDelete = $this->promptDeleteOption('remote');
 
+        $this->analyzeAndDisplayPreview($paths);
+
         if ($this->isDryRun) {
             $this->components->info(__('remote-sync::messages.info.dry_run_mode'));
 
-            return $this->performDryRun($paths);
+            return self::SUCCESS;
         }
 
         if (! $this->option('force')) {
@@ -103,51 +111,49 @@ class PushFilesCommand extends Command
         );
     }
 
-    protected function performDryRun(array $paths): int
+    protected function analyzeAndDisplayPreview(array $paths): void
     {
-        foreach ($paths as $path) {
-            $validationError = $this->validateStoragePath($path);
+        $this->filesToTransfer = 0;
+        $this->filesToDelete = 0;
 
-            if ($validationError !== null) {
-                $this->components->error($validationError);
+        spin(
+            callback: function () use ($paths) {
+                foreach ($paths as $path) {
+                    $validationError = $this->validateStoragePath($path);
 
-                return self::FAILURE;
-            }
+                    if ($validationError !== null) {
+                        continue;
+                    }
 
-            $localPath = storage_path($path);
+                    $localPath = storage_path($path);
 
-            if (! is_dir($localPath)) {
-                $this->components->warn(__('remote-sync::messages.warnings.local_path_not_exists', ['path' => $path]));
+                    if (! is_dir($localPath)) {
+                        continue;
+                    }
 
-                continue;
-            }
+                    $localPath = rtrim($localPath, '/').'/';
+                    $remotePath = "{$this->remote->storagePath()}/{$path}/";
 
-            $localPath = rtrim($localPath, '/').'/';
-            $remotePath = "{$this->remote->storagePath()}/{$path}/";
+                    $options = $this->shouldDelete ? ['--delete'] : [];
 
-            $this->components->info(__('remote-sync::messages.info.would_sync_path', ['path' => $path]));
+                    $result = $this->syncService->rsyncUploadDryRun(
+                        $this->remote,
+                        $localPath,
+                        $remotePath,
+                        $options
+                    );
 
-            $options = ['--partial', '--info=progress2', '--dry-run'];
+                    if ($result->successful()) {
+                        $counts = $this->parseRsyncDryRunOutput($result->output());
+                        $this->filesToTransfer += $counts['transfer'];
+                        $this->filesToDelete += $counts['delete'];
+                    }
+                }
+            },
+            message: __('remote-sync::messages.spinners.analyzing_files')
+        );
 
-            if ($this->shouldDelete) {
-                $options[] = '--delete';
-            }
-
-            $result = $this->syncService->rsyncUpload(
-                $this->remote,
-                $localPath,
-                $remotePath,
-                $options
-            );
-
-            if (! $result->successful()) {
-                $this->components->error(__('remote-sync::messages.errors.failed_dry_run', ['path' => $path, 'error' => $result->errorOutput()]));
-
-                return self::FAILURE;
-            }
-        }
-
-        return self::SUCCESS;
+        $this->displayFilesPreview($this->filesToTransfer, $this->filesToDelete);
     }
 
     protected function pushPath(string $path): bool

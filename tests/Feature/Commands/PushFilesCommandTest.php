@@ -62,6 +62,7 @@ describe('PushFilesCommand', function () {
 
         $mockResult = Mockery::mock(ProcessResult::class);
         $mockResult->shouldReceive('successful')->andReturn(true);
+        $mockResult->shouldReceive('output')->andReturn('');
 
         $this->mock(RemoteSyncService::class, function ($mock) use ($mockResult) {
             $mock->shouldReceive('getRemote')
@@ -75,11 +76,7 @@ describe('PushFilesCommand', function () {
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
-            $mock->shouldReceive('rsyncUpload')
-                ->once()
-                ->withArgs(function ($remote, $localPath, $remotePath, $options) {
-                    return in_array('--dry-run', $options);
-                })
+            $mock->shouldReceive('rsyncUploadDryRun')
                 ->andReturn($mockResult);
         });
 
@@ -89,7 +86,6 @@ describe('PushFilesCommand', function () {
             '--force' => true,
         ])
             ->expectsOutputToContain('Dry run mode')
-            ->expectsOutputToContain('Would sync: app/public')
             ->assertSuccessful();
 
         if (is_dir($testPath) && count(scandir($testPath)) == 2) {
@@ -112,6 +108,7 @@ describe('PushFilesCommand', function () {
 
         $mockResult = Mockery::mock(ProcessResult::class);
         $mockResult->shouldReceive('successful')->andReturn(true);
+        $mockResult->shouldReceive('output')->andReturn('');
 
         $this->mock(RemoteSyncService::class, function ($mock) use ($mockResult) {
             $mock->shouldReceive('getRemote')
@@ -124,6 +121,9 @@ describe('PushFilesCommand', function () {
 
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
+
+            $mock->shouldReceive('rsyncUploadDryRun')
+                ->andReturn($mockResult);
 
             $mock->shouldReceive('rsyncUpload')
                 ->twice()
@@ -158,6 +158,7 @@ describe('PushFilesCommand', function () {
 
         $mockResult = Mockery::mock(ProcessResult::class);
         $mockResult->shouldReceive('successful')->andReturn(true);
+        $mockResult->shouldReceive('output')->andReturn('');
 
         $this->mock(RemoteSyncService::class, function ($mock) use ($mockResult) {
             $mock->shouldReceive('getRemote')
@@ -170,6 +171,9 @@ describe('PushFilesCommand', function () {
 
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
+
+            $mock->shouldReceive('rsyncUploadDryRun')
+                ->andReturn($mockResult);
 
             $mock->shouldReceive('rsyncUpload')
                 ->once()
@@ -200,6 +204,7 @@ describe('PushFilesCommand', function () {
 
         $mockResult = Mockery::mock(ProcessResult::class);
         $mockResult->shouldReceive('successful')->andReturn(true);
+        $mockResult->shouldReceive('output')->andReturn('');
 
         $this->mock(RemoteSyncService::class, function ($mock) use ($mockResult) {
             $mock->shouldReceive('getRemote')
@@ -212,6 +217,9 @@ describe('PushFilesCommand', function () {
 
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
+
+            $mock->shouldReceive('rsyncUploadDryRun')
+                ->andReturn($mockResult);
 
             $mock->shouldReceive('rsyncUpload')
                 ->once()
@@ -238,7 +246,11 @@ describe('PushFilesCommand', function () {
         $this->setUpStagingRemote();
         config()->set('remote-sync.paths', ['app/nonexistent-path']);
 
-        $this->mock(RemoteSyncService::class, function ($mock) {
+        $mockResult = Mockery::mock(ProcessResult::class);
+        $mockResult->shouldReceive('successful')->andReturn(true);
+        $mockResult->shouldReceive('output')->andReturn('');
+
+        $this->mock(RemoteSyncService::class, function ($mock) use ($mockResult) {
             $mock->shouldReceive('getRemote')
                 ->andReturn(new RemoteConfig(
                     name: 'staging',
@@ -249,6 +261,9 @@ describe('PushFilesCommand', function () {
 
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
+
+            $mock->shouldReceive('rsyncUploadDryRun')
+                ->andReturn($mockResult);
         });
 
         $this->artisan('remote-sync:push-files', [
@@ -269,11 +284,15 @@ describe('PushFilesCommand', function () {
             mkdir($testPath, 0755, true);
         }
 
+        $mockDryRunResult = Mockery::mock(ProcessResult::class);
+        $mockDryRunResult->shouldReceive('successful')->andReturn(true);
+        $mockDryRunResult->shouldReceive('output')->andReturn('');
+
         $mockResult = Mockery::mock(ProcessResult::class);
         $mockResult->shouldReceive('successful')->andReturn(false);
         $mockResult->shouldReceive('errorOutput')->andReturn('Connection refused');
 
-        $this->mock(RemoteSyncService::class, function ($mock) use ($mockResult) {
+        $this->mock(RemoteSyncService::class, function ($mock) use ($mockDryRunResult, $mockResult) {
             $mock->shouldReceive('getRemote')
                 ->andReturn(new RemoteConfig(
                     name: 'staging',
@@ -284,6 +303,9 @@ describe('PushFilesCommand', function () {
 
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
+
+            $mock->shouldReceive('rsyncUploadDryRun')
+                ->andReturn($mockDryRunResult);
 
             $mock->shouldReceive('rsyncUpload')
                 ->once()
