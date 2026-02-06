@@ -240,10 +240,23 @@ trait InteractsWithRemote
         array $sourceInfo,
         array $targetInfo,
         array $excludedTables,
-        bool $fullMode
+        bool $fullMode,
+        string $direction = 'pull'
     ): void {
+        $headerKey = $direction === 'push'
+            ? 'remote-sync::messages.preview.database_push_header'
+            : 'remote-sync::messages.preview.database_pull_header';
+
+        $tablesKey = $direction === 'push'
+            ? 'remote-sync::messages.preview.tables_to_push'
+            : 'remote-sync::messages.preview.tables_to_pull';
+
+        $excludedHeaderKey = $direction === 'push'
+            ? 'remote-sync::messages.preview.tables_preserved_header'
+            : 'remote-sync::messages.preview.tables_to_truncate_header';
+
         $this->newLine();
-        $this->components->info(__('remote-sync::messages.preview.database_header'));
+        $this->components->info(__($headerKey));
 
         $tablesToSync = $fullMode
             ? array_keys($sourceInfo)
@@ -258,7 +271,7 @@ trait InteractsWithRemote
         }
 
         $this->components->twoColumnDetail(
-            __('remote-sync::messages.preview.tables_to_pull'),
+            __($tablesKey),
             count($tablesToSync).' '.trans_choice('table|tables', count($tablesToSync))
         );
 
@@ -280,7 +293,7 @@ trait InteractsWithRemote
 
             if (! empty($existingExcluded)) {
                 $this->newLine();
-                $this->line('  '.__('remote-sync::messages.preview.tables_to_truncate_header'));
+                $this->line('  '.__($excludedHeaderKey));
 
                 foreach ($existingExcluded as $table) {
                     $this->line("  • {$table}");
