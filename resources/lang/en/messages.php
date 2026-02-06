@@ -124,14 +124,12 @@ return [
     */
 
     'preview' => [
-        'database_pull_header' => 'Database pull preview:',
-        'database_push_header' => 'Database push preview:',
-        'tables_to_pull' => 'Tables to pull',
-        'tables_to_push' => 'Tables to push',
-        'source_rows' => 'Source rows (approx)',
-        'target_rows' => 'Target rows to replace',
-        'tables_to_truncate_header' => 'Tables that will be truncated (excluded from pull):',
-        'tables_preserved_header' => 'Tables preserved on remote (excluded from push):',
+        'database_pull_header' => 'Database pull preview: remote → local',
+        'database_push_header' => 'Database push preview: local → remote',
+        'syncing_tables' => 'Syncing :count table:|Syncing :count tables:',
+        'syncing_tables_full' => 'Syncing :count table (full import):|Syncing :count tables (full import):',
+        'excluded_tables_truncate' => 'Excluded :count table (will be truncated locally):|Excluded :count tables (will be truncated locally):',
+        'excluded_tables_preserved' => 'Excluded :count table (preserved on remote):|Excluded :count tables (preserved on remote):',
         'files_pull_header' => 'Files pull preview:',
         'files_push_header' => 'Files push preview:',
         'files_to_transfer' => 'Files to transfer',

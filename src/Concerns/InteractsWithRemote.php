@@ -232,13 +232,13 @@ trait InteractsWithRemote
     /**
      * Display a database sync preview.
      *
-     * @param  array<string, int>  $sourceInfo
-     * @param  array<string, int>  $targetInfo
+     * @param  array<int, string>  $sourceTables
+     * @param  array<int, string>  $targetTables
      * @param  array<int, string>  $excludedTables
      */
     protected function displayDatabasePreview(
-        array $sourceInfo,
-        array $targetInfo,
+        array $sourceTables,
+        array $targetTables,
         array $excludedTables,
         bool $fullMode,
         string $direction = 'pull'
@@ -247,57 +247,42 @@ trait InteractsWithRemote
             ? 'remote-sync::messages.preview.database_push_header'
             : 'remote-sync::messages.preview.database_pull_header';
 
-        $tablesKey = $direction === 'push'
-            ? 'remote-sync::messages.preview.tables_to_push'
-            : 'remote-sync::messages.preview.tables_to_pull';
+        $tablesToSync = $fullMode
+            ? $sourceTables
+            : array_values(array_diff($sourceTables, $excludedTables));
 
-        $excludedHeaderKey = $direction === 'push'
-            ? 'remote-sync::messages.preview.tables_preserved_header'
-            : 'remote-sync::messages.preview.tables_to_truncate_header';
+        sort($tablesToSync);
+
+        $syncCount = count($tablesToSync);
 
         $this->newLine();
         $this->components->info(__($headerKey));
 
-        $tablesToSync = $fullMode
-            ? array_keys($sourceInfo)
-            : array_diff(array_keys($sourceInfo), $excludedTables);
+        $syncLabelKey = $fullMode
+            ? 'remote-sync::messages.preview.syncing_tables_full'
+            : 'remote-sync::messages.preview.syncing_tables';
 
-        $sourceRowCount = 0;
-        $targetRowCount = 0;
-
-        foreach ($tablesToSync as $table) {
-            $sourceRowCount += $sourceInfo[$table] ?? 0;
-            $targetRowCount += $targetInfo[$table] ?? 0;
-        }
-
-        $this->components->twoColumnDetail(
-            __($tablesKey),
-            count($tablesToSync).' '.trans_choice('table|tables', count($tablesToSync))
-        );
-
-        $this->components->twoColumnDetail(
-            __('remote-sync::messages.preview.source_rows'),
-            number_format($sourceRowCount)
-        );
-
-        $this->components->twoColumnDetail(
-            __('remote-sync::messages.preview.target_rows'),
-            number_format($targetRowCount)
-        );
+        $this->line('  '.trans_choice(__($syncLabelKey), $syncCount, ['count' => $syncCount]));
+        $this->line('  '.implode(', ', $tablesToSync));
 
         if (! $fullMode && ! empty($excludedTables)) {
-            $existingExcluded = array_filter(
+            $existingExcluded = array_values(array_filter(
                 $excludedTables,
-                fn (string $table) => isset($targetInfo[$table])
-            );
+                fn (string $table) => in_array($table, $targetTables, true)
+            ));
 
             if (! empty($existingExcluded)) {
-                $this->newLine();
-                $this->line('  '.__($excludedHeaderKey));
+                sort($existingExcluded);
 
-                foreach ($existingExcluded as $table) {
-                    $this->line("  • {$table}");
-                }
+                $excludedCount = count($existingExcluded);
+
+                $excludedLabelKey = $direction === 'push'
+                    ? 'remote-sync::messages.preview.excluded_tables_preserved'
+                    : 'remote-sync::messages.preview.excluded_tables_truncate';
+
+                $this->newLine();
+                $this->line('  '.trans_choice(__($excludedLabelKey), $excludedCount, ['count' => $excludedCount]));
+                $this->line('  '.implode(', ', $existingExcluded));
             }
         }
 

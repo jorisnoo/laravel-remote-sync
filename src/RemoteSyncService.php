@@ -242,7 +242,7 @@ class RemoteSyncService
     {
         $escapedPath = escapeshellarg($remote->workingPath());
         $escapedSnapshotName = escapeshellarg($snapshotName);
-        $command = "cd {$escapedPath} && php artisan snapshot:load {$escapedSnapshotName} --force";
+        $command = "cd {$escapedPath} && php artisan snapshot:load {$escapedSnapshotName} --force --drop-tables=0";
         $timeout = config('remote-sync.timeouts.snapshot_load', config('remote-sync.timeouts.snapshot_create', 300));
 
         return $this->executeRemoteCommand($remote, $command, $timeout);
@@ -312,25 +312,17 @@ class RemoteSyncService
     }
 
     /**
-     * Get table names and row counts from a remote database.
+     * Get table names from a remote database.
      *
-     * @return array<string, int>
+     * @return array<int, string>
      */
-    public function getRemoteTableInfo(RemoteConfig $remote): array
+    public function getRemoteTableNames(RemoteConfig $remote): array
     {
         $escapedPath = escapeshellarg($remote->workingPath());
         $code = <<<'PHP'
 $schemaBuilder = DB::connection()->getSchemaBuilder();
 $tables = $schemaBuilder->getTableListing($schemaBuilder->getCurrentSchemaName(), schemaQualified: false);
-$info = [];
-foreach ($tables as $table) {
-    try {
-        $info[$table] = DB::table($table)->count();
-    } catch (\Throwable $e) {
-        $info[$table] = 0;
-    }
-}
-echo json_encode($info);
+echo json_encode(array_values($tables));
 PHP;
 
         $escapedCode = escapeshellarg($code);
@@ -354,27 +346,17 @@ PHP;
     }
 
     /**
-     * Get table names and row counts from the local database.
+     * Get table names from the local database.
      *
-     * @return array<string, int>
+     * @return array<int, string>
      */
-    public function getLocalTableInfo(): array
+    public function getLocalTableNames(): array
     {
         $schemaBuilder = DB::connection()->getSchemaBuilder();
-        $tables = $schemaBuilder->getTableListing(
+
+        return $schemaBuilder->getTableListing(
             $schemaBuilder->getCurrentSchemaName(),
             schemaQualified: false
         );
-        $info = [];
-
-        foreach ($tables as $table) {
-            try {
-                $info[$table] = DB::table($table)->count();
-            } catch (\Throwable $e) {
-                $info[$table] = 0;
-            }
-        }
-
-        return $info;
     }
 }

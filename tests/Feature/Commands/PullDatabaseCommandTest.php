@@ -61,10 +61,10 @@ describe('PullDatabaseCommand', function () {
                 ->once()
                 ->andReturn(null);
 
-            $mock->shouldReceive('getRemoteTableInfo')
+            $mock->shouldReceive('getRemoteTableNames')
                 ->andReturn([]);
 
-            $mock->shouldReceive('getLocalTableInfo')
+            $mock->shouldReceive('getLocalTableNames')
                 ->andReturn([]);
 
             $mock->shouldReceive('createRemoteSnapshot')
@@ -141,10 +141,10 @@ describe('PullDatabaseCommand', function () {
             $mock->shouldReceive('getRemoteDatabaseDriver')
                 ->andReturn('mysql');
 
-            $mock->shouldReceive('getRemoteTableInfo')
+            $mock->shouldReceive('getRemoteTableNames')
                 ->andReturn([]);
 
-            $mock->shouldReceive('getLocalTableInfo')
+            $mock->shouldReceive('getLocalTableNames')
                 ->andReturn([]);
 
             $mock->shouldReceive('createRemoteSnapshot')
@@ -194,10 +194,10 @@ describe('PullDatabaseCommand', function () {
             $mock->shouldReceive('getRemoteDatabaseDriver')
                 ->andReturn('mysql');
 
-            $mock->shouldReceive('getRemoteTableInfo')
+            $mock->shouldReceive('getRemoteTableNames')
                 ->andReturn([]);
 
-            $mock->shouldReceive('getLocalTableInfo')
+            $mock->shouldReceive('getLocalTableNames')
                 ->andReturn([]);
 
             $mock->shouldReceive('createRemoteSnapshot')
@@ -247,10 +247,10 @@ describe('PullDatabaseCommand', function () {
             $mock->shouldReceive('getRemoteDatabaseDriver')
                 ->andReturn('mysql');
 
-            $mock->shouldReceive('getRemoteTableInfo')
+            $mock->shouldReceive('getRemoteTableNames')
                 ->andReturn([]);
 
-            $mock->shouldReceive('getLocalTableInfo')
+            $mock->shouldReceive('getLocalTableNames')
                 ->andReturn([]);
 
             $mock->shouldReceive('createRemoteSnapshot')
@@ -307,10 +307,10 @@ describe('PullDatabaseCommand', function () {
             $mock->shouldReceive('getRemoteDatabaseDriver')
                 ->andReturn('mysql');
 
-            $mock->shouldReceive('getRemoteTableInfo')
+            $mock->shouldReceive('getRemoteTableNames')
                 ->andReturn([]);
 
-            $mock->shouldReceive('getLocalTableInfo')
+            $mock->shouldReceive('getLocalTableNames')
                 ->andReturn([]);
 
             $mock->shouldReceive('createRemoteSnapshot')

@@ -34,11 +34,11 @@ class PullDatabaseCommand extends Command
 
     protected bool $keepSnapshot;
 
-    /** @var array<string, int> */
-    protected array $remoteTableInfo = [];
+    /** @var array<int, string> */
+    protected array $remoteTables = [];
 
-    /** @var array<string, int> */
-    protected array $localTableInfo = [];
+    /** @var array<int, string> */
+    protected array $localTables = [];
 
     public function handle(): int
     {
@@ -115,18 +115,18 @@ class PullDatabaseCommand extends Command
 
     protected function fetchAndDisplayPreview(): void
     {
-        $this->remoteTableInfo = spin(
-            callback: fn () => $this->syncService->getRemoteTableInfo($this->remote),
+        $this->remoteTables = spin(
+            callback: fn () => $this->syncService->getRemoteTableNames($this->remote),
             message: __('remote-sync::messages.spinners.fetching_remote_table_info')
         );
 
-        $this->localTableInfo = $this->syncService->getLocalTableInfo();
+        $this->localTables = $this->syncService->getLocalTableNames();
 
         $excludedTables = config('remote-sync.exclude_tables', []);
 
         $this->displayDatabasePreview(
-            $this->remoteTableInfo,
-            $this->localTableInfo,
+            $this->remoteTables,
+            $this->localTables,
             $excludedTables,
             $this->fullImport,
             'pull'
