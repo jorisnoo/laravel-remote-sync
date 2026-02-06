@@ -153,7 +153,7 @@ class PushFilesCommand extends Command
             message: __('remote-sync::messages.spinners.analyzing_files')
         );
 
-        $this->displayFilesPreview($this->filesToTransfer, $this->filesToDelete);
+        $this->displayFilesPreview($this->filesToTransfer, $this->filesToDelete, 'push');
     }
 
     protected function pushPath(string $path): bool

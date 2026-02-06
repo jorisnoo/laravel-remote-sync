@@ -119,6 +119,7 @@ return [
 
     'timeouts' => [
         'snapshot_create' => 300,
+        'snapshot_load' => 300,
         'snapshot_download' => 600,
         'snapshot_upload' => 600,
         'snapshot_cleanup' => 60,

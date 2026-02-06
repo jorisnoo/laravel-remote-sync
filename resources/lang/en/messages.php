@@ -114,6 +114,7 @@ return [
         'loading_remote_snapshot' => 'Loading snapshot on [:name]...',
         'fetching_remote_table_info' => 'Fetching remote table info...',
         'analyzing_files_to_pull' => 'Analyzing files to pull...',
+        'analyzing_files' => 'Analyzing files...',
     ],
 
     /*
@@ -131,7 +132,8 @@ return [
         'target_rows' => 'Target rows to replace',
         'tables_to_truncate_header' => 'Tables that will be truncated (excluded from pull):',
         'tables_preserved_header' => 'Tables preserved on remote (excluded from push):',
-        'files_header' => 'Files pull preview:',
+        'files_pull_header' => 'Files pull preview:',
+        'files_push_header' => 'Files push preview:',
         'files_to_transfer' => 'Files to transfer',
         'files_to_delete' => 'Files to delete',
     ],
