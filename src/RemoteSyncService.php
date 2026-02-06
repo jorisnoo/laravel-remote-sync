@@ -320,7 +320,8 @@ class RemoteSyncService
     {
         $escapedPath = escapeshellarg($remote->workingPath());
         $code = <<<'PHP'
-$tables = DB::connection()->getSchemaBuilder()->getTableListing();
+$schemaBuilder = DB::connection()->getSchemaBuilder();
+$tables = $schemaBuilder->getTableListing($schemaBuilder->getCurrentSchemaName(), schemaQualified: false);
 $info = [];
 foreach ($tables as $table) {
     try {
@@ -359,7 +360,11 @@ PHP;
      */
     public function getLocalTableInfo(): array
     {
-        $tables = DB::connection()->getSchemaBuilder()->getTableListing();
+        $schemaBuilder = DB::connection()->getSchemaBuilder();
+        $tables = $schemaBuilder->getTableListing(
+            $schemaBuilder->getCurrentSchemaName(),
+            schemaQualified: false
+        );
         $info = [];
 
         foreach ($tables as $table) {
