@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.2](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.3.2) (2026-02-06)
+
+### Features
+
+- add snapshot_load timeout, direction-aware file preview headers, and cross-platform stat fallback ([a024721](https://github.com/jorisnoo/laravel-remote-sync/commit/a024721568ebb69eee0e076e73575f0c4fb4d6ab))
+- support exclude_tables config in push-db command with direction-aware preview labels ([90a4c8a](https://github.com/jorisnoo/laravel-remote-sync/commit/90a4c8a5ee6ca8088617de7c048ea18f4b2430e1))
+- add preview for push-db and push-files commands ([85e8194](https://github.com/jorisnoo/laravel-remote-sync/commit/85e81947822179521a570e0b014a6f983043df81))
+
+### Bug Fixes
+
+- scope getTableListing to current database to avoid cross-database pollution ([b3ac19b](https://github.com/jorisnoo/laravel-remote-sync/commit/b3ac19b450313e5c6968fd0ca711c376febcfe74))
+
+### Code Refactoring
+
+- simplify database preview to show table names only, remove row counts, and improve pluralized labels ([f99d95d](https://github.com/jorisnoo/laravel-remote-sync/commit/f99d95d3246397fc75faebc57d5f2953f2d2dfa8))
+- rename Sync commands to Pull for clearer terminology ([b0ec5d6](https://github.com/jorisnoo/laravel-remote-sync/commit/b0ec5d6e1314058752fc5cc20a011a8e053a2bfc))
+
+### Build System
+
+- add support URLs and author homepage for Packagist ([74f75ee](https://github.com/jorisnoo/laravel-remote-sync/commit/74f75eed30e782bb01aa5a1e488315ae961bc4a4))
 ## [0.3.1](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.3.1) (2026-01-21)
 
 ### Features
