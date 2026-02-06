@@ -123,11 +123,14 @@ return [
     */
 
     'preview' => [
-        'database_header' => 'Database pull preview:',
+        'database_pull_header' => 'Database pull preview:',
+        'database_push_header' => 'Database push preview:',
         'tables_to_pull' => 'Tables to pull',
+        'tables_to_push' => 'Tables to push',
         'source_rows' => 'Source rows (approx)',
         'target_rows' => 'Target rows to replace',
         'tables_to_truncate_header' => 'Tables that will be truncated (excluded from pull):',
+        'tables_preserved_header' => 'Tables preserved on remote (excluded from push):',
         'files_header' => 'Files pull preview:',
         'files_to_transfer' => 'Files to transfer',
         'files_to_delete' => 'Files to delete',

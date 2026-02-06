@@ -308,6 +308,78 @@ describe('PushDatabaseCommand', function () {
             ->assertSuccessful();
     });
 
+    it('excludes configured tables from push preview and snapshot', function () {
+        $this->setUpStagingRemote();
+        config()->set('remote-sync.exclude_tables', ['sessions', 'cache', 'jobs']);
+
+        $mockProcessResult = Mockery::mock(ProcessResult::class);
+        $mockProcessResult->shouldReceive('successful')->andReturn(true);
+        $mockProcessResult->shouldReceive('output')->andReturn('');
+
+        $this->mock(RemoteSyncService::class, function ($mock) use ($mockProcessResult) {
+            $mock->shouldReceive('getRemote')
+                ->andReturn(new RemoteConfig(
+                    name: 'staging',
+                    host: 'user@staging.example.com',
+                    path: '/var/www/app',
+                    pushAllowed: true,
+                ));
+
+            $mock->shouldReceive('isAtomicDeployment')
+                ->andReturn(false);
+
+            $mock->shouldReceive('getRemoteDatabaseDriver')
+                ->andReturn('sqlite');
+
+            $mock->shouldReceive('getLocalTableInfo')
+                ->andReturn([
+                    'users' => 10,
+                    'posts' => 25,
+                    'sessions' => 100,
+                    'cache' => 50,
+                    'jobs' => 5,
+                ]);
+
+            $mock->shouldReceive('getRemoteTableInfo')
+                ->andReturn([
+                    'users' => 8,
+                    'posts' => 20,
+                    'sessions' => 200,
+                    'cache' => 30,
+                    'jobs' => 12,
+                ]);
+
+            $mock->shouldReceive('createRemoteBackup')
+                ->once()
+                ->andReturn($mockProcessResult);
+
+            $mock->shouldReceive('getSnapshotPath')
+                ->andReturn(storage_path('snapshots'));
+
+            $mock->shouldReceive('uploadSnapshot')
+                ->once()
+                ->andReturn($mockProcessResult);
+
+            $mock->shouldReceive('loadRemoteSnapshot')
+                ->once()
+                ->andReturn($mockProcessResult);
+
+            $mock->shouldReceive('deleteRemoteSnapshot')
+                ->once()
+                ->andReturn($mockProcessResult);
+        });
+
+        $this->artisan('remote-sync:push-db', [
+            'remote' => 'staging',
+            '--force' => true,
+        ])
+            ->expectsOutputToContain('Database push preview')
+            ->expectsOutputToContain('Tables to push')
+            ->expectsOutputToContain('Tables preserved on remote (excluded from push)')
+            ->expectsOutputToContain('sessions')
+            ->assertSuccessful();
+    });
+
     it('detects atomic deployment and uses correct path', function () {
         config()->set('remote-sync.remotes', [
             'staging' => [

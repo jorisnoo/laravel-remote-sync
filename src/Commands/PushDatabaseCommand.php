@@ -103,11 +103,14 @@ class PushDatabaseCommand extends Command
             message: __('remote-sync::messages.spinners.fetching_remote_table_info')
         );
 
+        $excludedTables = config('remote-sync.exclude_tables', []);
+
         $this->displayDatabasePreview(
             $this->localTableInfo,
             $this->remoteTableInfo,
-            [],
-            true
+            $excludedTables,
+            false,
+            'push'
         );
     }
 
@@ -135,9 +138,12 @@ class PushDatabaseCommand extends Command
     {
         $this->components->info(__('remote-sync::messages.info.creating_local_snapshot', ['name' => $this->snapshotName]));
 
+        $excludeTables = config('remote-sync.exclude_tables', []);
+
         $exitCode = $this->call(SnapshotCreate::class, [
             'name' => $this->snapshotName,
             '--compress' => true,
+            '--exclude' => $excludeTables,
         ]);
 
         if ($exitCode !== 0) {
