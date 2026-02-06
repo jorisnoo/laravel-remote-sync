@@ -321,7 +321,9 @@ class RemoteSyncService
         $escapedPath = escapeshellarg($remote->workingPath());
         $code = <<<'PHP'
 $schemaBuilder = DB::connection()->getSchemaBuilder();
-$tables = $schemaBuilder->getTableListing($schemaBuilder->getCurrentSchemaName(), schemaQualified: false);
+$tables = method_exists($schemaBuilder, 'getCurrentSchemaName')
+    ? $schemaBuilder->getTableListing($schemaBuilder->getCurrentSchemaName(), schemaQualified: false)
+    : $schemaBuilder->getTableListing();
 echo json_encode(array_values($tables));
 PHP;
 
@@ -354,9 +356,13 @@ PHP;
     {
         $schemaBuilder = DB::connection()->getSchemaBuilder();
 
-        return $schemaBuilder->getTableListing(
-            $schemaBuilder->getCurrentSchemaName(),
-            schemaQualified: false
-        );
+        if (method_exists($schemaBuilder, 'getCurrentSchemaName')) {
+            return $schemaBuilder->getTableListing(
+                $schemaBuilder->getCurrentSchemaName(),
+                schemaQualified: false
+            );
+        }
+
+        return $schemaBuilder->getTableListing();
     }
 }

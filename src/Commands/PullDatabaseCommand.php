@@ -215,12 +215,7 @@ class PullDatabaseCommand extends Command
             return;
         }
 
-        $schemaBuilder = DB::connection()->getSchemaBuilder();
-
-        $existingTables = $schemaBuilder->getTableListing(
-            $schemaBuilder->getCurrentSchemaName(),
-            schemaQualified: false
-        );
+        $existingTables = $this->syncService->getLocalTableNames();
 
         $tablesToTruncate = array_filter(
             $excludedTables,
@@ -231,13 +226,14 @@ class PullDatabaseCommand extends Command
             return;
         }
 
-        $schemaBuilder->disableForeignKeyConstraints();
+        $schema = DB::connection()->getSchemaBuilder();
+        $schema->disableForeignKeyConstraints();
 
         foreach ($tablesToTruncate as $table) {
             DB::table($table)->truncate();
         }
 
-        $schemaBuilder->enableForeignKeyConstraints();
+        $schema->enableForeignKeyConstraints();
     }
 
     protected function checkEmptyDatabaseAndOfferMigrations(): bool
@@ -250,11 +246,7 @@ class PullDatabaseCommand extends Command
             return true;
         }
 
-        $schemaBuilder = DB::connection()->getSchemaBuilder();
-        $existingTables = $schemaBuilder->getTableListing(
-            $schemaBuilder->getCurrentSchemaName(),
-            schemaQualified: false
-        );
+        $existingTables = $this->syncService->getLocalTableNames();
 
         if (! empty($existingTables)) {
             return true;
