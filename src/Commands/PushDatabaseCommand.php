@@ -22,11 +22,11 @@ class PushDatabaseCommand extends Command
 
     protected bool $localSnapshotCreated = false;
 
-    /** @var array<string, int> */
-    protected array $localTableInfo = [];
+    /** @var array<int, string> */
+    protected array $localTables = [];
 
-    /** @var array<string, int> */
-    protected array $remoteTableInfo = [];
+    /** @var array<int, string> */
+    protected array $remoteTables = [];
 
     public function handle(): int
     {
@@ -96,18 +96,18 @@ class PushDatabaseCommand extends Command
 
     protected function fetchAndDisplayPreview(): void
     {
-        $this->localTableInfo = $this->syncService->getLocalTableInfo();
+        $this->localTables = $this->syncService->getLocalTableNames();
 
-        $this->remoteTableInfo = spin(
-            callback: fn () => $this->syncService->getRemoteTableInfo($this->remote),
+        $this->remoteTables = spin(
+            callback: fn () => $this->syncService->getRemoteTableNames($this->remote),
             message: __('remote-sync::messages.spinners.fetching_remote_table_info')
         );
 
         $excludedTables = config('remote-sync.exclude_tables', []);
 
         $this->displayDatabasePreview(
-            $this->localTableInfo,
-            $this->remoteTableInfo,
+            $this->localTables,
+            $this->remoteTables,
             $excludedTables,
             false,
             'push'
