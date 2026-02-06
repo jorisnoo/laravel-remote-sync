@@ -330,7 +330,7 @@ describe('RemoteSyncService', function () {
     });
 
     describe('listRemoteSnapshots', function () {
-        it('builds correct stat command', function () {
+        it('builds correct stat command with GNU and BSD fallback', function () {
             Process::fake();
 
             $remote = new RemoteConfig(
@@ -343,7 +343,8 @@ describe('RemoteSyncService', function () {
 
             Process::assertRan(function ($process) {
                 return str_contains($process->command[2], "stat -c '%Y %n'")
-                    && str_contains($process->command[2], "'/var/www/app/storage/snapshots'/*.sql.gz");
+                    && str_contains($process->command[2], "stat -f '%m %N'")
+                    && str_contains($process->command[2], "'/var/www/app/storage/snapshots'");
             });
         });
     });

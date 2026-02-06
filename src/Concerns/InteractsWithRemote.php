@@ -307,10 +307,14 @@ trait InteractsWithRemote
     /**
      * Display a files sync preview.
      */
-    protected function displayFilesPreview(int $filesToTransfer, int $filesToDelete): void
+    protected function displayFilesPreview(int $filesToTransfer, int $filesToDelete, string $direction = 'pull'): void
     {
+        $headerKey = $direction === 'push'
+            ? 'remote-sync::messages.preview.files_push_header'
+            : 'remote-sync::messages.preview.files_pull_header';
+
         $this->newLine();
-        $this->components->info(__('remote-sync::messages.preview.files_header'));
+        $this->components->info(__($headerKey));
 
         $this->components->twoColumnDetail(
             __('remote-sync::messages.preview.files_to_transfer'),

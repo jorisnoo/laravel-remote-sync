@@ -188,7 +188,7 @@ class RemoteSyncService
         $subdir = $this->getSnapshotSubdirectory();
         $snapshotPath = "{$remote->storagePath()}/{$subdir}";
         $escapedSnapshotPath = escapeshellarg($snapshotPath);
-        $command = "stat -c '%Y %n' {$escapedSnapshotPath}/*.sql.gz 2>/dev/null | sort -rn || true";
+        $command = "find {$escapedSnapshotPath} -maxdepth 1 -name '*.sql.gz' -exec stat -c '%Y %n' {} + 2>/dev/null || find {$escapedSnapshotPath} -maxdepth 1 -name '*.sql.gz' -exec stat -f '%m %N' {} + 2>/dev/null | sort -rn || true";
         $timeout = config('remote-sync.timeouts.snapshot_cleanup', 60);
 
         return $this->executeRemoteCommand($remote, $command, $timeout);
@@ -243,7 +243,7 @@ class RemoteSyncService
         $escapedPath = escapeshellarg($remote->workingPath());
         $escapedSnapshotName = escapeshellarg($snapshotName);
         $command = "cd {$escapedPath} && php artisan snapshot:load {$escapedSnapshotName} --force";
-        $timeout = config('remote-sync.timeouts.snapshot_create', 300);
+        $timeout = config('remote-sync.timeouts.snapshot_load', config('remote-sync.timeouts.snapshot_create', 300));
 
         return $this->executeRemoteCommand($remote, $command, $timeout);
     }
