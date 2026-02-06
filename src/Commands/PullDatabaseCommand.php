@@ -128,7 +128,8 @@ class PullDatabaseCommand extends Command
             $this->remoteTableInfo,
             $this->localTableInfo,
             $excludedTables,
-            $this->fullImport
+            $this->fullImport,
+            'pull'
         );
     }
 
@@ -216,7 +217,10 @@ class PullDatabaseCommand extends Command
 
         $schemaBuilder = DB::connection()->getSchemaBuilder();
 
-        $existingTables = $schemaBuilder->getTableListing();
+        $existingTables = $schemaBuilder->getTableListing(
+            $schemaBuilder->getCurrentSchemaName(),
+            schemaQualified: false
+        );
 
         $tablesToTruncate = array_filter(
             $excludedTables,
@@ -247,7 +251,10 @@ class PullDatabaseCommand extends Command
         }
 
         $schemaBuilder = DB::connection()->getSchemaBuilder();
-        $existingTables = $schemaBuilder->getTableListing();
+        $existingTables = $schemaBuilder->getTableListing(
+            $schemaBuilder->getCurrentSchemaName(),
+            schemaQualified: false
+        );
 
         if (! empty($existingTables)) {
             return true;
