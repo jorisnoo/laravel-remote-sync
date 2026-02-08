@@ -186,11 +186,15 @@ class PullDatabaseCommand extends Command
     {
         $this->components->info(__('remote-sync::messages.info.loading_snapshot'));
 
+        $previousMemoryLimit = ini_set('memory_limit', '-1');
+
         $exitCode = $this->call(SnapshotLoad::class, [
             'name' => $this->snapshotName,
             '--force' => true,
             '--drop-tables' => $this->fullImport ? 1 : 0,
         ]);
+
+        ini_set('memory_limit', $previousMemoryLimit);
 
         if ($exitCode !== 0) {
             $this->components->error(__('remote-sync::messages.errors.failed_load_snapshot'));
