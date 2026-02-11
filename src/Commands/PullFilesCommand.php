@@ -34,8 +34,16 @@ class PullFilesCommand extends Command
             return self::FAILURE;
         }
 
+        $remoteName = $this->argument('remote') ?? $this->selectRemote();
+
+        if (! $remoteName) {
+            $this->components->error(__('remote-sync::messages.errors.no_remote_selected'));
+
+            return self::FAILURE;
+        }
+
         try {
-            $this->initializeRemote($this->argument('remote'));
+            $this->initializeRemote($remoteName);
         } catch (\InvalidArgumentException $e) {
             $this->components->error($e->getMessage());
 

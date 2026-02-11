@@ -4,10 +4,8 @@ namespace Noo\LaravelRemoteSync\Commands;
 
 use Illuminate\Console\Command;
 use Noo\LaravelRemoteSync\Concerns\InteractsWithRemote;
-use Noo\LaravelRemoteSync\RemoteSyncService;
 
 use function Laravel\Prompts\multiselect;
-use function Laravel\Prompts\select;
 
 class PushRemoteCommand extends Command
 {
@@ -30,7 +28,7 @@ class PushRemoteCommand extends Command
             return self::FAILURE;
         }
 
-        $remoteName = $this->argument('remote') ?? $this->selectRemote();
+        $remoteName = $this->argument('remote') ?? $this->selectRemote(__('remote-sync::prompts.remote.push_label'));
 
         if (! $remoteName) {
             $this->components->error(__('remote-sync::messages.errors.no_remote_selected'));
@@ -81,25 +79,6 @@ class PushRemoteCommand extends Command
         }
 
         return $exitCode;
-    }
-
-    protected function selectRemote(): ?string
-    {
-        $remotes = app(RemoteSyncService::class)->getAvailableRemotes();
-
-        if (empty($remotes)) {
-            return null;
-        }
-
-        if (count($remotes) === 1) {
-            return $remotes[0];
-        }
-
-        return select(
-            label: __('remote-sync::prompts.remote.push_label'),
-            options: $remotes,
-            default: config('remote-sync.default'),
-        );
     }
 
     protected function selectOperations(): array

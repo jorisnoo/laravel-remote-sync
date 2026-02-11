@@ -264,6 +264,9 @@ describe('PushDatabaseCommand', function () {
         $mockProcessResult->shouldReceive('output')->andReturn('');
 
         $this->mock(RemoteSyncService::class, function ($mock) use ($mockProcessResult) {
+            $mock->shouldReceive('getAvailableRemotes')
+                ->andReturn(['staging']);
+
             $mock->shouldReceive('getRemote')
                 ->andReturn(new RemoteConfig(
                     name: 'staging',

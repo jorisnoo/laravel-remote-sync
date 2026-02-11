@@ -202,25 +202,6 @@ class CleanupSnapshotsCommand extends Command
         return $choice === 'yes';
     }
 
-    protected function selectRemote(): ?string
-    {
-        $remotes = $this->syncService->getAvailableRemotes();
-
-        if (empty($remotes)) {
-            return null;
-        }
-
-        if (count($remotes) === 1) {
-            return $remotes[0];
-        }
-
-        return select(
-            label: __('remote-sync::prompts.remote.label'),
-            options: $remotes,
-            default: config('remote-sync.default'),
-        );
-    }
-
     /**
      * @return array<int, array{path: string, name: string, mtime: int}>
      */

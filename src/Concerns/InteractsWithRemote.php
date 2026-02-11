@@ -14,6 +14,25 @@ trait InteractsWithRemote
 
     protected RemoteConfig $remote;
 
+    protected function selectRemote(?string $label = null): ?string
+    {
+        $remotes = app(RemoteSyncService::class)->getAvailableRemotes();
+
+        if (empty($remotes)) {
+            return null;
+        }
+
+        if (count($remotes) === 1) {
+            return $remotes[0];
+        }
+
+        return select(
+            label: $label ?? __('remote-sync::prompts.remote.label'),
+            options: $remotes,
+            default: config('remote-sync.default'),
+        );
+    }
+
     protected function initializeRemote(?string $remoteName): void
     {
         $this->syncService = app(RemoteSyncService::class);

@@ -247,6 +247,9 @@ describe('PullFilesCommand', function () {
         $mockResult->shouldReceive('output')->andReturn('');
 
         $this->mock(RemoteSyncService::class, function ($mock) use ($mockResult) {
+            $mock->shouldReceive('getAvailableRemotes')
+                ->andReturn(['production']);
+
             $mock->shouldReceive('getRemote')
                 ->andReturn(new RemoteConfig(
                     name: 'production',
