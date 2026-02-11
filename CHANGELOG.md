@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.3](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.3.3) (2026-02-11)
+
+### Features
+
+- add snapshot_load timeout, direction-aware file preview headers, and cross-platform stat fallback ([c80951d](https://github.com/jorisnoo/laravel-remote-sync/commit/c80951d32f1a0d2f977e030360c529194c52f2f7))
+- support exclude_tables config in push-db command with direction-aware preview labels ([272dfdf](https://github.com/jorisnoo/laravel-remote-sync/commit/272dfdf4fe103b695e518c0753f9741d023e2ee4))
+- add preview for push-db and push-files commands ([85e8194](https://github.com/jorisnoo/laravel-remote-sync/commit/85e81947822179521a570e0b014a6f983043df81))
+
+### Bug Fixes
+
+- temporarily remove memory limit during snapshot load to prevent out-of-memory errors ([dd09cf5](https://github.com/jorisnoo/laravel-remote-sync/commit/dd09cf50991777322b9d42365bc2f980d1689c36))
+- add Laravel 11 compatibility for getCurrentSchemaName ([6f78fba](https://github.com/jorisnoo/laravel-remote-sync/commit/6f78fba9213c18f3204024d9efb3c96fcc2b9e64))
+- scope getTableListing to current database to avoid cross-database pollution ([3ece619](https://github.com/jorisnoo/laravel-remote-sync/commit/3ece619afb965ed0252b96dbfb94c8c783aac5ac))
+
+### Code Refactoring
+
+- simplify database preview to show table names only, remove row counts, and improve pluralized labels ([bd53a92](https://github.com/jorisnoo/laravel-remote-sync/commit/bd53a9248b8ea6ad97d7859b2d32cb0e5d5ead9e))
+- rename Sync commands to Pull for clearer terminology ([b0ec5d6](https://github.com/jorisnoo/laravel-remote-sync/commit/b0ec5d6e1314058752fc5cc20a011a8e053a2bfc))
+
+### Build System
+
+- add support URLs and author homepage for Packagist ([74f75ee](https://github.com/jorisnoo/laravel-remote-sync/commit/74f75eed30e782bb01aa5a1e488315ae961bc4a4))
 ## [0.3.2](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.3.2) (2026-02-11)
 
 ### Features
