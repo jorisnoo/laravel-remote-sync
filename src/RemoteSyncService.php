@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
 use InvalidArgumentException;
 use Noo\LaravelRemoteSync\Data\RemoteConfig;
+use RuntimeException;
 
 class RemoteSyncService
 {
@@ -364,5 +365,100 @@ PHP;
         }
 
         return $schemaBuilder->getTableListing();
+    }
+
+    public function loadSnapshotViaCli(string $snapshotName, bool $dropTables): ProcessResult
+    {
+        $snapshotPath = $this->getSnapshotPath()."/{$snapshotName}.sql.gz";
+
+        if (! file_exists($snapshotPath)) {
+            throw new RuntimeException("Snapshot file not found: {$snapshotPath}");
+        }
+
+        $driver = $this->normalizeLocalDriver();
+
+        if ($dropTables) {
+            $schema = DB::connection()->getSchemaBuilder();
+            $schema->dropAllTables();
+        }
+
+        $timeout = config('remote-sync.timeouts.snapshot_load', config('remote-sync.timeouts.snapshot_create', 300));
+
+        return match ($driver) {
+            'mysql' => $this->loadViaMysqlCli($snapshotPath, $timeout),
+            'pgsql' => $this->loadViaPsqlCli($snapshotPath, $timeout),
+            default => throw new RuntimeException("Unsupported database driver for CLI loading: {$driver}"),
+        };
+    }
+
+    public function normalizeLocalDriver(): string
+    {
+        $driver = config('database.connections.'.config('database.default').'.driver');
+
+        return match (strtolower($driver)) {
+            'mariadb' => 'mysql',
+            default => strtolower($driver),
+        };
+    }
+
+    protected function loadViaMysqlCli(string $snapshotPath, int $timeout): ProcessResult
+    {
+        $connection = config('database.connections.'.config('database.default'));
+
+        $host = $connection['host'] ?? '127.0.0.1';
+        $port = $connection['port'] ?? 3306;
+        $username = $connection['username'] ?? 'root';
+        $password = $connection['password'] ?? '';
+        $database = $connection['database'];
+        $socket = $connection['unix_socket'] ?? '';
+
+        $escapedPath = escapeshellarg($snapshotPath);
+
+        $args = [];
+
+        if ($socket) {
+            $args[] = "--socket={$socket}";
+        } else {
+            $args[] = "--host={$host}";
+            $args[] = "--port={$port}";
+        }
+
+        $args[] = "--user={$username}";
+
+        if ($password !== '') {
+            $args[] = "--password={$password}";
+        }
+
+        $args[] = $database;
+
+        $argString = implode(' ', array_map('escapeshellarg', $args));
+        $command = "gunzip -c {$escapedPath} | mysql {$argString}";
+
+        return Process::timeout($timeout)->run($command);
+    }
+
+    protected function loadViaPsqlCli(string $snapshotPath, int $timeout): ProcessResult
+    {
+        $connection = config('database.connections.'.config('database.default'));
+
+        $host = $connection['host'] ?? '127.0.0.1';
+        $port = $connection['port'] ?? 5432;
+        $username = $connection['username'] ?? 'postgres';
+        $password = $connection['password'] ?? '';
+        $database = $connection['database'];
+
+        $escapedPath = escapeshellarg($snapshotPath);
+
+        $args = ["--host={$host}", "--port={$port}", "--username={$username}", $database];
+        $argString = implode(' ', array_map('escapeshellarg', $args));
+        $command = "gunzip -c {$escapedPath} | psql {$argString}";
+
+        $env = [];
+
+        if ($password !== '') {
+            $env['PGPASSWORD'] = $password;
+        }
+
+        return Process::timeout($timeout)->env($env)->run($command);
     }
 }

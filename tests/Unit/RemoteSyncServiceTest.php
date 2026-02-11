@@ -394,6 +394,176 @@ describe('RemoteSyncService', function () {
         });
     });
 
+    describe('loadSnapshotViaCli', function () {
+        it('constructs correct MySQL CLI command', function () {
+            Process::fake();
+
+            config()->set('database.default', 'testing');
+            config()->set('database.connections.testing', [
+                'driver' => 'mysql',
+                'host' => '127.0.0.1',
+                'port' => 3306,
+                'username' => 'root',
+                'password' => 'secret',
+                'database' => 'mydb',
+                'unix_socket' => '',
+            ]);
+
+            $snapshotPath = storage_path('snapshots');
+
+            if (! is_dir($snapshotPath)) {
+                mkdir($snapshotPath, 0755, true);
+            }
+
+            file_put_contents("{$snapshotPath}/test.sql.gz", 'fake');
+
+            $this->service->loadSnapshotViaCli('test', false);
+
+            Process::assertRan(function ($process) {
+                $command = $process->command;
+
+                return str_contains($command, 'gunzip -c')
+                    && str_contains($command, '| mysql')
+                    && str_contains($command, '--host=127.0.0.1')
+                    && str_contains($command, '--port=3306')
+                    && str_contains($command, '--user=root')
+                    && str_contains($command, '--password=secret')
+                    && str_contains($command, 'mydb');
+            });
+
+            @unlink("{$snapshotPath}/test.sql.gz");
+        });
+
+        it('uses socket instead of host/port for MySQL with unix_socket', function () {
+            Process::fake();
+
+            config()->set('database.default', 'testing');
+            config()->set('database.connections.testing', [
+                'driver' => 'mysql',
+                'host' => '127.0.0.1',
+                'port' => 3306,
+                'username' => 'root',
+                'password' => 'secret',
+                'database' => 'mydb',
+                'unix_socket' => '/tmp/mysql.sock',
+            ]);
+
+            $snapshotPath = storage_path('snapshots');
+
+            if (! is_dir($snapshotPath)) {
+                mkdir($snapshotPath, 0755, true);
+            }
+
+            file_put_contents("{$snapshotPath}/test.sql.gz", 'fake');
+
+            $this->service->loadSnapshotViaCli('test', false);
+
+            Process::assertRan(function ($process) {
+                $command = $process->command;
+
+                return str_contains($command, '--socket=/tmp/mysql.sock')
+                    && ! str_contains($command, '--host=')
+                    && ! str_contains($command, '--port=');
+            });
+
+            @unlink("{$snapshotPath}/test.sql.gz");
+        });
+
+        it('omits password flag for MySQL when password is empty', function () {
+            Process::fake();
+
+            config()->set('database.default', 'testing');
+            config()->set('database.connections.testing', [
+                'driver' => 'mysql',
+                'host' => '127.0.0.1',
+                'port' => 3306,
+                'username' => 'root',
+                'password' => '',
+                'database' => 'mydb',
+                'unix_socket' => '',
+            ]);
+
+            $snapshotPath = storage_path('snapshots');
+
+            if (! is_dir($snapshotPath)) {
+                mkdir($snapshotPath, 0755, true);
+            }
+
+            file_put_contents("{$snapshotPath}/test.sql.gz", 'fake');
+
+            $this->service->loadSnapshotViaCli('test', false);
+
+            Process::assertRan(function ($process) {
+                return ! str_contains($process->command, '--password=');
+            });
+
+            @unlink("{$snapshotPath}/test.sql.gz");
+        });
+
+        it('constructs correct PostgreSQL CLI command with PGPASSWORD', function () {
+            Process::fake();
+
+            config()->set('database.default', 'testing');
+            config()->set('database.connections.testing', [
+                'driver' => 'pgsql',
+                'host' => '127.0.0.1',
+                'port' => 5432,
+                'username' => 'postgres',
+                'password' => 'pgpass',
+                'database' => 'mydb',
+            ]);
+
+            $snapshotPath = storage_path('snapshots');
+
+            if (! is_dir($snapshotPath)) {
+                mkdir($snapshotPath, 0755, true);
+            }
+
+            file_put_contents("{$snapshotPath}/test.sql.gz", 'fake');
+
+            $this->service->loadSnapshotViaCli('test', false);
+
+            Process::assertRan(function ($process) {
+                $command = $process->command;
+
+                return str_contains($command, 'gunzip -c')
+                    && str_contains($command, '| psql')
+                    && str_contains($command, '--host=127.0.0.1')
+                    && str_contains($command, '--port=5432')
+                    && str_contains($command, '--username=postgres')
+                    && str_contains($command, 'mydb');
+            });
+
+            @unlink("{$snapshotPath}/test.sql.gz");
+        });
+
+        it('throws RuntimeException for unsupported drivers', function () {
+            config()->set('database.default', 'testing');
+            config()->set('database.connections.testing', [
+                'driver' => 'sqlite',
+                'database' => ':memory:',
+            ]);
+
+            $snapshotPath = storage_path('snapshots');
+
+            if (! is_dir($snapshotPath)) {
+                mkdir($snapshotPath, 0755, true);
+            }
+
+            file_put_contents("{$snapshotPath}/test.sql.gz", 'fake');
+
+            expect(fn () => $this->service->loadSnapshotViaCli('test', false))
+                ->toThrow(RuntimeException::class, 'Unsupported database driver for CLI loading: sqlite');
+
+            @unlink("{$snapshotPath}/test.sql.gz");
+        });
+
+        it('throws RuntimeException when snapshot file not found', function () {
+            expect(fn () => $this->service->loadSnapshotViaCli('nonexistent', false))
+                ->toThrow(RuntimeException::class, 'Snapshot file not found');
+        });
+    });
+
     describe('createRemoteBackup', function () {
         it('builds correct backup command with exclusions', function () {
             Process::fake();

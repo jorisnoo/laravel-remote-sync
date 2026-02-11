@@ -5,6 +5,20 @@ use Illuminate\Support\Facades\Process;
 use Noo\LaravelRemoteSync\Data\RemoteConfig;
 use Noo\LaravelRemoteSync\RemoteSyncService;
 
+function mockSuccessfulPullFlow($mock, $mockProcessResult, $remoteConfig, array $extras = []): void
+{
+    $mock->shouldReceive('getRemote')->andReturn($remoteConfig);
+    $mock->shouldReceive('isAtomicDeployment')->andReturn($extras['isAtomic'] ?? false);
+    $mock->shouldReceive('getRemoteDatabaseDriver')->andReturn($extras['remoteDriver'] ?? null);
+    $mock->shouldReceive('getRemoteTableNames')->andReturn([]);
+    $mock->shouldReceive('getLocalTableNames')->andReturn([]);
+    $mock->shouldReceive('createRemoteSnapshot')->once()->andReturn($mockProcessResult);
+    $mock->shouldReceive('getSnapshotPath')->andReturn(storage_path('snapshots'));
+    $mock->shouldReceive('downloadSnapshot')->once()->andReturn($mockProcessResult);
+    $mock->shouldReceive('loadSnapshotViaCli')->once()->andReturn($mockProcessResult);
+    $mock->shouldReceive('deleteRemoteSnapshot')->once()->andReturn($mockProcessResult);
+}
+
 beforeEach(function () {
     Process::fake([
         '*' => Process::result(output: 'no'),
@@ -46,41 +60,14 @@ describe('PullDatabaseCommand', function () {
         $mockProcessResult->shouldReceive('successful')->andReturn(true);
         $mockProcessResult->shouldReceive('output')->andReturn('');
 
-        $this->mock(RemoteSyncService::class, function ($mock) use ($mockProcessResult) {
-            $mock->shouldReceive('getRemote')
-                ->andReturn(new RemoteConfig(
-                    name: 'production',
-                    host: 'user@production.example.com',
-                    path: '/var/www/app',
-                ));
+        $remoteConfig = new RemoteConfig(
+            name: 'production',
+            host: 'user@production.example.com',
+            path: '/var/www/app',
+        );
 
-            $mock->shouldReceive('isAtomicDeployment')
-                ->andReturn(false);
-
-            $mock->shouldReceive('getRemoteDatabaseDriver')
-                ->once()
-                ->andReturn(null);
-
-            $mock->shouldReceive('getRemoteTableNames')
-                ->andReturn([]);
-
-            $mock->shouldReceive('getLocalTableNames')
-                ->andReturn([]);
-
-            $mock->shouldReceive('createRemoteSnapshot')
-                ->once()
-                ->andReturn($mockProcessResult);
-
-            $mock->shouldReceive('getSnapshotPath')
-                ->andReturn(storage_path('snapshots'));
-
-            $mock->shouldReceive('downloadSnapshot')
-                ->once()
-                ->andReturn($mockProcessResult);
-
-            $mock->shouldReceive('deleteRemoteSnapshot')
-                ->once()
-                ->andReturn($mockProcessResult);
+        $this->mock(RemoteSyncService::class, function ($mock) use ($mockProcessResult, $remoteConfig) {
+            mockSuccessfulPullFlow($mock, $mockProcessResult, $remoteConfig);
         });
 
         $this->artisan('remote-sync:pull-db', [
@@ -127,40 +114,14 @@ describe('PullDatabaseCommand', function () {
         $mockProcessResult->shouldReceive('successful')->andReturn(true);
         $mockProcessResult->shouldReceive('output')->andReturn('');
 
-        $this->mock(RemoteSyncService::class, function ($mock) use ($mockProcessResult) {
-            $mock->shouldReceive('getRemote')
-                ->andReturn(new RemoteConfig(
-                    name: 'production',
-                    host: 'user@production.example.com',
-                    path: '/var/www/app',
-                ));
+        $remoteConfig = new RemoteConfig(
+            name: 'production',
+            host: 'user@production.example.com',
+            path: '/var/www/app',
+        );
 
-            $mock->shouldReceive('isAtomicDeployment')
-                ->andReturn(false);
-
-            $mock->shouldReceive('getRemoteDatabaseDriver')
-                ->andReturn('mysql');
-
-            $mock->shouldReceive('getRemoteTableNames')
-                ->andReturn([]);
-
-            $mock->shouldReceive('getLocalTableNames')
-                ->andReturn([]);
-
-            $mock->shouldReceive('createRemoteSnapshot')
-                ->once()
-                ->andReturn($mockProcessResult);
-
-            $mock->shouldReceive('getSnapshotPath')
-                ->andReturn(storage_path('snapshots'));
-
-            $mock->shouldReceive('downloadSnapshot')
-                ->once()
-                ->andReturn($mockProcessResult);
-
-            $mock->shouldReceive('deleteRemoteSnapshot')
-                ->once()
-                ->andReturn($mockProcessResult);
+        $this->mock(RemoteSyncService::class, function ($mock) use ($mockProcessResult, $remoteConfig) {
+            mockSuccessfulPullFlow($mock, $mockProcessResult, $remoteConfig, ['remoteDriver' => 'mysql']);
         });
 
         $this->artisan('remote-sync:pull-db', [
@@ -180,40 +141,14 @@ describe('PullDatabaseCommand', function () {
         $mockProcessResult->shouldReceive('successful')->andReturn(true);
         $mockProcessResult->shouldReceive('output')->andReturn('');
 
-        $this->mock(RemoteSyncService::class, function ($mock) use ($mockProcessResult) {
-            $mock->shouldReceive('getRemote')
-                ->andReturn(new RemoteConfig(
-                    name: 'production',
-                    host: 'user@production.example.com',
-                    path: '/var/www/app',
-                ));
+        $remoteConfig = new RemoteConfig(
+            name: 'production',
+            host: 'user@production.example.com',
+            path: '/var/www/app',
+        );
 
-            $mock->shouldReceive('isAtomicDeployment')
-                ->andReturn(false);
-
-            $mock->shouldReceive('getRemoteDatabaseDriver')
-                ->andReturn('mysql');
-
-            $mock->shouldReceive('getRemoteTableNames')
-                ->andReturn([]);
-
-            $mock->shouldReceive('getLocalTableNames')
-                ->andReturn([]);
-
-            $mock->shouldReceive('createRemoteSnapshot')
-                ->once()
-                ->andReturn($mockProcessResult);
-
-            $mock->shouldReceive('getSnapshotPath')
-                ->andReturn(storage_path('snapshots'));
-
-            $mock->shouldReceive('downloadSnapshot')
-                ->once()
-                ->andReturn($mockProcessResult);
-
-            $mock->shouldReceive('deleteRemoteSnapshot')
-                ->once()
-                ->andReturn($mockProcessResult);
+        $this->mock(RemoteSyncService::class, function ($mock) use ($mockProcessResult, $remoteConfig) {
+            mockSuccessfulPullFlow($mock, $mockProcessResult, $remoteConfig, ['remoteDriver' => 'mysql']);
         });
 
         $this->artisan('remote-sync:pull-db', [
@@ -233,43 +168,15 @@ describe('PullDatabaseCommand', function () {
         $mockProcessResult->shouldReceive('successful')->andReturn(true);
         $mockProcessResult->shouldReceive('output')->andReturn('');
 
-        $this->mock(RemoteSyncService::class, function ($mock) use ($mockProcessResult) {
-            $mock->shouldReceive('getAvailableRemotes')
-                ->andReturn(['production']);
+        $remoteConfig = new RemoteConfig(
+            name: 'production',
+            host: 'user@production.example.com',
+            path: '/var/www/app',
+        );
 
-            $mock->shouldReceive('getRemote')
-                ->andReturn(new RemoteConfig(
-                    name: 'production',
-                    host: 'user@production.example.com',
-                    path: '/var/www/app',
-                ));
-
-            $mock->shouldReceive('isAtomicDeployment')
-                ->andReturn(false);
-
-            $mock->shouldReceive('getRemoteDatabaseDriver')
-                ->andReturn('mysql');
-
-            $mock->shouldReceive('getRemoteTableNames')
-                ->andReturn([]);
-
-            $mock->shouldReceive('getLocalTableNames')
-                ->andReturn([]);
-
-            $mock->shouldReceive('createRemoteSnapshot')
-                ->once()
-                ->andReturn($mockProcessResult);
-
-            $mock->shouldReceive('getSnapshotPath')
-                ->andReturn(storage_path('snapshots'));
-
-            $mock->shouldReceive('downloadSnapshot')
-                ->once()
-                ->andReturn($mockProcessResult);
-
-            $mock->shouldReceive('deleteRemoteSnapshot')
-                ->once()
-                ->andReturn($mockProcessResult);
+        $this->mock(RemoteSyncService::class, function ($mock) use ($mockProcessResult, $remoteConfig) {
+            $mock->shouldReceive('getAvailableRemotes')->andReturn(['production']);
+            mockSuccessfulPullFlow($mock, $mockProcessResult, $remoteConfig, ['remoteDriver' => 'mysql']);
         });
 
         $this->artisan('remote-sync:pull-db', [
@@ -301,35 +208,10 @@ describe('PullDatabaseCommand', function () {
         );
 
         $this->mock(RemoteSyncService::class, function ($mock) use ($mockProcessResult, $remoteConfig) {
-            $mock->shouldReceive('getRemote')
-                ->andReturn($remoteConfig);
-
-            $mock->shouldReceive('isAtomicDeployment')
-                ->andReturn(true);
-
-            $mock->shouldReceive('getRemoteDatabaseDriver')
-                ->andReturn('mysql');
-
-            $mock->shouldReceive('getRemoteTableNames')
-                ->andReturn([]);
-
-            $mock->shouldReceive('getLocalTableNames')
-                ->andReturn([]);
-
-            $mock->shouldReceive('createRemoteSnapshot')
-                ->once()
-                ->andReturn($mockProcessResult);
-
-            $mock->shouldReceive('getSnapshotPath')
-                ->andReturn(storage_path('snapshots'));
-
-            $mock->shouldReceive('downloadSnapshot')
-                ->once()
-                ->andReturn($mockProcessResult);
-
-            $mock->shouldReceive('deleteRemoteSnapshot')
-                ->once()
-                ->andReturn($mockProcessResult);
+            mockSuccessfulPullFlow($mock, $mockProcessResult, $remoteConfig, [
+                'isAtomic' => true,
+                'remoteDriver' => 'mysql',
+            ]);
         });
 
         $this->artisan('remote-sync:pull-db', [

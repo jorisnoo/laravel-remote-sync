@@ -6,7 +6,6 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Noo\LaravelRemoteSync\Concerns\InteractsWithRemote;
 use Spatie\DbSnapshots\Commands\Create as SnapshotCreate;
-use Spatie\DbSnapshots\Commands\Load as SnapshotLoad;
 
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\spin;
@@ -194,15 +193,14 @@ class PullDatabaseCommand extends Command
     {
         $this->components->info(__('remote-sync::messages.info.loading_snapshot'));
 
-        $exitCode = $this->call(SnapshotLoad::class, [
-            'name' => $this->snapshotName,
-            '--force' => true,
-            '--stream' => true,
-            '--drop-tables' => $this->fullImport ? 1 : 0,
-        ]);
+        $result = spin(
+            callback: fn () => $this->syncService->loadSnapshotViaCli($this->snapshotName, $this->fullImport),
+            message: __('remote-sync::messages.info.loading_snapshot')
+        );
 
-        if ($exitCode !== 0) {
+        if (! $result->successful()) {
             $this->components->error(__('remote-sync::messages.errors.failed_load_snapshot'));
+            $this->components->error($result->errorOutput());
 
             return false;
         }
