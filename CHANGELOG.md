@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.5](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.3.5) (2026-02-11)
+
+### Code Refactoring
+
+- load snapshots via direct CLI piping instead of artisan command and extract shared test helper ([4a91abd](https://github.com/jorisnoo/laravel-remote-sync/commit/4a91abd13efb45481636046200f264949498728c))
 ## [0.3.4](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.3.4) (2026-02-11)
 
 ### Bug Fixes
