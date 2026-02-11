@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.4](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.3.4) (2026-02-11)
+
+### Bug Fixes
+
+- use --stream flag for snapshot loading instead of removing memory limit ([7d5a605](https://github.com/jorisnoo/laravel-remote-sync/commit/7d5a605f2704a5d548aaf71ddaa59049c05daf75))
+
+### Code Refactoring
+
+- extract selectRemote into InteractsWithRemote trait and add remote selection to individual commands ([73e5849](https://github.com/jorisnoo/laravel-remote-sync/commit/73e58491dc9894f190b164bf6fa67ff53891a44f))
 ## [0.3.3](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.3.3) (2026-02-11)
 
 ### Features
