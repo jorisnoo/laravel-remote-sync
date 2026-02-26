@@ -5,6 +5,7 @@ namespace Noo\LaravelRemoteSync\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Noo\LaravelRemoteSync\Concerns\InteractsWithRemote;
+use Noo\LaravelRemoteSync\RemoteSyncService;
 use Spatie\DbSnapshots\Commands\Create as SnapshotCreate;
 
 use function Laravel\Prompts\confirm;
@@ -89,8 +90,8 @@ class PullDatabaseCommand extends Command
             exit(1);
         });
 
-        if ($this->shouldBackup) {
-            $this->createLocalBackup();
+        if ($this->shouldBackup && ! $this->createLocalBackup()) {
+            return self::FAILURE;
         }
 
         if (! $this->createRemoteSnapshot()) {
@@ -130,21 +131,35 @@ class PullDatabaseCommand extends Command
         $this->localTables = $this->syncService->getLocalTableNames();
 
         $excludedTables = config('remote-sync.exclude_tables', []);
+        $migrationDiff = $this->compareMigrations();
 
         $this->displayDatabasePreview(
             $this->remoteTables,
             $this->localTables,
             $excludedTables,
+            $migrationDiff,
             $this->fullImport,
             'pull'
         );
     }
 
-    protected function createLocalBackup(): void
+    protected function createLocalBackup(): bool
     {
         $backupName = 'local-before-sync-'.date('Y-m-d-H-i-s');
         $this->components->info(__('remote-sync::messages.info.creating_local_backup', ['name' => $backupName]));
-        $this->call(SnapshotCreate::class, ['name' => $backupName]);
+
+        $exitCode = $this->call(SnapshotCreate::class, [
+            'name' => $backupName,
+            '--compress' => true,
+        ]);
+
+        if ($exitCode !== 0) {
+            $this->components->error(__('remote-sync::messages.errors.failed_local_backup'));
+
+            return false;
+        }
+
+        return true;
     }
 
     protected function createRemoteSnapshot(): bool
@@ -227,6 +242,7 @@ class PullDatabaseCommand extends Command
         $tablesToTruncate = array_filter(
             $excludedTables,
             fn (string $table) => in_array($table, $existingTables, true)
+                && ! in_array($table, RemoteSyncService::ALWAYS_PRESERVED_TABLES, true)
         );
 
         if (empty($tablesToTruncate)) {
@@ -236,11 +252,13 @@ class PullDatabaseCommand extends Command
         $schema = DB::connection()->getSchemaBuilder();
         $schema->disableForeignKeyConstraints();
 
-        foreach ($tablesToTruncate as $table) {
-            DB::table($table)->truncate();
+        try {
+            foreach ($tablesToTruncate as $table) {
+                DB::table($table)->truncate();
+            }
+        } finally {
+            $schema->enableForeignKeyConstraints();
         }
-
-        $schema->enableForeignKeyConstraints();
     }
 
     protected function checkEmptyDatabaseAndOfferMigrations(): bool
@@ -321,6 +339,11 @@ class PullDatabaseCommand extends Command
 
         if ($remoteDriver === null) {
             $this->components->warn(__('remote-sync::messages.warnings.driver_detection_failed'));
+
+            if (! $this->shouldSkipPrompts()
+                && ! confirm(label: __('remote-sync::prompts.confirm.continue_without_driver'), default: false)) {
+                return false;
+            }
 
             return true;
         }

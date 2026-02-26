@@ -309,6 +309,47 @@ describe('RemoteSyncService', function () {
                     && str_contains($command, "--exclude='cache'");
             });
         });
+
+        it('includes migrations in exclusions when full=false', function () {
+            Process::fake();
+
+            $remote = new RemoteConfig(
+                name: 'production',
+                host: 'user@example.com',
+                path: '/var/www/app',
+            );
+
+            config()->set('remote-sync.exclude_tables', ['sessions']);
+
+            $this->service->createRemoteSnapshot($remote, 'test-snapshot', full: false);
+
+            Process::assertRan(function ($process) {
+                $command = $process->command[2];
+
+                return str_contains($command, "--exclude='sessions'")
+                    && str_contains($command, "--exclude='migrations'");
+            });
+        });
+
+        it('does not include migrations in exclusions when full=true', function () {
+            Process::fake();
+
+            $remote = new RemoteConfig(
+                name: 'production',
+                host: 'user@example.com',
+                path: '/var/www/app',
+            );
+
+            config()->set('remote-sync.exclude_tables', ['sessions']);
+
+            $this->service->createRemoteSnapshot($remote, 'test-snapshot', full: true);
+
+            Process::assertRan(function ($process) {
+                $command = $process->command[2];
+
+                return ! str_contains($command, '--exclude');
+            });
+        });
     });
 
     describe('deleteRemoteSnapshot', function () {
@@ -331,7 +372,9 @@ describe('RemoteSyncService', function () {
 
     describe('listRemoteSnapshots', function () {
         it('builds correct stat command with GNU and BSD fallback', function () {
-            Process::fake();
+            Process::fake([
+                '*' => Process::result(output: 'snapshots'),
+            ]);
 
             $remote = new RemoteConfig(
                 name: 'production',
@@ -342,8 +385,9 @@ describe('RemoteSyncService', function () {
             $this->service->listRemoteSnapshots($remote);
 
             Process::assertRan(function ($process) {
-                return str_contains($process->command[2], "stat -c '%Y %n'")
+                return str_contains($process->command[2] ?? '', "stat -c '%Y %n'")
                     && str_contains($process->command[2], "stat -f '%m %N'")
+                    && str_contains($process->command[2], 'sort -rn')
                     && str_contains($process->command[2], "'/var/www/app/storage/snapshots'");
             });
         });
@@ -351,6 +395,10 @@ describe('RemoteSyncService', function () {
 
     describe('getRemoteSnapshotPath', function () {
         it('returns correct path', function () {
+            Process::fake([
+                '*' => Process::result(output: 'snapshots'),
+            ]);
+
             $remote = new RemoteConfig(
                 name: 'production',
                 host: 'user@example.com',
@@ -363,6 +411,10 @@ describe('RemoteSyncService', function () {
         });
 
         it('returns correct path for atomic deployment', function () {
+            Process::fake([
+                '*' => Process::result(output: 'snapshots'),
+            ]);
+
             $remote = new RemoteConfig(
                 name: 'production',
                 host: 'user@example.com',
@@ -373,6 +425,56 @@ describe('RemoteSyncService', function () {
             $path = $this->service->getRemoteSnapshotPath($remote, 'test-snapshot');
 
             expect($path)->toBe('/var/www/app/current/storage/snapshots/test-snapshot.sql.gz');
+        });
+
+        it('queries remote for snapshot subdirectory', function () {
+            Process::fake([
+                '*' => Process::result(output: 'custom-snapshots'),
+            ]);
+
+            $remote = new RemoteConfig(
+                name: 'production',
+                host: 'user@example.com',
+                path: '/var/www/app',
+            );
+
+            $path = $this->service->getRemoteSnapshotPath($remote, 'test-snapshot');
+
+            expect($path)->toBe('/var/www/app/storage/custom-snapshots/test-snapshot.sql.gz');
+        });
+
+        it('falls back to local config when remote query fails', function () {
+            Process::fake([
+                '*' => Process::result(exitCode: 1, errorOutput: 'Command failed'),
+            ]);
+
+            $remote = new RemoteConfig(
+                name: 'production',
+                host: 'user@example.com',
+                path: '/var/www/app',
+            );
+
+            $path = $this->service->getRemoteSnapshotPath($remote, 'test-snapshot');
+
+            expect($path)->toBe('/var/www/app/storage/snapshots/test-snapshot.sql.gz');
+        });
+
+        it('caches remote snapshot subdirectory per remote', function () {
+            Process::fake([
+                '*' => Process::result(output: 'custom-dir'),
+            ]);
+
+            $remote = new RemoteConfig(
+                name: 'production',
+                host: 'user@example.com',
+                path: '/var/www/app',
+            );
+
+            $this->service->getRemoteSnapshotPath($remote, 'first');
+            $this->service->getRemoteSnapshotPath($remote, 'second');
+
+            // Only one SSH call should be made (cached after first)
+            Process::assertRanTimes(fn ($process) => str_contains($process->command[2] ?? '', 'artisan tinker'), 1);
         });
     });
 
@@ -427,7 +529,7 @@ describe('RemoteSyncService', function () {
                     && str_contains($command, '--host=127.0.0.1')
                     && str_contains($command, '--port=3306')
                     && str_contains($command, '--user=root')
-                    && str_contains($command, '--password=secret')
+                    && ! str_contains($command, '--password')
                     && str_contains($command, 'mydb');
             });
 
@@ -586,6 +688,85 @@ describe('RemoteSyncService', function () {
                     && str_contains($command, "--exclude='cache'")
                     && str_contains($command, '--compress');
             });
+        });
+
+        it('includes migrations in backup exclusions', function () {
+            Process::fake();
+
+            $remote = new RemoteConfig(
+                name: 'production',
+                host: 'user@example.com',
+                path: '/var/www/app',
+            );
+
+            config()->set('remote-sync.exclude_tables', ['sessions']);
+
+            $this->service->createRemoteBackup($remote, 'backup-name');
+
+            Process::assertRan(function ($process) {
+                $command = $process->command[2];
+
+                return str_contains($command, "--exclude='sessions'")
+                    && str_contains($command, "--exclude='migrations'");
+            });
+        });
+    });
+
+    describe('getRemoteMigrationRecords', function () {
+        it('parses migration names from tinker output', function () {
+            Process::fake([
+                '*' => Process::result(output: '["2024_01_01_create_users_table","2024_01_02_create_posts_table"]'),
+            ]);
+
+            $remote = new RemoteConfig(
+                name: 'production',
+                host: 'user@example.com',
+                path: '/var/www/app',
+            );
+
+            $migrations = $this->service->getRemoteMigrationRecords($remote);
+
+            expect($migrations)->toBe(['2024_01_01_create_users_table', '2024_01_02_create_posts_table']);
+        });
+
+        it('returns empty array on failure', function () {
+            Process::fake([
+                '*' => Process::result(exitCode: 1, errorOutput: 'Command failed'),
+            ]);
+
+            $remote = new RemoteConfig(
+                name: 'production',
+                host: 'user@example.com',
+                path: '/var/www/app',
+            );
+
+            $migrations = $this->service->getRemoteMigrationRecords($remote);
+
+            expect($migrations)->toBe([]);
+        });
+
+        it('returns empty array for invalid JSON output', function () {
+            Process::fake([
+                '*' => Process::result(output: 'not json'),
+            ]);
+
+            $remote = new RemoteConfig(
+                name: 'production',
+                host: 'user@example.com',
+                path: '/var/www/app',
+            );
+
+            $migrations = $this->service->getRemoteMigrationRecords($remote);
+
+            expect($migrations)->toBe([]);
+        });
+    });
+
+    describe('getLocalMigrationRecords', function () {
+        it('returns empty array when migrations table does not exist', function () {
+            $migrations = $this->service->getLocalMigrationRecords();
+
+            expect($migrations)->toBe([]);
         });
     });
 });

@@ -14,6 +14,7 @@ return [
         'delete_remote' => 'Push local files to [:name] with deletion? Type "yes" to continue',
         'cleanup' => 'Delete :summary? Type "yes" to continue',
         'validation' => 'Type "yes" to confirm',
+        'continue_without_driver' => 'Could not detect remote database driver. Continue anyway?',
     ],
 
     /*

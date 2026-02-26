@@ -6,6 +6,7 @@ use Noo\LaravelRemoteSync\Data\RemoteConfig;
 use Noo\LaravelRemoteSync\RemoteSyncService;
 
 use function Laravel\Prompts\select;
+use function Laravel\Prompts\spin;
 use function Laravel\Prompts\text;
 
 trait InteractsWithRemote
@@ -254,21 +255,25 @@ trait InteractsWithRemote
      * @param  array<int, string>  $sourceTables
      * @param  array<int, string>  $targetTables
      * @param  array<int, string>  $excludedTables
+     * @param  array{local_only: array<int, string>, remote_only: array<int, string>}  $migrationDiff
      */
     protected function displayDatabasePreview(
         array $sourceTables,
         array $targetTables,
         array $excludedTables,
+        array $migrationDiff,
         bool $fullMode,
         string $direction = 'pull'
     ): void {
+        $allExcluded = array_unique(array_merge($excludedTables, RemoteSyncService::ALWAYS_PRESERVED_TABLES));
+
         $headerKey = $direction === 'push'
             ? 'remote-sync::messages.preview.database_push_header'
             : 'remote-sync::messages.preview.database_pull_header';
 
         $tablesToSync = $fullMode
             ? $sourceTables
-            : array_values(array_diff($sourceTables, $excludedTables));
+            : array_values(array_diff($sourceTables, $allExcluded));
 
         sort($tablesToSync);
 
@@ -283,6 +288,19 @@ trait InteractsWithRemote
 
         $this->line('  '.trans_choice(__($syncLabelKey), $syncCount, ['count' => $syncCount]));
         $this->line('  '.implode(', ', $tablesToSync));
+
+        if ($direction === 'push' && ! $fullMode) {
+            $staleRemoteTables = array_values(array_diff($targetTables, $sourceTables, $allExcluded));
+
+            if (! empty($staleRemoteTables)) {
+                sort($staleRemoteTables);
+                $staleCount = count($staleRemoteTables);
+
+                $this->newLine();
+                $this->components->warn(trans_choice(__('remote-sync::messages.preview.stale_remote_tables'), $staleCount, ['count' => $staleCount]));
+                $this->line('  '.implode(', ', $staleRemoteTables));
+            }
+        }
 
         if (! $fullMode && ! empty($excludedTables)) {
             $existingExcluded = array_values(array_filter(
@@ -306,6 +324,55 @@ trait InteractsWithRemote
         }
 
         $this->newLine();
+
+        $localOnly = $migrationDiff['local_only'] ?? [];
+        $remoteOnly = $migrationDiff['remote_only'] ?? [];
+
+        if ($fullMode) {
+            $this->line('  '.__('remote-sync::messages.preview.migrations_differ_full'));
+        } elseif (! empty($localOnly) || ! empty($remoteOnly)) {
+            $this->components->warn(__('remote-sync::messages.preview.migrations_differ'));
+
+            if (! empty($localOnly)) {
+                $localCount = count($localOnly);
+                $this->line('  '.trans_choice(__('remote-sync::messages.preview.migrations_local_only'), $localCount, ['count' => $localCount]));
+                foreach ($localOnly as $migration) {
+                    $this->line('    - '.$migration);
+                }
+            }
+
+            if (! empty($remoteOnly)) {
+                $remoteCount = count($remoteOnly);
+                $this->line('  '.trans_choice(__('remote-sync::messages.preview.migrations_remote_only'), $remoteCount, ['count' => $remoteCount]));
+                foreach ($remoteOnly as $migration) {
+                    $this->line('    - '.$migration);
+                }
+            }
+        } else {
+            $this->line('  '.__('remote-sync::messages.preview.migrations_match'));
+        }
+
+        $this->newLine();
+    }
+
+    /**
+     * Compare local and remote migration records.
+     *
+     * @return array{local_only: array<int, string>, remote_only: array<int, string>}
+     */
+    protected function compareMigrations(): array
+    {
+        $localMigrations = $this->syncService->getLocalMigrationRecords();
+
+        $remoteMigrations = spin(
+            callback: fn () => $this->syncService->getRemoteMigrationRecords($this->remote),
+            message: __('remote-sync::messages.spinners.comparing_migrations')
+        );
+
+        return [
+            'local_only' => array_values(array_diff($localMigrations, $remoteMigrations)),
+            'remote_only' => array_values(array_diff($remoteMigrations, $localMigrations)),
+        ];
     }
 
     /**

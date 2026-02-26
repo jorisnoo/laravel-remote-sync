@@ -22,6 +22,8 @@ class PullFilesCommand extends Command
 
     protected ?string $specificPath = null;
 
+    protected bool $isDryRun;
+
     protected bool $shouldDelete;
 
     protected int $filesToTransfer = 0;
@@ -59,18 +61,19 @@ class PullFilesCommand extends Command
             return self::SUCCESS;
         }
 
+        $this->isDryRun = $this->promptDryRunOption();
         $this->shouldDelete = $this->promptDeleteOption('local');
 
         $this->analyzeAndDisplayPreview($paths);
 
-        if (! $this->option('force') && ! $this->confirmPull('files')) {
-            $this->components->info(__('remote-sync::messages.info.operation_cancelled'));
+        if ($this->isDryRun) {
+            $this->components->info(__('remote-sync::messages.info.dry_run_mode'));
 
             return self::SUCCESS;
         }
 
-        if ($this->option('dry-run')) {
-            $this->components->info(__('remote-sync::messages.info.dry_run_mode'));
+        if (! $this->option('force') && ! $this->confirmPull('files')) {
+            $this->components->info(__('remote-sync::messages.info.operation_cancelled'));
 
             return self::SUCCESS;
         }

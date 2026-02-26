@@ -11,6 +11,12 @@ use RuntimeException;
 
 class RemoteSyncService
 {
+    /** @var array<int, string> */
+    public const ALWAYS_PRESERVED_TABLES = ['migrations'];
+
+    /** @var array<string, string> */
+    protected array $remoteSnapshotSubdirs = [];
+
     public function getRemote(?string $name = null): RemoteConfig
     {
         $name ??= config('remote-sync.default');
@@ -106,7 +112,7 @@ class RemoteSyncService
 
         $excludePaths = config('remote-sync.exclude_paths', []);
         $excludeOptions = collect($excludePaths)
-            ->map(fn (string $pattern) => '--exclude='.escapeshellarg($pattern))
+            ->map(fn (string $pattern) => '--exclude='.$pattern)
             ->all();
 
         $options = array_merge($defaultOptions, $excludeOptions, $options);
@@ -137,7 +143,10 @@ class RemoteSyncService
         $excludeFlags = '';
 
         if (! $full) {
-            $excludeTables = config('remote-sync.exclude_tables', []);
+            $excludeTables = array_unique(array_merge(
+                config('remote-sync.exclude_tables', []),
+                self::ALWAYS_PRESERVED_TABLES
+            ));
             $excludeFlags = collect($excludeTables)
                 ->map(fn (string $table) => '--exclude='.escapeshellarg($table))
                 ->implode(' ');
@@ -153,9 +162,46 @@ class RemoteSyncService
 
     public function getRemoteSnapshotPath(RemoteConfig $remote, string $snapshotName): string
     {
-        $subdir = $this->getSnapshotSubdirectory();
+        $subdir = $this->getRemoteSnapshotSubdirectory($remote);
 
         return "{$remote->storagePath()}/{$subdir}/{$snapshotName}.sql.gz";
+    }
+
+    public function getRemoteSnapshotSubdirectory(RemoteConfig $remote): string
+    {
+        if (isset($this->remoteSnapshotSubdirs[$remote->name])) {
+            return $this->remoteSnapshotSubdirs[$remote->name];
+        }
+
+        $escapedPath = escapeshellarg($remote->workingPath());
+        $code = <<<'PHP'
+$diskName = config('db-snapshots.disk', 'snapshots');
+$diskConfig = config("filesystems.disks.{$diskName}");
+if ($diskConfig && isset($diskConfig['root'])) {
+    $root = $diskConfig['root'];
+    $storagePath = storage_path();
+    if (str_starts_with($root, $storagePath)) {
+        echo ltrim(substr($root, strlen($storagePath)), '/');
+        return;
+    }
+}
+echo 'snapshots';
+PHP;
+
+        $escapedCode = escapeshellarg($code);
+        $command = "cd {$escapedPath} && php artisan tinker --execute={$escapedCode}";
+
+        $result = $this->executeRemoteCommand($remote, $command, 30);
+
+        if ($result->successful() && trim($result->output()) !== '') {
+            $subdir = trim($result->output());
+        } else {
+            $subdir = $this->getSnapshotSubdirectory();
+        }
+
+        $this->remoteSnapshotSubdirs[$remote->name] = $subdir;
+
+        return $subdir;
     }
 
     public function downloadSnapshot(RemoteConfig $remote, string $snapshotName, string $localPath): ProcessResult
@@ -186,10 +232,10 @@ class RemoteSyncService
 
     public function listRemoteSnapshots(RemoteConfig $remote): ProcessResult
     {
-        $subdir = $this->getSnapshotSubdirectory();
+        $subdir = $this->getRemoteSnapshotSubdirectory($remote);
         $snapshotPath = "{$remote->storagePath()}/{$subdir}";
         $escapedSnapshotPath = escapeshellarg($snapshotPath);
-        $command = "find {$escapedSnapshotPath} -maxdepth 1 -name '*.sql.gz' -exec stat -c '%Y %n' {} + 2>/dev/null || find {$escapedSnapshotPath} -maxdepth 1 -name '*.sql.gz' -exec stat -f '%m %N' {} + 2>/dev/null | sort -rn || true";
+        $command = "{ find {$escapedSnapshotPath} -maxdepth 1 -name '*.sql.gz' -exec stat -c '%Y %n' {} + 2>/dev/null || find {$escapedSnapshotPath} -maxdepth 1 -name '*.sql.gz' -exec stat -f '%m %N' {} + 2>/dev/null; } | sort -rn || true";
         $timeout = config('remote-sync.timeouts.snapshot_cleanup', 60);
 
         return $this->executeRemoteCommand($remote, $command, $timeout);
@@ -208,7 +254,7 @@ class RemoteSyncService
 
         $excludePaths = config('remote-sync.exclude_paths', []);
         $excludeOptions = collect($excludePaths)
-            ->map(fn (string $pattern) => '--exclude='.escapeshellarg($pattern))
+            ->map(fn (string $pattern) => '--exclude='.$pattern)
             ->all();
 
         $options = array_merge($defaultOptions, $excludeOptions, $options);
@@ -222,7 +268,7 @@ class RemoteSyncService
 
     public function uploadSnapshot(RemoteConfig $remote, string $snapshotName, string $localPath): ProcessResult
     {
-        $subdir = $this->getSnapshotSubdirectory();
+        $subdir = $this->getRemoteSnapshotSubdirectory($remote);
         $remotePath = "{$remote->storagePath()}/{$subdir}/";
         $localFile = "{$localPath}/{$snapshotName}.sql.gz";
         $timeout = config('remote-sync.timeouts.snapshot_upload', 600);
@@ -251,7 +297,10 @@ class RemoteSyncService
 
     public function createRemoteBackup(RemoteConfig $remote, string $backupName): ProcessResult
     {
-        $excludeTables = config('remote-sync.exclude_tables', []);
+        $excludeTables = array_unique(array_merge(
+            config('remote-sync.exclude_tables', []),
+            self::ALWAYS_PRESERVED_TABLES
+        ));
         $excludeFlags = collect($excludeTables)
             ->map(fn (string $table) => '--exclude='.escapeshellarg($table))
             ->implode(' ');
@@ -277,7 +326,7 @@ class RemoteSyncService
 
         $excludePaths = config('remote-sync.exclude_paths', []);
         $excludeOptions = collect($excludePaths)
-            ->map(fn (string $pattern) => '--exclude='.escapeshellarg($pattern))
+            ->map(fn (string $pattern) => '--exclude='.$pattern)
             ->all();
 
         $options = array_merge($defaultOptions, $excludeOptions, $options);
@@ -301,7 +350,7 @@ class RemoteSyncService
 
         $excludePaths = config('remote-sync.exclude_paths', []);
         $excludeOptions = collect($excludePaths)
-            ->map(fn (string $pattern) => '--exclude='.escapeshellarg($pattern))
+            ->map(fn (string $pattern) => '--exclude='.$pattern)
             ->all();
 
         $options = array_merge($defaultOptions, $excludeOptions, $options);
@@ -424,17 +473,18 @@ PHP;
         }
 
         $args[] = "--user={$username}";
-
-        if ($password !== '') {
-            $args[] = "--password={$password}";
-        }
-
         $args[] = $database;
 
         $argString = implode(' ', array_map('escapeshellarg', $args));
         $command = "gunzip -c {$escapedPath} | mysql {$argString}";
 
-        return Process::timeout($timeout)->run($command);
+        $env = [];
+
+        if ($password !== '') {
+            $env['MYSQL_PWD'] = $password;
+        }
+
+        return Process::timeout($timeout)->env($env)->run($command);
     }
 
     protected function loadViaPsqlCli(string $snapshotPath, int $timeout): ProcessResult
@@ -460,5 +510,53 @@ PHP;
         }
 
         return Process::timeout($timeout)->env($env)->run($command);
+    }
+
+    /**
+     * Get migration records from a remote database.
+     *
+     * @return array<int, string>
+     */
+    public function getRemoteMigrationRecords(RemoteConfig $remote): array
+    {
+        try {
+            $escapedPath = escapeshellarg($remote->workingPath());
+            $code = "echo json_encode(DB::table('migrations')->pluck('migration')->toArray());";
+
+            $escapedCode = escapeshellarg($code);
+            $command = "cd {$escapedPath} && php artisan tinker --execute={$escapedCode}";
+
+            $result = $this->executeRemoteCommand($remote, $command, 60);
+
+            if (! $result->successful()) {
+                return [];
+            }
+
+            $output = trim($result->output());
+
+            $decoded = json_decode($output, true);
+
+            if (! is_array($decoded)) {
+                return [];
+            }
+
+            return $decoded;
+        } catch (\Exception) {
+            return [];
+        }
+    }
+
+    /**
+     * Get migration records from the local database.
+     *
+     * @return array<int, string>
+     */
+    public function getLocalMigrationRecords(): array
+    {
+        try {
+            return DB::table('migrations')->pluck('migration')->toArray();
+        } catch (\Exception) {
+            return [];
+        }
     }
 }

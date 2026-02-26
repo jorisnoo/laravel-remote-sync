@@ -103,6 +103,7 @@ class PushRemoteCommand extends Command
     {
         return $this->call(PushDatabaseCommand::class, [
             'remote' => $this->remote->name,
+            '--force' => true,
         ]);
     }
 

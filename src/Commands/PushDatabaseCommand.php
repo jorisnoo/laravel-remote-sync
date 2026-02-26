@@ -4,8 +4,10 @@ namespace Noo\LaravelRemoteSync\Commands;
 
 use Illuminate\Console\Command;
 use Noo\LaravelRemoteSync\Concerns\InteractsWithRemote;
+use Noo\LaravelRemoteSync\RemoteSyncService;
 use Spatie\DbSnapshots\Commands\Create as SnapshotCreate;
 
+use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\spin;
 
 class PushDatabaseCommand extends Command
@@ -21,6 +23,8 @@ class PushDatabaseCommand extends Command
     protected string $snapshotName;
 
     protected bool $localSnapshotCreated = false;
+
+    protected bool $remoteSnapshotUploaded = false;
 
     /** @var array<int, string> */
     protected array $localTables = [];
@@ -71,6 +75,7 @@ class PushDatabaseCommand extends Command
         $this->trap([SIGTERM, SIGINT], function () {
             $this->components->warn(__('remote-sync::messages.warnings.interrupt_cleanup'));
             $this->cleanupLocalSnapshot();
+            $this->cleanupRemoteSnapshot();
             exit(1);
         });
 
@@ -112,11 +117,13 @@ class PushDatabaseCommand extends Command
         );
 
         $excludedTables = config('remote-sync.exclude_tables', []);
+        $migrationDiff = $this->compareMigrations();
 
         $this->displayDatabasePreview(
             $this->localTables,
             $this->remoteTables,
             $excludedTables,
+            $migrationDiff,
             false,
             'push'
         );
@@ -146,7 +153,10 @@ class PushDatabaseCommand extends Command
     {
         $this->components->info(__('remote-sync::messages.info.creating_local_snapshot', ['name' => $this->snapshotName]));
 
-        $excludeTables = config('remote-sync.exclude_tables', []);
+        $excludeTables = array_unique(array_merge(
+            config('remote-sync.exclude_tables', []),
+            RemoteSyncService::ALWAYS_PRESERVED_TABLES
+        ));
 
         $exitCode = $this->call(SnapshotCreate::class, [
             'name' => $this->snapshotName,
@@ -180,6 +190,7 @@ class PushDatabaseCommand extends Command
             return false;
         }
 
+        $this->remoteSnapshotUploaded = true;
         $this->components->info(__('remote-sync::messages.info.snapshot_uploaded'));
 
         return true;
@@ -219,6 +230,10 @@ class PushDatabaseCommand extends Command
 
     protected function cleanupRemoteSnapshot(): void
     {
+        if (! $this->remoteSnapshotUploaded) {
+            return;
+        }
+
         $result = spin(
             callback: fn () => $this->syncService->deleteRemoteSnapshot($this->remote, $this->snapshotName),
             message: __('remote-sync::messages.spinners.cleaning_remote_snapshot')
@@ -240,6 +255,11 @@ class PushDatabaseCommand extends Command
 
         if ($remoteDriver === null) {
             $this->components->warn(__('remote-sync::messages.warnings.driver_detection_failed'));
+
+            if (! $this->shouldSkipPrompts()
+                && ! confirm(label: __('remote-sync::prompts.confirm.continue_without_driver'), default: false)) {
+                return false;
+            }
 
             return true;
         }

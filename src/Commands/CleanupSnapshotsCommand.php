@@ -262,6 +262,8 @@ class CleanupSnapshotsCommand extends Command
             ];
         }
 
+        usort($snapshots, fn ($a, $b) => $b['mtime'] <=> $a['mtime']);
+
         return $snapshots;
     }
 
