@@ -4,6 +4,7 @@ namespace Noo\LaravelRemoteSync\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Noo\LaravelRemoteSync\Concerns\InteractsWithRemote;
 use Noo\LaravelRemoteSync\RemoteSyncService;
 use Spatie\DbSnapshots\Commands\Create as SnapshotCreate;
@@ -226,6 +227,8 @@ class PullDatabaseCommand extends Command
             $this->truncateExcludedTables();
         }
 
+        $this->filterUsersTable();
+
         return true;
     }
 
@@ -259,6 +262,28 @@ class PullDatabaseCommand extends Command
         } finally {
             $schema->enableForeignKeyConstraints();
         }
+    }
+
+    protected function filterUsersTable(): void
+    {
+        $filterUsers = config('remote-sync.filter_users', false);
+
+        if (! is_array($filterUsers) || empty($filterUsers)) {
+            return;
+        }
+
+        $usersTable = config('auth.providers.users.table', 'users');
+
+        if (! Schema::hasTable($usersTable)) {
+            return;
+        }
+
+        DB::table($usersTable)->whereNotIn('email', $filterUsers)->delete();
+
+        $this->components->info(__('remote-sync::messages.info.filter_users_applied', [
+            'count' => count($filterUsers),
+            'table' => $usersTable,
+        ]));
     }
 
     protected function checkEmptyDatabaseAndOfferMigrations(): bool

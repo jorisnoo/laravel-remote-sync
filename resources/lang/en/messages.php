@@ -48,6 +48,7 @@ return [
         'snapshot_downloaded' => 'Snapshot downloaded.',
         'loading_snapshot' => 'Loading snapshot into database...',
         'snapshot_loaded' => 'Snapshot loaded.',
+        'filter_users_applied' => 'Users table filtered: only :count allowed user(s) kept in :table.',
         'local_snapshot_removed' => 'Local snapshot file removed.',
         'remote_backup_created' => 'Remote backup created: :name',
         'creating_local_snapshot' => 'Creating local snapshot: :name',
@@ -143,6 +144,7 @@ return [
         'files_push_header' => 'Files push preview:',
         'files_to_transfer' => 'Files to transfer',
         'files_to_delete' => 'Files to delete',
+        'filter_users' => 'Users table will be filtered after pull: only :count allowed user(s) will be kept.',
     ],
 
     /*

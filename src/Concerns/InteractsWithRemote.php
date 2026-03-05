@@ -323,6 +323,11 @@ trait InteractsWithRemote
             }
         }
 
+        $filterUsers = config('remote-sync.filter_users', false);
+        if ($direction === 'pull' && is_array($filterUsers) && ! empty($filterUsers)) {
+            $this->components->warn(__('remote-sync::messages.preview.filter_users', ['count' => count($filterUsers)]));
+        }
+
         $this->newLine();
 
         $localOnly = $migrationDiff['local_only'] ?? [];
