@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.6](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.3.6) (2026-03-05)
+
+### Features
+
+- add filter_users option to keep only allowed users after database pull ([517176a](https://github.com/jorisnoo/laravel-remote-sync/commit/517176abb0aabbdaee0d40cf55e94b5dfc1f7f0c))
+- add migration comparison preview, preserve migrations table during sync, and detect remote snapshot subdirectory ([862889d](https://github.com/jorisnoo/laravel-remote-sync/commit/862889d85e4261660f204ff35eea594f36b56327))
 ## [0.3.5](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.3.5) (2026-02-11)
 
 ### Code Refactoring
