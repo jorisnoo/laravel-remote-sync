@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.7](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.3.7) (2026-03-07)
+
+### Features
+
+- add withoutTty option to make TTY usage configurable for rsync processes ([a53666d](https://github.com/jorisnoo/laravel-remote-sync/commit/a53666d36012dc6e1a4906d8827dc2b04341b21a))
 ## [0.3.6](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.3.6) (2026-03-05)
 
 ### Features
