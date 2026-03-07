@@ -17,6 +17,15 @@ class RemoteSyncService
     /** @var array<string, string> */
     protected array $remoteSnapshotSubdirs = [];
 
+    protected bool $useTty = true;
+
+    public function withoutTty(): static
+    {
+        $this->useTty = false;
+
+        return $this;
+    }
+
     public function getRemote(?string $name = null): RemoteConfig
     {
         $name ??= config('remote-sync.default');
@@ -119,9 +128,13 @@ class RemoteSyncService
 
         $source = "{$remote->host}:{$sourcePath}";
 
-        return Process::timeout($timeout)
-            ->tty()
-            ->run(array_merge(['rsync'], $options, [$source, $destinationPath]));
+        $process = Process::timeout($timeout);
+
+        if ($this->useTty) {
+            $process = $process->tty();
+        }
+
+        return $process->run(array_merge(['rsync'], $options, [$source, $destinationPath]));
     }
 
     public function getRemoteDatabaseDriver(RemoteConfig $remote): ?string
@@ -209,15 +222,19 @@ PHP;
         $remotePath = $this->getRemoteSnapshotPath($remote, $snapshotName);
         $timeout = config('remote-sync.timeouts.snapshot_download', 600);
 
-        return Process::timeout($timeout)
-            ->tty()
-            ->run([
-                'rsync',
-                '-avz',
-                '--progress',
-                "{$remote->host}:{$remotePath}",
-                $localPath,
-            ]);
+        $process = Process::timeout($timeout);
+
+        if ($this->useTty) {
+            $process = $process->tty();
+        }
+
+        return $process->run([
+            'rsync',
+            '-avz',
+            '--progress',
+            "{$remote->host}:{$remotePath}",
+            $localPath,
+        ]);
     }
 
     public function deleteRemoteSnapshot(RemoteConfig $remote, string $snapshotName): ProcessResult
@@ -261,9 +278,13 @@ PHP;
 
         $destination = "{$remote->host}:{$destinationPath}";
 
-        return Process::timeout($timeout)
-            ->tty()
-            ->run(array_merge(['rsync'], $options, [$sourcePath, $destination]));
+        $process = Process::timeout($timeout);
+
+        if ($this->useTty) {
+            $process = $process->tty();
+        }
+
+        return $process->run(array_merge(['rsync'], $options, [$sourcePath, $destination]));
     }
 
     public function uploadSnapshot(RemoteConfig $remote, string $snapshotName, string $localPath): ProcessResult
@@ -273,16 +294,20 @@ PHP;
         $localFile = "{$localPath}/{$snapshotName}.sql.gz";
         $timeout = config('remote-sync.timeouts.snapshot_upload', 600);
 
-        return Process::timeout($timeout)
-            ->tty()
-            ->run([
-                'rsync',
-                '-avz',
-                '--progress',
-                '--partial',
-                $localFile,
-                "{$remote->host}:{$remotePath}",
-            ]);
+        $process = Process::timeout($timeout);
+
+        if ($this->useTty) {
+            $process = $process->tty();
+        }
+
+        return $process->run([
+            'rsync',
+            '-avz',
+            '--progress',
+            '--partial',
+            $localFile,
+            "{$remote->host}:{$remotePath}",
+        ]);
     }
 
     public function loadRemoteSnapshot(RemoteConfig $remote, string $snapshotName): ProcessResult
