@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.8](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.3.8) (2026-03-09)
+
+### Features
+
+- add --force option to skip confirmation prompt in push command ([ae121a5](https://github.com/jorisnoo/laravel-remote-sync/commit/ae121a57f1c6e4c15d3a94e3ebee1c70e0782b2c))
 ## [0.3.7](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.3.7) (2026-03-07)
 
 ### Features
