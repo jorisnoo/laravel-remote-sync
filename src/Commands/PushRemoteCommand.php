@@ -14,7 +14,8 @@ class PushRemoteCommand extends Command
     protected $signature = 'remote-sync:push
         {remote? : The remote environment to push to}
         {--dry-run : Show what would be synced without making changes}
-        {--delete : Delete remote files that do not exist locally}';
+        {--delete : Delete remote files that do not exist locally}
+        {--force : Skip confirmation prompt}';
 
     protected $description = 'Push database and/or files to a remote environment';
 
