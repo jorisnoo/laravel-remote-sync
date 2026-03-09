@@ -61,9 +61,7 @@ return [
     */
 
     'exclude_paths' => [
-        // 'cache',
-        // '*.log',
-        // 'temp/**',
+        'app/snapshots',
     ],
 
     /*
