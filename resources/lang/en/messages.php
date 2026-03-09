@@ -155,6 +155,11 @@ return [
 
     'push' => [
         'overwrite_warning' => 'You are about to push local :operation to [:name]. This will OVERWRITE remote data.',
+        'migration_mismatch_warning' => 'DANGER: Migration records differ between local and remote. Pushing to [:name] may cause data loss or schema corruption.',
+    ],
+
+    'pull' => [
+        'migration_mismatch_warning' => 'DANGER: Migration records differ between local and remote. Pulling from [:name] will overwrite your local migrations table.',
     ],
 
     /*

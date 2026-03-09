@@ -41,6 +41,11 @@ class PullDatabaseCommand extends Command
     /** @var array<int, string> */
     protected array $localTables = [];
 
+    /** @var array{local_only: array<int, string>, remote_only: array<int, string>} */
+    protected array $migrationDiff = ['local_only' => [], 'remote_only' => []];
+
+    protected bool $includeMigrations = false;
+
     public function handle(): int
     {
         if (! $this->ensureNotProduction()) {
@@ -83,6 +88,16 @@ class PullDatabaseCommand extends Command
             $this->components->info(__('remote-sync::messages.info.operation_cancelled'));
 
             return self::SUCCESS;
+        }
+
+        if (! $this->fullImport && $this->hasMigrationMismatch()) {
+            if (! $this->option('force') && ! $this->confirmMigrationMismatchPull()) {
+                $this->components->info(__('remote-sync::messages.info.operation_cancelled'));
+
+                return self::SUCCESS;
+            }
+
+            $this->includeMigrations = true;
         }
 
         $this->trap([SIGTERM, SIGINT], function () {
@@ -132,13 +147,13 @@ class PullDatabaseCommand extends Command
         $this->localTables = $this->syncService->getLocalTableNames();
 
         $excludedTables = config('remote-sync.exclude_tables', []);
-        $migrationDiff = $this->compareMigrations();
+        $this->migrationDiff = $this->compareMigrations();
 
         $this->displayDatabasePreview(
             $this->remoteTables,
             $this->localTables,
             $excludedTables,
-            $migrationDiff,
+            $this->migrationDiff,
             $this->fullImport,
             'pull'
         );
@@ -166,7 +181,7 @@ class PullDatabaseCommand extends Command
     protected function createRemoteSnapshot(): bool
     {
         $result = spin(
-            callback: fn () => $this->syncService->createRemoteSnapshot($this->remote, $this->snapshotName, $this->fullImport),
+            callback: fn () => $this->syncService->createRemoteSnapshot($this->remote, $this->snapshotName, $this->fullImport, $this->includeMigrations),
             message: __('remote-sync::messages.spinners.creating_remote_snapshot', ['name' => $this->remote->name])
         );
 
@@ -396,5 +411,20 @@ class PullDatabaseCommand extends Command
             'mariadb' => 'mysql',
             default => strtolower($driver),
         };
+    }
+
+    protected function hasMigrationMismatch(): bool
+    {
+        return ! empty($this->migrationDiff['local_only']) || ! empty($this->migrationDiff['remote_only']);
+    }
+
+    protected function confirmMigrationMismatchPull(): bool
+    {
+        $this->newLine();
+        $this->components->error(__('remote-sync::messages.pull.migration_mismatch_warning', ['name' => $this->remote->name]));
+
+        return $this->confirmWithTypedYes(
+            __('remote-sync::prompts.confirm.pull_migration_mismatch')
+        );
     }
 }

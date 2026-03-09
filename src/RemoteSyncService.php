@@ -151,14 +151,15 @@ class RemoteSyncService
         return trim($result->output()) ?: null;
     }
 
-    public function createRemoteSnapshot(RemoteConfig $remote, string $snapshotName, bool $full = false): ProcessResult
+    public function createRemoteSnapshot(RemoteConfig $remote, string $snapshotName, bool $full = false, bool $includeMigrations = false): ProcessResult
     {
         $excludeFlags = '';
 
         if (! $full) {
+            $preservedTables = $includeMigrations ? [] : self::ALWAYS_PRESERVED_TABLES;
             $excludeTables = array_unique(array_merge(
                 config('remote-sync.exclude_tables', []),
-                self::ALWAYS_PRESERVED_TABLES
+                $preservedTables
             ));
             $excludeFlags = collect($excludeTables)
                 ->map(fn (string $table) => '--exclude='.escapeshellarg($table))
@@ -320,11 +321,12 @@ PHP;
         return $this->executeRemoteCommand($remote, $command, $timeout);
     }
 
-    public function createRemoteBackup(RemoteConfig $remote, string $backupName): ProcessResult
+    public function createRemoteBackup(RemoteConfig $remote, string $backupName, bool $includeMigrations = false): ProcessResult
     {
+        $preservedTables = $includeMigrations ? [] : self::ALWAYS_PRESERVED_TABLES;
         $excludeTables = array_unique(array_merge(
             config('remote-sync.exclude_tables', []),
-            self::ALWAYS_PRESERVED_TABLES
+            $preservedTables
         ));
         $excludeFlags = collect($excludeTables)
             ->map(fn (string $table) => '--exclude='.escapeshellarg($table))

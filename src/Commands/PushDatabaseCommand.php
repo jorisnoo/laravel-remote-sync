@@ -32,6 +32,11 @@ class PushDatabaseCommand extends Command
     /** @var array<int, string> */
     protected array $remoteTables = [];
 
+    /** @var array{local_only: array<int, string>, remote_only: array<int, string>} */
+    protected array $migrationDiff = ['local_only' => [], 'remote_only' => []];
+
+    protected bool $includeMigrations = false;
+
     public function handle(): int
     {
         if (! $this->ensureNotProduction()) {
@@ -70,6 +75,16 @@ class PushDatabaseCommand extends Command
             $this->components->info(__('remote-sync::messages.info.operation_cancelled'));
 
             return self::SUCCESS;
+        }
+
+        if ($this->hasMigrationMismatch()) {
+            if (! $this->option('force') && ! $this->confirmMigrationMismatchPush()) {
+                $this->components->info(__('remote-sync::messages.info.operation_cancelled'));
+
+                return self::SUCCESS;
+            }
+
+            $this->includeMigrations = true;
         }
 
         $this->trap([SIGTERM, SIGINT], function () {
@@ -117,13 +132,13 @@ class PushDatabaseCommand extends Command
         );
 
         $excludedTables = config('remote-sync.exclude_tables', []);
-        $migrationDiff = $this->compareMigrations();
+        $this->migrationDiff = $this->compareMigrations();
 
         $this->displayDatabasePreview(
             $this->localTables,
             $this->remoteTables,
             $excludedTables,
-            $migrationDiff,
+            $this->migrationDiff,
             false,
             'push'
         );
@@ -134,7 +149,7 @@ class PushDatabaseCommand extends Command
         $backupName = 'pre-push-backup-'.date('Y-m-d-H-i-s');
 
         $result = spin(
-            callback: fn () => $this->syncService->createRemoteBackup($this->remote, $backupName),
+            callback: fn () => $this->syncService->createRemoteBackup($this->remote, $backupName, $this->includeMigrations),
             message: __('remote-sync::messages.spinners.creating_remote_backup', ['name' => $this->remote->name])
         );
 
@@ -153,9 +168,10 @@ class PushDatabaseCommand extends Command
     {
         $this->components->info(__('remote-sync::messages.info.creating_local_snapshot', ['name' => $this->snapshotName]));
 
+        $preservedTables = $this->includeMigrations ? [] : RemoteSyncService::ALWAYS_PRESERVED_TABLES;
         $excludeTables = array_unique(array_merge(
             config('remote-sync.exclude_tables', []),
-            RemoteSyncService::ALWAYS_PRESERVED_TABLES
+            $preservedTables
         ));
 
         $exitCode = $this->call(SnapshotCreate::class, [
@@ -287,5 +303,20 @@ class PushDatabaseCommand extends Command
             'mariadb' => 'mysql',
             default => strtolower($driver),
         };
+    }
+
+    protected function hasMigrationMismatch(): bool
+    {
+        return ! empty($this->migrationDiff['local_only']) || ! empty($this->migrationDiff['remote_only']);
+    }
+
+    protected function confirmMigrationMismatchPush(): bool
+    {
+        $this->newLine();
+        $this->components->error(__('remote-sync::messages.push.migration_mismatch_warning', ['name' => $this->remote->name]));
+
+        return $this->confirmWithTypedYes(
+            __('remote-sync::prompts.confirm.push_migration_mismatch')
+        );
     }
 }
