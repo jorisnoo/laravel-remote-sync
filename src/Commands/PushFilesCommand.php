@@ -30,6 +30,10 @@ class PushFilesCommand extends Command
 
     protected int $filesToDelete = 0;
 
+    protected array $transferFiles = [];
+
+    protected array $deleteFiles = [];
+
     public function handle(): int
     {
         if (! $this->ensureNotProduction()) {
@@ -155,13 +159,15 @@ class PushFilesCommand extends Command
                         $counts = $this->parseRsyncDryRunOutput($result->output());
                         $this->filesToTransfer += $counts['transfer'];
                         $this->filesToDelete += $counts['delete'];
+                        $this->transferFiles = array_merge($this->transferFiles, $counts['transfer_files']);
+                        $this->deleteFiles = array_merge($this->deleteFiles, $counts['delete_files']);
                     }
                 }
             },
             message: __('remote-sync::messages.spinners.analyzing_files')
         );
 
-        $this->displayFilesPreview($this->filesToTransfer, $this->filesToDelete, 'push');
+        $this->displayFilesPreview($this->filesToTransfer, $this->filesToDelete, 'push', $this->transferFiles, $this->deleteFiles);
     }
 
     protected function pushPath(string $path): bool

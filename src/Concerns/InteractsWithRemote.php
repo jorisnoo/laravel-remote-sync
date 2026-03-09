@@ -383,7 +383,7 @@ trait InteractsWithRemote
     /**
      * Display a files sync preview.
      */
-    protected function displayFilesPreview(int $filesToTransfer, int $filesToDelete, string $direction = 'pull'): void
+    protected function displayFilesPreview(int $filesToTransfer, int $filesToDelete, string $direction = 'pull', array $transferFiles = [], array $deleteFiles = []): void
     {
         $headerKey = $direction === 'push'
             ? 'remote-sync::messages.preview.files_push_header'
@@ -397,10 +397,18 @@ trait InteractsWithRemote
             (string) $filesToTransfer
         );
 
+        if (! empty($transferFiles)) {
+            $this->components->bulletList($transferFiles);
+        }
+
         $this->components->twoColumnDetail(
             __('remote-sync::messages.preview.files_to_delete'),
             (string) $filesToDelete
         );
+
+        if (! empty($deleteFiles)) {
+            $this->components->bulletList($deleteFiles);
+        }
 
         $this->newLine();
     }
@@ -408,13 +416,15 @@ trait InteractsWithRemote
     /**
      * Parse rsync dry-run output with itemize-changes to count files.
      *
-     * @return array{transfer: int, delete: int}
+     * @return array{transfer: int, delete: int, transfer_files: list<string>, delete_files: list<string>}
      */
     protected function parseRsyncDryRunOutput(string $output): array
     {
         $lines = explode("\n", $output);
         $transfer = 0;
         $delete = 0;
+        $transferFiles = [];
+        $deleteFiles = [];
 
         foreach ($lines as $line) {
             $line = trim($line);
@@ -425,6 +435,7 @@ trait InteractsWithRemote
 
             if (str_starts_with($line, '*deleting')) {
                 $delete++;
+                $deleteFiles[] = trim(substr($line, strlen('*deleting')));
 
                 continue;
             }
@@ -432,11 +443,12 @@ trait InteractsWithRemote
             if (preg_match('/^[<>ch.][fdLDS]/', $line)) {
                 if (! str_ends_with($line, '/')) {
                     $transfer++;
+                    $transferFiles[] = preg_replace('/^[<>ch.][fdLDS][^ ]* /', '', $line);
                 }
             }
         }
 
-        return ['transfer' => $transfer, 'delete' => $delete];
+        return ['transfer' => $transfer, 'delete' => $delete, 'transfer_files' => $transferFiles, 'delete_files' => $deleteFiles];
     }
 
     protected function validateStoragePath(string $path): ?string
