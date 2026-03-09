@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.9](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.3.9) (2026-03-09)
+
+### Features
+
+- add migration mismatch detection and confirmation before push/pull operations ([e39ead0](https://github.com/jorisnoo/laravel-remote-sync/commit/e39ead07d7425db2d4d3b50b30b0aac4d5d23b69))
+- display individual file names in sync preview for transfer and delete operations ([640de88](https://github.com/jorisnoo/laravel-remote-sync/commit/640de88a765e25f29d0bdfc2370b4994a7a6d3f3))
+
+### Bug Fixes
+
+- replace example comments with actual exclude path in remote-sync config ([ca7e965](https://github.com/jorisnoo/laravel-remote-sync/commit/ca7e9657a13dbc3fb9787bd71f7105c05a94313b))
 ## [0.3.8](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.3.8) (2026-03-09)
 
 ### Features
