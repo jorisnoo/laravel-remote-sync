@@ -5,6 +5,7 @@ namespace Noo\LaravelRemoteSync\Concerns;
 use Noo\LaravelRemoteSync\Data\RemoteConfig;
 use Noo\LaravelRemoteSync\RemoteSyncService;
 
+use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\select;
 use function Laravel\Prompts\spin;
 use function Laravel\Prompts\text;
@@ -14,6 +15,31 @@ trait InteractsWithRemote
     protected RemoteSyncService $syncService;
 
     protected RemoteConfig $remote;
+
+    protected string $snapshotName;
+
+    protected bool $remoteSnapshotCreated = false;
+
+    /** @var array<int, string> */
+    protected array $remoteTables = [];
+
+    /** @var array<int, string> */
+    protected array $localTables = [];
+
+    /** @var array{local_only: array<int, string>, remote_only: array<int, string>} */
+    protected array $migrationDiff = ['local_only' => [], 'remote_only' => []];
+
+    protected bool $includeMigrations = false;
+
+    protected ?string $specificPath = null;
+
+    protected int $filesToTransfer = 0;
+
+    protected int $filesToDelete = 0;
+
+    protected array $transferFiles = [];
+
+    protected array $deleteFiles = [];
 
     protected function selectRemote(?string $label = null): ?string
     {
@@ -247,6 +273,92 @@ trait InteractsWithRemote
     protected function generateSnapshotName(): string
     {
         return 'remote-sync-'.date('Y-m-d-H-i-s').'-'.bin2hex(random_bytes(4));
+    }
+
+    protected function validateDatabaseCompatibility(string $direction): bool
+    {
+        $localDriver = config('database.connections.'.config('database.default').'.driver');
+
+        $remoteDriver = spin(
+            callback: fn () => $this->syncService->getRemoteDatabaseDriver($this->remote),
+            message: __('remote-sync::messages.spinners.detecting_driver')
+        );
+
+        if ($remoteDriver === null) {
+            $this->components->warn(__('remote-sync::messages.warnings.driver_detection_failed'));
+
+            if (! $this->shouldSkipPrompts()
+                && ! confirm(label: __('remote-sync::prompts.confirm.continue_without_driver'), default: false)) {
+                return false;
+            }
+
+            return true;
+        }
+
+        $normalize = fn (string $d) => match (strtolower($d)) {
+            'mariadb' => 'mysql',
+            default => strtolower($d),
+        };
+
+        $normalizedLocal = $normalize($localDriver);
+        $normalizedRemote = $normalize($remoteDriver);
+
+        if ($normalizedLocal !== $normalizedRemote) {
+            $errorKey = $direction === 'push'
+                ? 'remote-sync::messages.errors.driver_mismatch_push'
+                : 'remote-sync::messages.errors.driver_mismatch_pull';
+
+            $this->components->error(
+                __($errorKey, ['remote' => $remoteDriver, 'local' => $localDriver])
+            );
+            $this->components->error(
+                __('remote-sync::messages.errors.cross_database_not_supported')
+            );
+
+            return false;
+        }
+
+        return true;
+    }
+
+    protected function hasMigrationMismatch(): bool
+    {
+        return ! empty($this->migrationDiff['local_only']) || ! empty($this->migrationDiff['remote_only']);
+    }
+
+    protected function getConfiguredPaths(): array
+    {
+        if ($this->specificPath !== null) {
+            return [$this->specificPath];
+        }
+
+        return config('remote-sync.paths', []);
+    }
+
+    protected function cleanupLocalSnapshotFile(): void
+    {
+        $snapshotPath = $this->syncService->getSnapshotPath()."/{$this->snapshotName}.sql.gz";
+
+        if (file_exists($snapshotPath)) {
+            unlink($snapshotPath);
+            $this->components->info(__('remote-sync::messages.info.local_snapshot_removed'));
+        }
+    }
+
+    protected function cleanupRemoteSnapshot(): void
+    {
+        if (! $this->remoteSnapshotCreated) {
+            return;
+        }
+
+        $result = spin(
+            callback: fn () => $this->syncService->deleteRemoteSnapshot($this->remote, $this->snapshotName),
+            message: __('remote-sync::messages.spinners.cleaning_remote_snapshot')
+        );
+
+        if (! $result->successful()) {
+            $this->components->warn(__('remote-sync::messages.warnings.manual_cleanup_needed', ['name' => $this->snapshotName]));
+        }
     }
 
     /**

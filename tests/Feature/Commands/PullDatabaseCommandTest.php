@@ -25,14 +25,15 @@ beforeEach(function () {
     Process::fake([
         '*' => Process::result(output: 'no'),
     ]);
+    config()->set('remote-sync.paths', []);
 });
 
-describe('PullDatabaseCommand', function () {
+describe('PullRemoteCommand (database)', function () {
     it('refuses to run in production environment', function () {
         app()->detectEnvironment(fn () => 'production');
         $this->setUpProductionRemote();
 
-        $this->artisan('remote-sync:pull-db', ['remote' => 'production'])
+        $this->artisan('remote-sync:pull', ['remote' => 'production'])
             ->assertFailed()
             ->expectsOutputToContain('This command cannot be run in production');
     });
@@ -40,7 +41,7 @@ describe('PullDatabaseCommand', function () {
     it('fails when remote is not configured', function () {
         config()->set('remote-sync.remotes', []);
 
-        $this->artisan('remote-sync:pull-db', ['remote' => 'nonexistent'])
+        $this->artisan('remote-sync:pull', ['remote' => 'nonexistent'])
             ->assertFailed()
             ->expectsOutputToContain("Remote 'nonexistent' is not configured");
     });
@@ -50,7 +51,7 @@ describe('PullDatabaseCommand', function () {
             'incomplete' => ['path' => '/var/www/app'],
         ]);
 
-        $this->artisan('remote-sync:pull-db', ['remote' => 'incomplete'])
+        $this->artisan('remote-sync:pull', ['remote' => 'incomplete'])
             ->assertFailed()
             ->expectsOutputToContain('missing host or path configuration');
     });
@@ -72,7 +73,7 @@ describe('PullDatabaseCommand', function () {
             mockSuccessfulPullFlow($mock, $mockProcessResult, $remoteConfig);
         });
 
-        $this->artisan('remote-sync:pull-db', [
+        $this->artisan('remote-sync:pull', [
             'remote' => 'production',
             '--no-backup' => true,
             '--force' => true,
@@ -102,7 +103,7 @@ describe('PullDatabaseCommand', function () {
                 ->andReturn('mysql');
         });
 
-        $this->artisan('remote-sync:pull-db', ['remote' => 'production'])
+        $this->artisan('remote-sync:pull', ['remote' => 'production', '--force' => true])
             ->assertFailed()
             ->expectsOutputToContain('Database driver mismatch');
     });
@@ -126,7 +127,7 @@ describe('PullDatabaseCommand', function () {
             mockSuccessfulPullFlow($mock, $mockProcessResult, $remoteConfig, ['remoteDriver' => 'mysql']);
         });
 
-        $this->artisan('remote-sync:pull-db', [
+        $this->artisan('remote-sync:pull', [
             'remote' => 'production',
             '--no-backup' => true,
             '--force' => true,
@@ -153,7 +154,7 @@ describe('PullDatabaseCommand', function () {
             mockSuccessfulPullFlow($mock, $mockProcessResult, $remoteConfig, ['remoteDriver' => 'mysql']);
         });
 
-        $this->artisan('remote-sync:pull-db', [
+        $this->artisan('remote-sync:pull', [
             'remote' => 'production',
             '--no-backup' => true,
             '--force' => true,
@@ -181,7 +182,7 @@ describe('PullDatabaseCommand', function () {
             mockSuccessfulPullFlow($mock, $mockProcessResult, $remoteConfig, ['remoteDriver' => 'mysql']);
         });
 
-        $this->artisan('remote-sync:pull-db', [
+        $this->artisan('remote-sync:pull', [
             '--no-backup' => true,
             '--force' => true,
         ])
@@ -216,7 +217,7 @@ describe('PullDatabaseCommand', function () {
             ]);
         });
 
-        $this->artisan('remote-sync:pull-db', [
+        $this->artisan('remote-sync:pull', [
             'remote' => 'production',
             '--no-backup' => true,
             '--force' => true,
@@ -247,7 +248,7 @@ describe('PullDatabaseCommand', function () {
             ]);
         });
 
-        $this->artisan('remote-sync:pull-db', [
+        $this->artisan('remote-sync:pull', [
             'remote' => 'production',
             '--no-backup' => true,
             '--force' => true,
@@ -283,7 +284,7 @@ describe('PullDatabaseCommand', function () {
             ]);
         });
 
-        $this->artisan('remote-sync:pull-db', [
+        $this->artisan('remote-sync:pull', [
             'remote' => 'production',
             '--no-backup' => true,
             '--force' => true,

@@ -11,13 +11,13 @@ beforeEach(function () {
     ]);
 });
 
-describe('PullFilesCommand', function () {
+describe('PullRemoteCommand (files)', function () {
     it('refuses to run in production environment', function () {
         app()->detectEnvironment(fn () => 'production');
         $this->setUpProductionRemote();
         config()->set('remote-sync.paths', ['app/public']);
 
-        $this->artisan('remote-sync:pull-files', ['remote' => 'production'])
+        $this->artisan('remote-sync:pull', ['remote' => 'production'])
             ->assertFailed()
             ->expectsOutputToContain('This command cannot be run in production');
     });
@@ -25,7 +25,7 @@ describe('PullFilesCommand', function () {
     it('fails when remote is not configured', function () {
         config()->set('remote-sync.remotes', []);
 
-        $this->artisan('remote-sync:pull-files', ['remote' => 'nonexistent'])
+        $this->artisan('remote-sync:pull', ['remote' => 'nonexistent'])
             ->assertFailed()
             ->expectsOutputToContain("Remote 'nonexistent' is not configured");
     });
@@ -34,11 +34,36 @@ describe('PullFilesCommand', function () {
         $this->setUpProductionRemote();
         config()->set('remote-sync.paths', []);
 
-        $this->artisan('remote-sync:pull-files', [
+        $mockProcessResult = Mockery::mock(ProcessResult::class);
+        $mockProcessResult->shouldReceive('successful')->andReturn(true);
+        $mockProcessResult->shouldReceive('output')->andReturn('');
+
+        $remoteConfig = new RemoteConfig(
+            name: 'production',
+            host: 'user@production.example.com',
+            path: '/var/www/app',
+        );
+
+        $this->mock(RemoteSyncService::class, function ($mock) use ($mockProcessResult, $remoteConfig) {
+            $mock->shouldReceive('getRemote')->andReturn($remoteConfig);
+            $mock->shouldReceive('isAtomicDeployment')->andReturn(false);
+            $mock->shouldReceive('getRemoteDatabaseDriver')->andReturn(null);
+            $mock->shouldReceive('getRemoteTableNames')->andReturn([]);
+            $mock->shouldReceive('getLocalTableNames')->andReturn([]);
+            $mock->shouldReceive('getLocalMigrationRecords')->andReturn([]);
+            $mock->shouldReceive('getRemoteMigrationRecords')->andReturn([]);
+            $mock->shouldReceive('createRemoteSnapshot')->once()->andReturn($mockProcessResult);
+            $mock->shouldReceive('getSnapshotPath')->andReturn(storage_path('snapshots'));
+            $mock->shouldReceive('downloadSnapshot')->once()->andReturn($mockProcessResult);
+            $mock->shouldReceive('loadSnapshotViaCli')->once()->andReturn($mockProcessResult);
+            $mock->shouldReceive('deleteRemoteSnapshot')->once()->andReturn($mockProcessResult);
+        });
+
+        $this->artisan('remote-sync:pull', [
             'remote' => 'production',
+            '--no-backup' => true,
             '--force' => true,
         ])
-            ->expectsOutputToContain('No paths configured for pulling')
             ->assertSuccessful();
     });
 
@@ -61,6 +86,17 @@ describe('PullFilesCommand', function () {
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
+            $mock->shouldReceive('getRemoteDatabaseDriver')->andReturn(null);
+            $mock->shouldReceive('getRemoteTableNames')->andReturn([]);
+            $mock->shouldReceive('getLocalTableNames')->andReturn([]);
+            $mock->shouldReceive('getLocalMigrationRecords')->andReturn([]);
+            $mock->shouldReceive('getRemoteMigrationRecords')->andReturn([]);
+            $mock->shouldReceive('createRemoteSnapshot')->once()->andReturn($mockResult);
+            $mock->shouldReceive('getSnapshotPath')->andReturn(storage_path('snapshots'));
+            $mock->shouldReceive('downloadSnapshot')->once()->andReturn($mockResult);
+            $mock->shouldReceive('loadSnapshotViaCli')->once()->andReturn($mockResult);
+            $mock->shouldReceive('deleteRemoteSnapshot')->once()->andReturn($mockResult);
+
             $mock->shouldReceive('rsyncDryRun')
                 ->andReturn($mockResult);
 
@@ -69,8 +105,9 @@ describe('PullFilesCommand', function () {
                 ->andReturn($mockResult);
         });
 
-        $this->artisan('remote-sync:pull-files', [
+        $this->artisan('remote-sync:pull', [
             'remote' => 'production',
+            '--no-backup' => true,
             '--force' => true,
         ])
             ->expectsOutputToContain('Pulling: app/public')
@@ -98,6 +135,17 @@ describe('PullFilesCommand', function () {
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
+            $mock->shouldReceive('getRemoteDatabaseDriver')->andReturn(null);
+            $mock->shouldReceive('getRemoteTableNames')->andReturn([]);
+            $mock->shouldReceive('getLocalTableNames')->andReturn([]);
+            $mock->shouldReceive('getLocalMigrationRecords')->andReturn([]);
+            $mock->shouldReceive('getRemoteMigrationRecords')->andReturn([]);
+            $mock->shouldReceive('createRemoteSnapshot')->once()->andReturn($mockResult);
+            $mock->shouldReceive('getSnapshotPath')->andReturn(storage_path('snapshots'));
+            $mock->shouldReceive('downloadSnapshot')->once()->andReturn($mockResult);
+            $mock->shouldReceive('loadSnapshotViaCli')->once()->andReturn($mockResult);
+            $mock->shouldReceive('deleteRemoteSnapshot')->once()->andReturn($mockResult);
+
             $mock->shouldReceive('rsyncDryRun')
                 ->andReturn($mockResult);
 
@@ -109,9 +157,10 @@ describe('PullFilesCommand', function () {
                 ->andReturn($mockResult);
         });
 
-        $this->artisan('remote-sync:pull-files', [
+        $this->artisan('remote-sync:pull', [
             'remote' => 'production',
             '--path' => 'app/custom',
+            '--no-backup' => true,
             '--force' => true,
         ])
             ->expectsOutputToContain('Pulling: app/custom')
@@ -137,6 +186,17 @@ describe('PullFilesCommand', function () {
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
+            $mock->shouldReceive('getRemoteDatabaseDriver')->andReturn(null);
+            $mock->shouldReceive('getRemoteTableNames')->andReturn([]);
+            $mock->shouldReceive('getLocalTableNames')->andReturn([]);
+            $mock->shouldReceive('getLocalMigrationRecords')->andReturn([]);
+            $mock->shouldReceive('getRemoteMigrationRecords')->andReturn([]);
+            $mock->shouldReceive('createRemoteSnapshot')->once()->andReturn($mockResult);
+            $mock->shouldReceive('getSnapshotPath')->andReturn(storage_path('snapshots'));
+            $mock->shouldReceive('downloadSnapshot')->once()->andReturn($mockResult);
+            $mock->shouldReceive('loadSnapshotViaCli')->once()->andReturn($mockResult);
+            $mock->shouldReceive('deleteRemoteSnapshot')->once()->andReturn($mockResult);
+
             $mock->shouldReceive('rsyncDryRun')
                 ->andReturn($mockResult);
 
@@ -148,9 +208,10 @@ describe('PullFilesCommand', function () {
                 ->andReturn($mockResult);
         });
 
-        $this->artisan('remote-sync:pull-files', [
+        $this->artisan('remote-sync:pull', [
             'remote' => 'production',
             '--delete' => true,
+            '--no-backup' => true,
             '--force' => true,
         ])
             ->assertSuccessful();
@@ -180,6 +241,17 @@ describe('PullFilesCommand', function () {
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
+            $mock->shouldReceive('getRemoteDatabaseDriver')->andReturn(null);
+            $mock->shouldReceive('getRemoteTableNames')->andReturn([]);
+            $mock->shouldReceive('getLocalTableNames')->andReturn([]);
+            $mock->shouldReceive('getLocalMigrationRecords')->andReturn([]);
+            $mock->shouldReceive('getRemoteMigrationRecords')->andReturn([]);
+            $mock->shouldReceive('createRemoteSnapshot')->once()->andReturn($mockResult);
+            $mock->shouldReceive('getSnapshotPath')->andReturn(storage_path('snapshots'));
+            $mock->shouldReceive('downloadSnapshot')->once()->andReturn($mockResult);
+            $mock->shouldReceive('loadSnapshotViaCli')->once()->andReturn($mockResult);
+            $mock->shouldReceive('deleteRemoteSnapshot')->once()->andReturn($mockResult);
+
             $mock->shouldReceive('rsyncDryRun')
                 ->andReturn($mockResult);
 
@@ -188,8 +260,9 @@ describe('PullFilesCommand', function () {
                 ->andReturn($mockResult);
         });
 
-        $this->artisan('remote-sync:pull-files', [
+        $this->artisan('remote-sync:pull', [
             'remote' => 'production',
+            '--no-backup' => true,
             '--force' => true,
         ])
             ->assertSuccessful();
@@ -203,15 +276,15 @@ describe('PullFilesCommand', function () {
         $this->setUpProductionRemote();
         config()->set('remote-sync.paths', ['app/public']);
 
-        $mockDryRunResult = Mockery::mock(ProcessResult::class);
-        $mockDryRunResult->shouldReceive('successful')->andReturn(true);
-        $mockDryRunResult->shouldReceive('output')->andReturn('');
+        $mockSuccessResult = Mockery::mock(ProcessResult::class);
+        $mockSuccessResult->shouldReceive('successful')->andReturn(true);
+        $mockSuccessResult->shouldReceive('output')->andReturn('');
 
         $mockResult = Mockery::mock(ProcessResult::class);
         $mockResult->shouldReceive('successful')->andReturn(false);
         $mockResult->shouldReceive('errorOutput')->andReturn('Connection refused');
 
-        $this->mock(RemoteSyncService::class, function ($mock) use ($mockDryRunResult, $mockResult) {
+        $this->mock(RemoteSyncService::class, function ($mock) use ($mockSuccessResult, $mockResult) {
             $mock->shouldReceive('getRemote')
                 ->andReturn(new RemoteConfig(
                     name: 'production',
@@ -222,54 +295,32 @@ describe('PullFilesCommand', function () {
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
+            $mock->shouldReceive('getRemoteDatabaseDriver')->andReturn(null);
+            $mock->shouldReceive('getRemoteTableNames')->andReturn([]);
+            $mock->shouldReceive('getLocalTableNames')->andReturn([]);
+            $mock->shouldReceive('getLocalMigrationRecords')->andReturn([]);
+            $mock->shouldReceive('getRemoteMigrationRecords')->andReturn([]);
+            $mock->shouldReceive('createRemoteSnapshot')->once()->andReturn($mockSuccessResult);
+            $mock->shouldReceive('getSnapshotPath')->andReturn(storage_path('snapshots'));
+            $mock->shouldReceive('downloadSnapshot')->once()->andReturn($mockSuccessResult);
+            $mock->shouldReceive('loadSnapshotViaCli')->once()->andReturn($mockSuccessResult);
+            $mock->shouldReceive('deleteRemoteSnapshot')->once()->andReturn($mockSuccessResult);
+
             $mock->shouldReceive('rsyncDryRun')
-                ->andReturn($mockDryRunResult);
+                ->andReturn($mockSuccessResult);
 
             $mock->shouldReceive('rsync')
                 ->once()
                 ->andReturn($mockResult);
         });
 
-        $this->artisan('remote-sync:pull-files', [
+        $this->artisan('remote-sync:pull', [
             'remote' => 'production',
+            '--no-backup' => true,
             '--force' => true,
         ])
             ->expectsOutputToContain('Failed to pull app/public')
             ->assertFailed();
-    });
-
-    it('uses default remote when not specified', function () {
-        $this->setUpProductionRemote();
-        config()->set('remote-sync.paths', ['app/public']);
-
-        $mockResult = Mockery::mock(ProcessResult::class);
-        $mockResult->shouldReceive('successful')->andReturn(true);
-        $mockResult->shouldReceive('output')->andReturn('');
-
-        $this->mock(RemoteSyncService::class, function ($mock) use ($mockResult) {
-            $mock->shouldReceive('getAvailableRemotes')
-                ->andReturn(['production']);
-
-            $mock->shouldReceive('getRemote')
-                ->andReturn(new RemoteConfig(
-                    name: 'production',
-                    host: 'user@production.example.com',
-                    path: '/var/www/app',
-                ));
-
-            $mock->shouldReceive('isAtomicDeployment')
-                ->andReturn(false);
-
-            $mock->shouldReceive('rsyncDryRun')
-                ->andReturn($mockResult);
-
-            $mock->shouldReceive('rsync')
-                ->once()
-                ->andReturn($mockResult);
-        });
-
-        $this->artisan('remote-sync:pull-files', ['--force' => true])
-            ->assertSuccessful();
     });
 
     it('uses storage path from atomic deployment', function () {
@@ -298,6 +349,17 @@ describe('PullFilesCommand', function () {
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(true);
 
+            $mock->shouldReceive('getRemoteDatabaseDriver')->andReturn(null);
+            $mock->shouldReceive('getRemoteTableNames')->andReturn([]);
+            $mock->shouldReceive('getLocalTableNames')->andReturn([]);
+            $mock->shouldReceive('getLocalMigrationRecords')->andReturn([]);
+            $mock->shouldReceive('getRemoteMigrationRecords')->andReturn([]);
+            $mock->shouldReceive('createRemoteSnapshot')->once()->andReturn($mockResult);
+            $mock->shouldReceive('getSnapshotPath')->andReturn(storage_path('snapshots'));
+            $mock->shouldReceive('downloadSnapshot')->once()->andReturn($mockResult);
+            $mock->shouldReceive('loadSnapshotViaCli')->once()->andReturn($mockResult);
+            $mock->shouldReceive('deleteRemoteSnapshot')->once()->andReturn($mockResult);
+
             $mock->shouldReceive('rsyncDryRun')
                 ->andReturn($mockResult);
 
@@ -309,8 +371,9 @@ describe('PullFilesCommand', function () {
                 ->andReturn($mockResult);
         });
 
-        $this->artisan('remote-sync:pull-files', [
+        $this->artisan('remote-sync:pull', [
             'remote' => 'production',
+            '--no-backup' => true,
             '--force' => true,
         ])
             ->assertSuccessful();

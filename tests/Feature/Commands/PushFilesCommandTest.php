@@ -11,13 +11,13 @@ beforeEach(function () {
     ]);
 });
 
-describe('PushFilesCommand', function () {
+describe('PushRemoteCommand (files)', function () {
     it('refuses to run in production environment', function () {
         app()->detectEnvironment(fn () => 'production');
         $this->setUpStagingRemote();
         config()->set('remote-sync.paths', ['app/public']);
 
-        $this->artisan('remote-sync:push-files', ['remote' => 'staging'])
+        $this->artisan('remote-sync:push', ['remote' => 'staging'])
             ->assertFailed()
             ->expectsOutputToContain('This command cannot be run in production');
     });
@@ -25,7 +25,7 @@ describe('PushFilesCommand', function () {
     it('fails when remote is not configured', function () {
         config()->set('remote-sync.remotes', []);
 
-        $this->artisan('remote-sync:push-files', ['remote' => 'nonexistent'])
+        $this->artisan('remote-sync:push', ['remote' => 'nonexistent'])
             ->assertFailed()
             ->expectsOutputToContain("Remote 'nonexistent' is not configured");
     });
@@ -34,7 +34,7 @@ describe('PushFilesCommand', function () {
         $this->setUpProductionRemote();
         config()->set('remote-sync.paths', ['app/public']);
 
-        $this->artisan('remote-sync:push-files', ['remote' => 'production'])
+        $this->artisan('remote-sync:push', ['remote' => 'production'])
             ->assertFailed()
             ->expectsOutputToContain('Push is not allowed for remote [production]');
     });
@@ -43,11 +43,38 @@ describe('PushFilesCommand', function () {
         $this->setUpStagingRemote();
         config()->set('remote-sync.paths', []);
 
-        $this->artisan('remote-sync:push-files', [
+        $mockProcessResult = Mockery::mock(ProcessResult::class);
+        $mockProcessResult->shouldReceive('successful')->andReturn(true);
+        $mockProcessResult->shouldReceive('output')->andReturn('');
+
+        $this->mock(RemoteSyncService::class, function ($mock) use ($mockProcessResult) {
+            $mock->shouldReceive('getRemote')
+                ->andReturn(new RemoteConfig(
+                    name: 'staging',
+                    host: 'user@staging.example.com',
+                    path: '/var/www/app',
+                    pushAllowed: true,
+                ));
+
+            $mock->shouldReceive('isAtomicDeployment')
+                ->andReturn(false);
+
+            $mock->shouldReceive('getRemoteDatabaseDriver')->andReturn('sqlite');
+            $mock->shouldReceive('getLocalTableNames')->andReturn([]);
+            $mock->shouldReceive('getRemoteTableNames')->andReturn([]);
+            $mock->shouldReceive('getLocalMigrationRecords')->andReturn([]);
+            $mock->shouldReceive('getRemoteMigrationRecords')->andReturn([]);
+            $mock->shouldReceive('createRemoteBackup')->once()->andReturn($mockProcessResult);
+            $mock->shouldReceive('getSnapshotPath')->andReturn(storage_path('snapshots'));
+            $mock->shouldReceive('uploadSnapshot')->once()->andReturn($mockProcessResult);
+            $mock->shouldReceive('loadRemoteSnapshot')->once()->andReturn($mockProcessResult);
+            $mock->shouldReceive('deleteRemoteSnapshot')->once()->andReturn($mockProcessResult);
+        });
+
+        $this->artisan('remote-sync:push', [
             'remote' => 'staging',
             '--force' => true,
         ])
-            ->expectsOutputToContain('No paths configured for pushing')
             ->assertSuccessful();
     });
 
@@ -76,11 +103,22 @@ describe('PushFilesCommand', function () {
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
+            $mock->shouldReceive('getRemoteDatabaseDriver')->andReturn('sqlite');
+            $mock->shouldReceive('getLocalTableNames')->andReturn([]);
+            $mock->shouldReceive('getRemoteTableNames')->andReturn([]);
+            $mock->shouldReceive('getLocalMigrationRecords')->andReturn([]);
+            $mock->shouldReceive('getRemoteMigrationRecords')->andReturn([]);
+            $mock->shouldReceive('createRemoteBackup')->once()->andReturn($mockResult);
+            $mock->shouldReceive('getSnapshotPath')->andReturn(storage_path('snapshots'));
+            $mock->shouldReceive('uploadSnapshot')->once()->andReturn($mockResult);
+            $mock->shouldReceive('loadRemoteSnapshot')->once()->andReturn($mockResult);
+            $mock->shouldReceive('deleteRemoteSnapshot')->once()->andReturn($mockResult);
+
             $mock->shouldReceive('rsyncUploadDryRun')
                 ->andReturn($mockResult);
         });
 
-        $this->artisan('remote-sync:push-files', [
+        $this->artisan('remote-sync:push', [
             'remote' => 'staging',
             '--dry-run' => true,
             '--force' => true,
@@ -122,6 +160,17 @@ describe('PushFilesCommand', function () {
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
+            $mock->shouldReceive('getRemoteDatabaseDriver')->andReturn('sqlite');
+            $mock->shouldReceive('getLocalTableNames')->andReturn([]);
+            $mock->shouldReceive('getRemoteTableNames')->andReturn([]);
+            $mock->shouldReceive('getLocalMigrationRecords')->andReturn([]);
+            $mock->shouldReceive('getRemoteMigrationRecords')->andReturn([]);
+            $mock->shouldReceive('createRemoteBackup')->once()->andReturn($mockResult);
+            $mock->shouldReceive('getSnapshotPath')->andReturn(storage_path('snapshots'));
+            $mock->shouldReceive('uploadSnapshot')->once()->andReturn($mockResult);
+            $mock->shouldReceive('loadRemoteSnapshot')->once()->andReturn($mockResult);
+            $mock->shouldReceive('deleteRemoteSnapshot')->once()->andReturn($mockResult);
+
             $mock->shouldReceive('rsyncUploadDryRun')
                 ->andReturn($mockResult);
 
@@ -130,7 +179,7 @@ describe('PushFilesCommand', function () {
                 ->andReturn($mockResult);
         });
 
-        $this->artisan('remote-sync:push-files', [
+        $this->artisan('remote-sync:push', [
             'remote' => 'staging',
             '--force' => true,
         ])
@@ -172,6 +221,17 @@ describe('PushFilesCommand', function () {
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
+            $mock->shouldReceive('getRemoteDatabaseDriver')->andReturn('sqlite');
+            $mock->shouldReceive('getLocalTableNames')->andReturn([]);
+            $mock->shouldReceive('getRemoteTableNames')->andReturn([]);
+            $mock->shouldReceive('getLocalMigrationRecords')->andReturn([]);
+            $mock->shouldReceive('getRemoteMigrationRecords')->andReturn([]);
+            $mock->shouldReceive('createRemoteBackup')->once()->andReturn($mockResult);
+            $mock->shouldReceive('getSnapshotPath')->andReturn(storage_path('snapshots'));
+            $mock->shouldReceive('uploadSnapshot')->once()->andReturn($mockResult);
+            $mock->shouldReceive('loadRemoteSnapshot')->once()->andReturn($mockResult);
+            $mock->shouldReceive('deleteRemoteSnapshot')->once()->andReturn($mockResult);
+
             $mock->shouldReceive('rsyncUploadDryRun')
                 ->andReturn($mockResult);
 
@@ -180,7 +240,7 @@ describe('PushFilesCommand', function () {
                 ->andReturn($mockResult);
         });
 
-        $this->artisan('remote-sync:push-files', [
+        $this->artisan('remote-sync:push', [
             'remote' => 'staging',
             '--path' => 'app/custom',
             '--force' => true,
@@ -218,6 +278,17 @@ describe('PushFilesCommand', function () {
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
+            $mock->shouldReceive('getRemoteDatabaseDriver')->andReturn('sqlite');
+            $mock->shouldReceive('getLocalTableNames')->andReturn([]);
+            $mock->shouldReceive('getRemoteTableNames')->andReturn([]);
+            $mock->shouldReceive('getLocalMigrationRecords')->andReturn([]);
+            $mock->shouldReceive('getRemoteMigrationRecords')->andReturn([]);
+            $mock->shouldReceive('createRemoteBackup')->once()->andReturn($mockResult);
+            $mock->shouldReceive('getSnapshotPath')->andReturn(storage_path('snapshots'));
+            $mock->shouldReceive('uploadSnapshot')->once()->andReturn($mockResult);
+            $mock->shouldReceive('loadRemoteSnapshot')->once()->andReturn($mockResult);
+            $mock->shouldReceive('deleteRemoteSnapshot')->once()->andReturn($mockResult);
+
             $mock->shouldReceive('rsyncUploadDryRun')
                 ->andReturn($mockResult);
 
@@ -229,7 +300,7 @@ describe('PushFilesCommand', function () {
                 ->andReturn($mockResult);
         });
 
-        $this->artisan('remote-sync:push-files', [
+        $this->artisan('remote-sync:push', [
             'remote' => 'staging',
             '--delete' => true,
             '--force' => true,
@@ -262,11 +333,22 @@ describe('PushFilesCommand', function () {
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
+            $mock->shouldReceive('getRemoteDatabaseDriver')->andReturn('sqlite');
+            $mock->shouldReceive('getLocalTableNames')->andReturn([]);
+            $mock->shouldReceive('getRemoteTableNames')->andReturn([]);
+            $mock->shouldReceive('getLocalMigrationRecords')->andReturn([]);
+            $mock->shouldReceive('getRemoteMigrationRecords')->andReturn([]);
+            $mock->shouldReceive('createRemoteBackup')->once()->andReturn($mockResult);
+            $mock->shouldReceive('getSnapshotPath')->andReturn(storage_path('snapshots'));
+            $mock->shouldReceive('uploadSnapshot')->once()->andReturn($mockResult);
+            $mock->shouldReceive('loadRemoteSnapshot')->once()->andReturn($mockResult);
+            $mock->shouldReceive('deleteRemoteSnapshot')->once()->andReturn($mockResult);
+
             $mock->shouldReceive('rsyncUploadDryRun')
                 ->andReturn($mockResult);
         });
 
-        $this->artisan('remote-sync:push-files', [
+        $this->artisan('remote-sync:push', [
             'remote' => 'staging',
             '--force' => true,
         ])
@@ -284,15 +366,15 @@ describe('PushFilesCommand', function () {
             mkdir($testPath, 0755, true);
         }
 
-        $mockDryRunResult = Mockery::mock(ProcessResult::class);
-        $mockDryRunResult->shouldReceive('successful')->andReturn(true);
-        $mockDryRunResult->shouldReceive('output')->andReturn('');
+        $mockSuccessResult = Mockery::mock(ProcessResult::class);
+        $mockSuccessResult->shouldReceive('successful')->andReturn(true);
+        $mockSuccessResult->shouldReceive('output')->andReturn('');
 
         $mockResult = Mockery::mock(ProcessResult::class);
         $mockResult->shouldReceive('successful')->andReturn(false);
         $mockResult->shouldReceive('errorOutput')->andReturn('Connection refused');
 
-        $this->mock(RemoteSyncService::class, function ($mock) use ($mockDryRunResult, $mockResult) {
+        $this->mock(RemoteSyncService::class, function ($mock) use ($mockSuccessResult, $mockResult) {
             $mock->shouldReceive('getRemote')
                 ->andReturn(new RemoteConfig(
                     name: 'staging',
@@ -304,15 +386,26 @@ describe('PushFilesCommand', function () {
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
+            $mock->shouldReceive('getRemoteDatabaseDriver')->andReturn('sqlite');
+            $mock->shouldReceive('getLocalTableNames')->andReturn([]);
+            $mock->shouldReceive('getRemoteTableNames')->andReturn([]);
+            $mock->shouldReceive('getLocalMigrationRecords')->andReturn([]);
+            $mock->shouldReceive('getRemoteMigrationRecords')->andReturn([]);
+            $mock->shouldReceive('createRemoteBackup')->once()->andReturn($mockSuccessResult);
+            $mock->shouldReceive('getSnapshotPath')->andReturn(storage_path('snapshots'));
+            $mock->shouldReceive('uploadSnapshot')->once()->andReturn($mockSuccessResult);
+            $mock->shouldReceive('loadRemoteSnapshot')->once()->andReturn($mockSuccessResult);
+            $mock->shouldReceive('deleteRemoteSnapshot')->once()->andReturn($mockSuccessResult);
+
             $mock->shouldReceive('rsyncUploadDryRun')
-                ->andReturn($mockDryRunResult);
+                ->andReturn($mockSuccessResult);
 
             $mock->shouldReceive('rsyncUpload')
                 ->once()
                 ->andReturn($mockResult);
         });
 
-        $this->artisan('remote-sync:push-files', [
+        $this->artisan('remote-sync:push', [
             'remote' => 'staging',
             '--force' => true,
         ])
