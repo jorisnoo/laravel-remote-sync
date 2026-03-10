@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.4.0) (2026-03-10)
+
+### Features
+
+- make rsync timeout configurable via remote-sync.timeouts.file_sync config ([88f8dcb](https://github.com/jorisnoo/laravel-remote-sync/commit/88f8dcb846231c224a6363c53efd51f498b451d3))
 ## [0.3.9](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.3.9) (2026-03-09)
 
 ### Features
