@@ -360,7 +360,9 @@ PHP;
 
         $source = "{$remote->host}:{$sourcePath}";
 
-        return Process::timeout(120)
+        $timeout = config('remote-sync.timeouts.file_sync', 1800);
+
+        return Process::timeout($timeout)
             ->run(array_merge(['rsync'], $options, [$source, $destinationPath]));
     }
 
@@ -384,7 +386,9 @@ PHP;
 
         $destination = "{$remote->host}:{$destinationPath}";
 
-        return Process::timeout(120)
+        $timeout = config('remote-sync.timeouts.file_sync', 1800);
+
+        return Process::timeout($timeout)
             ->run(array_merge(['rsync'], $options, [$sourcePath, $destination]));
     }
 
