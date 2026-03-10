@@ -84,6 +84,71 @@ class RemoteSyncService
         return 'snapshots';
     }
 
+    /**
+     * Check if the remote host's SSH key is known.
+     *
+     * @return string 'ok' if known/not an SSH key issue, 'unknown' if not in known_hosts, 'changed' if key mismatch
+     */
+    public function checkHostKey(RemoteConfig $remote): string
+    {
+        $result = Process::timeout(10)->run([
+            'ssh',
+            '-o', 'BatchMode=yes',
+            '-o', 'ConnectTimeout=5',
+            $remote->host,
+            'exit',
+        ]);
+
+        $error = $result->errorOutput();
+
+        if (str_contains($error, 'REMOTE HOST IDENTIFICATION HAS CHANGED')) {
+            return 'changed';
+        }
+
+        if (str_contains($error, 'Host key verification failed')) {
+            return 'unknown';
+        }
+
+        return 'ok';
+    }
+
+    public function getHostFingerprints(RemoteConfig $remote): ?string
+    {
+        $hostname = $this->extractHostname($remote->host);
+
+        $result = Process::timeout(10)->run(
+            'ssh-keyscan -t ed25519,rsa,ecdsa '.escapeshellarg($hostname).' 2>/dev/null | ssh-keygen -lf -'
+        );
+
+        if ($result->successful() && trim($result->output()) !== '') {
+            return trim($result->output());
+        }
+
+        return null;
+    }
+
+    public function acceptHostKey(RemoteConfig $remote): bool
+    {
+        $result = Process::timeout(15)->run([
+            'ssh',
+            '-o', 'StrictHostKeyChecking=accept-new',
+            '-o', 'ConnectTimeout=10',
+            $remote->host,
+            'exit',
+        ]);
+
+        return ! str_contains($result->errorOutput(), 'Host key verification failed');
+    }
+
+    public function extractHostname(string $host): string
+    {
+        if (str_contains($host, '@')) {
+            return explode('@', $host, 2)[1];
+        }
+
+        return $host;
+    }
+
     public function executeRemoteCommand(RemoteConfig $remote, string $command, ?int $timeout = null): ProcessResult
     {
         $timeout ??= 120;

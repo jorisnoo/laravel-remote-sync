@@ -68,6 +68,8 @@ describe('PushRemoteCommand (database)', function () {
                     pushAllowed: true,
                 ));
 
+            $mock->shouldReceive('checkHostKey')->andReturn('ok');
+
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
@@ -129,6 +131,8 @@ describe('PushRemoteCommand (database)', function () {
                     pushAllowed: true,
                 ));
 
+            $mock->shouldReceive('checkHostKey')->andReturn('ok');
+
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
@@ -157,6 +161,8 @@ describe('PushRemoteCommand (database)', function () {
                     path: '/var/www/app',
                     pushAllowed: true,
                 ));
+
+            $mock->shouldReceive('checkHostKey')->andReturn('ok');
 
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
@@ -218,6 +224,8 @@ describe('PushRemoteCommand (database)', function () {
                     path: '/var/www/app',
                     pushAllowed: true,
                 ));
+
+            $mock->shouldReceive('checkHostKey')->andReturn('ok');
 
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
@@ -290,6 +298,8 @@ describe('PushRemoteCommand (database)', function () {
                     pushAllowed: true,
                 ));
 
+            $mock->shouldReceive('checkHostKey')->andReturn('ok');
+
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
@@ -348,6 +358,8 @@ describe('PushRemoteCommand (database)', function () {
                     path: '/var/www/app',
                     pushAllowed: true,
                 ));
+
+            $mock->shouldReceive('checkHostKey')->andReturn('ok');
 
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
@@ -414,6 +426,8 @@ describe('PushRemoteCommand (database)', function () {
                     path: '/var/www/app',
                     pushAllowed: true,
                 ));
+
+            $mock->shouldReceive('checkHostKey')->andReturn('ok');
 
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
@@ -490,6 +504,8 @@ describe('PushRemoteCommand (database)', function () {
         $this->mock(RemoteSyncService::class, function ($mock) use ($mockProcessResult, $remoteConfig) {
             $mock->shouldReceive('getRemote')
                 ->andReturn($remoteConfig);
+
+            $mock->shouldReceive('checkHostKey')->andReturn('ok');
 
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(true);

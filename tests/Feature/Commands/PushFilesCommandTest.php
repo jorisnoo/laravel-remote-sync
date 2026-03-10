@@ -56,6 +56,8 @@ describe('PushRemoteCommand (files)', function () {
                     pushAllowed: true,
                 ));
 
+            $mock->shouldReceive('checkHostKey')->andReturn('ok');
+
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
@@ -99,6 +101,8 @@ describe('PushRemoteCommand (files)', function () {
                     path: '/var/www/app',
                     pushAllowed: true,
                 ));
+
+            $mock->shouldReceive('checkHostKey')->andReturn('ok');
 
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
@@ -156,6 +160,8 @@ describe('PushRemoteCommand (files)', function () {
                     path: '/var/www/app',
                     pushAllowed: true,
                 ));
+
+            $mock->shouldReceive('checkHostKey')->andReturn('ok');
 
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
@@ -218,6 +224,8 @@ describe('PushRemoteCommand (files)', function () {
                     pushAllowed: true,
                 ));
 
+            $mock->shouldReceive('checkHostKey')->andReturn('ok');
+
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
@@ -275,6 +283,8 @@ describe('PushRemoteCommand (files)', function () {
                     pushAllowed: true,
                 ));
 
+            $mock->shouldReceive('checkHostKey')->andReturn('ok');
+
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
@@ -330,6 +340,8 @@ describe('PushRemoteCommand (files)', function () {
                     pushAllowed: true,
                 ));
 
+            $mock->shouldReceive('checkHostKey')->andReturn('ok');
+
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
@@ -382,6 +394,8 @@ describe('PushRemoteCommand (files)', function () {
                     path: '/var/www/app',
                     pushAllowed: true,
                 ));
+
+            $mock->shouldReceive('checkHostKey')->andReturn('ok');
 
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);

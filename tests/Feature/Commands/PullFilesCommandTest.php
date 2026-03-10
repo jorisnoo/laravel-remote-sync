@@ -46,6 +46,7 @@ describe('PullRemoteCommand (files)', function () {
 
         $this->mock(RemoteSyncService::class, function ($mock) use ($mockProcessResult, $remoteConfig) {
             $mock->shouldReceive('getRemote')->andReturn($remoteConfig);
+            $mock->shouldReceive('checkHostKey')->andReturn('ok');
             $mock->shouldReceive('isAtomicDeployment')->andReturn(false);
             $mock->shouldReceive('getRemoteDatabaseDriver')->andReturn(null);
             $mock->shouldReceive('getRemoteTableNames')->andReturn([]);
@@ -82,6 +83,8 @@ describe('PullRemoteCommand (files)', function () {
                     host: 'user@production.example.com',
                     path: '/var/www/app',
                 ));
+
+            $mock->shouldReceive('checkHostKey')->andReturn('ok');
 
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
@@ -131,6 +134,8 @@ describe('PullRemoteCommand (files)', function () {
                     host: 'user@production.example.com',
                     path: '/var/www/app',
                 ));
+
+            $mock->shouldReceive('checkHostKey')->andReturn('ok');
 
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
@@ -182,6 +187,8 @@ describe('PullRemoteCommand (files)', function () {
                     host: 'user@production.example.com',
                     path: '/var/www/app',
                 ));
+
+            $mock->shouldReceive('checkHostKey')->andReturn('ok');
 
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
@@ -238,6 +245,8 @@ describe('PullRemoteCommand (files)', function () {
                     path: '/var/www/app',
                 ));
 
+            $mock->shouldReceive('checkHostKey')->andReturn('ok');
+
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
@@ -292,6 +301,8 @@ describe('PullRemoteCommand (files)', function () {
                     path: '/var/www/app',
                 ));
 
+            $mock->shouldReceive('checkHostKey')->andReturn('ok');
+
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
@@ -345,6 +356,8 @@ describe('PullRemoteCommand (files)', function () {
                     path: '/var/www/app',
                     isAtomic: true,
                 ));
+
+            $mock->shouldReceive('checkHostKey')->andReturn('ok');
 
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(true);

@@ -8,6 +8,7 @@ use Noo\LaravelRemoteSync\RemoteSyncService;
 function mockSuccessfulPullFlow($mock, $mockProcessResult, $remoteConfig, array $extras = []): void
 {
     $mock->shouldReceive('getRemote')->andReturn($remoteConfig);
+    $mock->shouldReceive('checkHostKey')->andReturn('ok');
     $mock->shouldReceive('isAtomicDeployment')->andReturn($extras['isAtomic'] ?? false);
     $mock->shouldReceive('getRemoteDatabaseDriver')->andReturn($extras['remoteDriver'] ?? null);
     $mock->shouldReceive('getRemoteTableNames')->andReturn($extras['remoteTables'] ?? []);
@@ -94,6 +95,8 @@ describe('PullRemoteCommand (database)', function () {
                     host: 'user@production.example.com',
                     path: '/var/www/app',
                 ));
+
+            $mock->shouldReceive('checkHostKey')->andReturn('ok');
 
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);

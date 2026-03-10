@@ -8,6 +8,7 @@ use Noo\LaravelRemoteSync\RemoteSyncService;
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\select;
 use function Laravel\Prompts\spin;
+use function Laravel\Prompts\table;
 use function Laravel\Prompts\text;
 
 trait InteractsWithRemote
@@ -60,15 +61,88 @@ trait InteractsWithRemote
         );
     }
 
-    protected function initializeRemote(?string $remoteName): void
+    protected function initializeRemote(?string $remoteName): bool
     {
         $this->syncService = app(RemoteSyncService::class);
         $this->remote = $this->syncService->getRemote($remoteName);
+
+        if (! $this->verifyHostKey()) {
+            return false;
+        }
 
         if ($this->remote->isAtomic === null) {
             $isAtomic = $this->syncService->isAtomicDeployment($this->remote);
             $this->remote = $this->remote->withAtomicDetection($isAtomic);
         }
+
+        return true;
+    }
+
+    protected function verifyHostKey(): bool
+    {
+        $status = spin(
+            callback: fn () => $this->syncService->checkHostKey($this->remote),
+            message: __('remote-sync::messages.spinners.verifying_host')
+        );
+
+        if ($status === 'ok') {
+            return true;
+        }
+
+        $hostname = $this->syncService->extractHostname($this->remote->host);
+
+        if ($status === 'changed') {
+            $this->components->error(__('remote-sync::messages.errors.host_key_changed', ['host' => $hostname]));
+
+            return false;
+        }
+
+        // status === 'unknown'
+        $this->components->warn(__('remote-sync::messages.warnings.unknown_host', ['host' => $hostname]));
+
+        $fingerprints = $this->syncService->getHostFingerprints($this->remote);
+
+        if ($fingerprints) {
+            $this->newLine();
+            $rows = collect(explode("\n", $fingerprints))
+                ->filter()
+                ->map(function (string $line) {
+                    // Format: "2048 SHA256:abc123... hostname (RSA)"
+                    if (preg_match('/^\d+\s+(SHA256:\S+)\s+.*\((\w+)\)$/', trim($line), $matches)) {
+                        return [$matches[2], $matches[1]];
+                    }
+
+                    return null;
+                })
+                ->filter()
+                ->values()
+                ->all();
+
+            if (! empty($rows)) {
+                table(['Type', 'Fingerprint'], $rows);
+            }
+
+            $this->newLine();
+        }
+
+        if (! confirm(label: __('remote-sync::prompts.confirm.accept_host_key', ['host' => $hostname]), default: false)) {
+            return false;
+        }
+
+        $accepted = spin(
+            callback: fn () => $this->syncService->acceptHostKey($this->remote),
+            message: __('remote-sync::messages.spinners.accepting_host_key')
+        );
+
+        if (! $accepted) {
+            $this->components->error(__('remote-sync::messages.errors.host_key_failed'));
+
+            return false;
+        }
+
+        $this->components->info(__('remote-sync::messages.info.host_key_accepted', ['host' => $hostname]));
+
+        return true;
     }
 
     protected function ensureNotProduction(): bool

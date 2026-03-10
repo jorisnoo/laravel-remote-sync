@@ -54,7 +54,9 @@ class PullRemoteCommand extends Command
         }
 
         try {
-            $this->initializeRemote($remoteName);
+            if (! $this->initializeRemote($remoteName)) {
+                return self::FAILURE;
+            }
         } catch (\InvalidArgumentException $e) {
             $this->components->error($e->getMessage());
 

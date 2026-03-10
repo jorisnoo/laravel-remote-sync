@@ -181,6 +181,8 @@ describe('CleanupSnapshotsCommand', function () {
                     path: '/var/www/app',
                 ));
 
+            $mock->shouldReceive('checkHostKey')->andReturn('ok');
+
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
@@ -231,6 +233,8 @@ describe('CleanupSnapshotsCommand', function () {
                     host: 'user@production.example.com',
                     path: '/var/www/app',
                 ));
+
+            $mock->shouldReceive('checkHostKey')->andReturn('ok');
 
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
@@ -345,6 +349,8 @@ describe('CleanupSnapshotsCommand', function () {
                     host: 'user@production.example.com',
                     path: '/var/www/app',
                 ));
+
+            $mock->shouldReceive('checkHostKey')->andReturn('ok');
 
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);

@@ -14,6 +14,7 @@ return [
         'delete_remote' => 'Push local files to [:name] with deletion? Type "yes" to continue',
         'cleanup' => 'Delete :summary? Type "yes" to continue',
         'validation' => 'Type "yes" to confirm',
+        'accept_host_key' => 'Do you want to trust this host [:host] and continue connecting?',
         'continue_without_driver' => 'Could not detect remote database driver. Continue anyway?',
         'push_migration_mismatch' => 'Migrations are out of sync. This will also push the migrations table. Are you ABSOLUTELY SURE? Type "yes" to continue',
         'pull_migration_mismatch' => 'Migrations are out of sync. This will also pull the migrations table. Are you ABSOLUTELY SURE? Type "yes" to continue',

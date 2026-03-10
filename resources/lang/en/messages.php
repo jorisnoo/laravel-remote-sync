@@ -32,6 +32,8 @@ return [
         'path_traversal' => 'Path traversal detected: :path must be within the storage directory.',
         'migrations_failed' => 'Migrations failed. Aborting pull.',
         'failed_local_backup' => 'Failed to create local backup. Aborting pull.',
+        'host_key_changed' => 'WARNING: The host key for [:host] has changed. This could indicate a man-in-the-middle attack. Update your ~/.ssh/known_hosts file manually if this change is expected.',
+        'host_key_failed' => 'Failed to save the host key.',
     ],
 
     /*
@@ -63,6 +65,7 @@ return [
         'would_sync_path' => 'Would sync: :path',
         'no_cleanup_targets' => 'No cleanup targets selected.',
         'no_snapshots_to_cleanup' => 'No snapshots to cleanup.',
+        'host_key_accepted' => 'Host key for [:host] has been saved.',
         'running_migrations' => 'Running migrations...',
         'migrations_completed' => 'Migrations completed.',
         'local_snapshots_to_delete' => 'Local snapshots to delete (keeping :count most recent):',
@@ -81,6 +84,7 @@ return [
     'warnings' => [
         'interrupt_cleanup' => 'Received interrupt signal, cleaning up...',
         'manual_cleanup_needed' => 'Failed to delete remote snapshot. You may need to manually clean up: :name',
+        'unknown_host' => 'The authenticity of host [:host] cannot be verified. It is not in your known_hosts file.',
         'driver_detection_failed' => 'Could not detect remote database driver. Proceeding anyway...',
         'no_paths_pull' => 'No paths configured for pulling.',
         'no_paths_push' => 'No paths configured for pushing.',
@@ -116,6 +120,8 @@ return [
         'loading_remote_snapshot' => 'Loading snapshot on [:name]...',
         'fetching_remote_table_info' => 'Fetching remote table info...',
         'comparing_migrations' => 'Comparing migration records...',
+        'verifying_host' => 'Verifying remote host...',
+        'accepting_host_key' => 'Saving host key...',
         'analyzing_files_to_pull' => 'Analyzing files to pull...',
         'analyzing_files' => 'Analyzing files...',
     ],
