@@ -63,6 +63,7 @@ describe('PullRemoteCommand (files)', function () {
         $this->artisan('remote-sync:pull', [
             'remote' => 'production',
             '--no-backup' => true,
+            '--no-clear-cache' => true,
             '--force' => true,
         ])
             ->assertSuccessful();
@@ -111,6 +112,7 @@ describe('PullRemoteCommand (files)', function () {
         $this->artisan('remote-sync:pull', [
             'remote' => 'production',
             '--no-backup' => true,
+            '--no-clear-cache' => true,
             '--force' => true,
         ])
             ->expectsOutputToContain('Pulling: app/public')
@@ -166,6 +168,7 @@ describe('PullRemoteCommand (files)', function () {
             'remote' => 'production',
             '--path' => 'app/custom',
             '--no-backup' => true,
+            '--no-clear-cache' => true,
             '--force' => true,
         ])
             ->expectsOutputToContain('Pulling: app/custom')
@@ -219,6 +222,7 @@ describe('PullRemoteCommand (files)', function () {
             'remote' => 'production',
             '--delete' => true,
             '--no-backup' => true,
+            '--no-clear-cache' => true,
             '--force' => true,
         ])
             ->assertSuccessful();
@@ -272,6 +276,7 @@ describe('PullRemoteCommand (files)', function () {
         $this->artisan('remote-sync:pull', [
             'remote' => 'production',
             '--no-backup' => true,
+            '--no-clear-cache' => true,
             '--force' => true,
         ])
             ->assertSuccessful();
@@ -328,6 +333,7 @@ describe('PullRemoteCommand (files)', function () {
         $this->artisan('remote-sync:pull', [
             'remote' => 'production',
             '--no-backup' => true,
+            '--no-clear-cache' => true,
             '--force' => true,
         ])
             ->expectsOutputToContain('Failed to pull app/public')
@@ -387,6 +393,7 @@ describe('PullRemoteCommand (files)', function () {
         $this->artisan('remote-sync:pull', [
             'remote' => 'production',
             '--no-backup' => true,
+            '--no-clear-cache' => true,
             '--force' => true,
         ])
             ->assertSuccessful();

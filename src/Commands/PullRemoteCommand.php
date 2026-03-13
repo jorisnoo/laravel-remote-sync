@@ -25,6 +25,7 @@ class PullRemoteCommand extends Command
         {--delete : Delete local files that do not exist on remote}
         {--path= : Pull only a specific path (relative to storage/)}
         {--dry-run : Show what would be transferred without making changes}
+        {--no-clear-cache : Skip clearing application cache after database pull}
         {--force : Skip confirmation prompt}';
 
     protected $description = 'Pull database and/or files from a remote environment';
@@ -204,9 +205,19 @@ class PullRemoteCommand extends Command
 
         $this->cleanupRemoteSnapshot();
 
+        if (! $this->option('no-clear-cache')) {
+            $this->clearApplicationCache();
+        }
+
         $this->components->success(__('remote-sync::messages.success.database_pulled', ['name' => $this->remote->name]));
 
         return self::SUCCESS;
+    }
+
+    protected function clearApplicationCache(): void
+    {
+        $this->call('optimize:clear');
+        $this->components->info(__('remote-sync::messages.info.cache_cleared'));
     }
 
     protected function fetchAndDisplayDatabasePreview(): void

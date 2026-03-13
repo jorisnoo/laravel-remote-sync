@@ -404,9 +404,11 @@ describe('PushRemoteCommand (database)', function () {
             '--force' => true,
         ])
             ->expectsOutputToContain('Database push preview: local → remote')
-            ->expectsOutputToContain('Syncing 2 tables')
-            ->expectsOutputToContain('Excluded 3 tables (preserved on remote)')
-            ->expectsOutputToContain('cache, jobs, sessions')
+            ->expectsOutputToContain('Tables to sync')
+            ->expectsOutputToContain('Excluded (preserved on remote)')
+            ->expectsOutputToContain('cache')
+            ->expectsOutputToContain('jobs')
+            ->expectsOutputToContain('sessions')
             ->assertSuccessful();
     });
 
@@ -471,7 +473,7 @@ describe('PushRemoteCommand (database)', function () {
             'remote' => 'staging',
             '--force' => true,
         ])
-            ->expectsOutputToContain('Syncing 2 tables')
+            ->expectsOutputToContain('Tables to sync')
             ->expectsOutputToContain('Migration records differ')
             ->expectsOutputToContain('1 migration only in local')
             ->expectsOutputToContain('2024_01_15_add_tags_table')

@@ -472,8 +472,11 @@ trait InteractsWithRemote
             ? 'remote-sync::messages.preview.syncing_tables_full'
             : 'remote-sync::messages.preview.syncing_tables';
 
-        $this->line('  '.trans_choice(__($syncLabelKey), $syncCount, ['count' => $syncCount]));
-        $this->line('  '.implode(', ', $tablesToSync));
+        $this->components->twoColumnDetail(
+            __($syncLabelKey),
+            (string) $syncCount
+        );
+        $this->components->bulletList($tablesToSync);
 
         if ($direction === 'push' && ! $fullMode) {
             $staleRemoteTables = array_values(array_diff($targetTables, $sourceTables, $allExcluded));
@@ -484,7 +487,7 @@ trait InteractsWithRemote
 
                 $this->newLine();
                 $this->components->warn(trans_choice(__('remote-sync::messages.preview.stale_remote_tables'), $staleCount, ['count' => $staleCount]));
-                $this->line('  '.implode(', ', $staleRemoteTables));
+                $this->components->bulletList($staleRemoteTables);
             }
         }
 
@@ -504,8 +507,11 @@ trait InteractsWithRemote
                     : 'remote-sync::messages.preview.excluded_tables_truncate';
 
                 $this->newLine();
-                $this->line('  '.trans_choice(__($excludedLabelKey), $excludedCount, ['count' => $excludedCount]));
-                $this->line('  '.implode(', ', $existingExcluded));
+                $this->components->twoColumnDetail(
+                    __($excludedLabelKey),
+                    (string) $excludedCount
+                );
+                $this->components->bulletList($existingExcluded);
             }
         }
 
@@ -520,27 +526,29 @@ trait InteractsWithRemote
         $remoteOnly = $migrationDiff['remote_only'] ?? [];
 
         if ($fullMode) {
-            $this->line('  '.__('remote-sync::messages.preview.migrations_differ_full'));
+            $this->components->twoColumnDetail(
+                __('remote-sync::messages.preview.migrations'),
+                __('remote-sync::messages.preview.migrations_differ_full')
+            );
         } elseif (! empty($localOnly) || ! empty($remoteOnly)) {
             $this->components->warn(__('remote-sync::messages.preview.migrations_differ'));
 
             if (! empty($localOnly)) {
                 $localCount = count($localOnly);
                 $this->line('  '.trans_choice(__('remote-sync::messages.preview.migrations_local_only'), $localCount, ['count' => $localCount]));
-                foreach ($localOnly as $migration) {
-                    $this->line('    - '.$migration);
-                }
+                $this->components->bulletList($localOnly);
             }
 
             if (! empty($remoteOnly)) {
                 $remoteCount = count($remoteOnly);
                 $this->line('  '.trans_choice(__('remote-sync::messages.preview.migrations_remote_only'), $remoteCount, ['count' => $remoteCount]));
-                foreach ($remoteOnly as $migration) {
-                    $this->line('    - '.$migration);
-                }
+                $this->components->bulletList($remoteOnly);
             }
         } else {
-            $this->line('  '.__('remote-sync::messages.preview.migrations_match'));
+            $this->components->twoColumnDetail(
+                __('remote-sync::messages.preview.migrations'),
+                __('remote-sync::messages.preview.migrations_match')
+            );
         }
 
         $this->newLine();

@@ -77,6 +77,7 @@ describe('PullRemoteCommand (database)', function () {
         $this->artisan('remote-sync:pull', [
             'remote' => 'production',
             '--no-backup' => true,
+            '--no-clear-cache' => true,
             '--force' => true,
         ])
             ->expectsOutputToContain('Could not detect remote database driver')
@@ -133,6 +134,7 @@ describe('PullRemoteCommand (database)', function () {
         $this->artisan('remote-sync:pull', [
             'remote' => 'production',
             '--no-backup' => true,
+            '--no-clear-cache' => true,
             '--force' => true,
         ])
             ->assertSuccessful();
@@ -160,6 +162,7 @@ describe('PullRemoteCommand (database)', function () {
         $this->artisan('remote-sync:pull', [
             'remote' => 'production',
             '--no-backup' => true,
+            '--no-clear-cache' => true,
             '--force' => true,
         ])
             ->assertSuccessful();
@@ -187,6 +190,7 @@ describe('PullRemoteCommand (database)', function () {
 
         $this->artisan('remote-sync:pull', [
             '--no-backup' => true,
+            '--no-clear-cache' => true,
             '--force' => true,
         ])
             ->assertSuccessful();
@@ -223,6 +227,7 @@ describe('PullRemoteCommand (database)', function () {
         $this->artisan('remote-sync:pull', [
             'remote' => 'production',
             '--no-backup' => true,
+            '--no-clear-cache' => true,
             '--force' => true,
         ])
             ->assertSuccessful();
@@ -254,6 +259,7 @@ describe('PullRemoteCommand (database)', function () {
         $this->artisan('remote-sync:pull', [
             'remote' => 'production',
             '--no-backup' => true,
+            '--no-clear-cache' => true,
             '--force' => true,
         ])
             ->expectsOutputToContain('Migration records differ')
@@ -290,9 +296,10 @@ describe('PullRemoteCommand (database)', function () {
         $this->artisan('remote-sync:pull', [
             'remote' => 'production',
             '--no-backup' => true,
+            '--no-clear-cache' => true,
             '--force' => true,
         ])
-            ->expectsOutputToContain('Migrations: in sync across environments')
+            ->expectsOutputToContain('in sync')
             ->assertSuccessful();
     });
 });
