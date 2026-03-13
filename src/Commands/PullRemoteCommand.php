@@ -365,7 +365,28 @@ class PullRemoteCommand extends Command
             return;
         }
 
-        DB::table($usersTable)->whereNotIn('email', $filterUsers)->delete();
+        $exactEmails = [];
+        $wildcardPatterns = [];
+
+        foreach ($filterUsers as $entry) {
+            if (str_contains($entry, '*')) {
+                $wildcardPatterns[] = str_replace('*', '%', $entry);
+            } else {
+                $exactEmails[] = $entry;
+            }
+        }
+
+        DB::table($usersTable)
+            ->whereNot(function ($query) use ($exactEmails, $wildcardPatterns) {
+                if (! empty($exactEmails)) {
+                    $query->whereIn('email', $exactEmails);
+                }
+
+                foreach ($wildcardPatterns as $pattern) {
+                    $query->orWhere('email', 'like', $pattern);
+                }
+            })
+            ->delete();
 
         $this->components->info(__('remote-sync::messages.info.filter_users_applied', [
             'count' => count($filterUsers),
