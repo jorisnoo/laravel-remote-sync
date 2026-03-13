@@ -161,17 +161,11 @@ class PullRemoteCommand extends Command
             return self::FAILURE;
         }
 
-        $this->fetchAndDisplayDatabasePreview();
-
-        if (! $this->fullImport && $this->hasMigrationMismatch()) {
-            if (! $this->option('force') && ! $this->confirmMigrationMismatchPull()) {
-                $this->components->info(__('remote-sync::messages.info.operation_cancelled'));
-
-                return self::SUCCESS;
-            }
-
+        if (! $this->fullImport) {
             $this->includeMigrations = true;
         }
+
+        $this->fetchAndDisplayDatabasePreview();
 
         $this->trap([SIGTERM, SIGINT], function () {
             $this->components->warn(__('remote-sync::messages.warnings.interrupt_cleanup'));
@@ -205,6 +199,10 @@ class PullRemoteCommand extends Command
 
         $this->cleanupRemoteSnapshot();
 
+        if (! $this->fullImport) {
+            $this->runMigrations();
+        }
+
         if (! $this->option('no-clear-cache')) {
             $this->clearApplicationCache();
         }
@@ -230,7 +228,10 @@ class PullRemoteCommand extends Command
         $this->localTables = $this->syncService->getLocalTableNames();
 
         $excludedTables = config('remote-sync.exclude_tables', []);
-        $this->migrationDiff = $this->compareMigrations();
+
+        if ($this->fullImport) {
+            $this->migrationDiff = $this->compareMigrations();
+        }
 
         $this->displayDatabasePreview(
             $this->remoteTables,
@@ -448,14 +449,19 @@ class PullRemoteCommand extends Command
         return true;
     }
 
-    protected function confirmMigrationMismatchPull(): bool
+    protected function runMigrations(): void
     {
-        $this->newLine();
-        $this->components->error(__('remote-sync::messages.pull.migration_mismatch_warning', ['name' => $this->remote->name]));
+        $this->components->info(__('remote-sync::messages.info.running_migrations'));
 
-        return $this->confirmWithTypedYes(
-            __('remote-sync::prompts.confirm.pull_migration_mismatch')
-        );
+        try {
+            $exitCode = $this->call('migrate', ['--force' => true]);
+
+            if ($exitCode !== 0) {
+                $this->components->warn(__('remote-sync::messages.errors.migrations_failed'));
+            }
+        } catch (\Exception $e) {
+            $this->components->warn(__('remote-sync::messages.errors.migrations_failed'));
+        }
     }
 
     // Files pull methods

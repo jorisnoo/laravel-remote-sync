@@ -451,7 +451,11 @@ trait InteractsWithRemote
         bool $fullMode,
         string $direction = 'pull'
     ): void {
-        $allExcluded = array_unique(array_merge($excludedTables, RemoteSyncService::ALWAYS_PRESERVED_TABLES));
+        $includeMigrationsInSync = $direction === 'pull' && ! $fullMode;
+
+        $allExcluded = $includeMigrationsInSync
+            ? $excludedTables
+            : array_unique(array_merge($excludedTables, RemoteSyncService::ALWAYS_PRESERVED_TABLES));
 
         $headerKey = $direction === 'push'
             ? 'remote-sync::messages.preview.database_push_header'
@@ -525,7 +529,12 @@ trait InteractsWithRemote
         $localOnly = $migrationDiff['local_only'] ?? [];
         $remoteOnly = $migrationDiff['remote_only'] ?? [];
 
-        if ($fullMode) {
+        if ($includeMigrationsInSync) {
+            $this->components->twoColumnDetail(
+                __('remote-sync::messages.preview.migrations'),
+                __('remote-sync::messages.preview.migrations_will_run')
+            );
+        } elseif ($fullMode) {
             $this->components->twoColumnDetail(
                 __('remote-sync::messages.preview.migrations'),
                 __('remote-sync::messages.preview.migrations_differ_full')

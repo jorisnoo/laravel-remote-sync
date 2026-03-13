@@ -144,6 +144,7 @@ return [
         'migrations_preserved' => 'Migrations table: preserved (not synced)',
         'migrations' => 'Migrations',
         'migrations_match' => 'in sync',
+        'migrations_will_run' => 'will run after import',
         'migrations_differ' => 'Migration records differ between local and remote:',
         'migrations_differ_full' => 'will be overwritten (full mode)',
         'migrations_local_only' => ':count migration only in local:|:count migrations only in local:',

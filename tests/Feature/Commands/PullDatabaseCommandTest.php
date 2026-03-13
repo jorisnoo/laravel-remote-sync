@@ -233,7 +233,7 @@ describe('PullRemoteCommand (database)', function () {
             ->assertSuccessful();
     });
 
-    it('shows migration diff in pull preview when records differ', function () {
+    it('skips migration comparison and shows will run after import', function () {
         $this->setUpProductionRemote();
         config()->set('database.connections.testing.driver', 'mysql');
         config()->set('remote-sync.exclude_tables', []);
@@ -262,11 +262,7 @@ describe('PullRemoteCommand (database)', function () {
             '--no-clear-cache' => true,
             '--force' => true,
         ])
-            ->expectsOutputToContain('Migration records differ')
-            ->expectsOutputToContain('1 migration only in local')
-            ->expectsOutputToContain('2024_01_15_add_tags_table')
-            ->expectsOutputToContain('1 migration only in remote')
-            ->expectsOutputToContain('2024_01_12_fix_users_index')
+            ->expectsOutputToContain('will run after import')
             ->assertSuccessful();
     });
 
@@ -299,7 +295,7 @@ describe('PullRemoteCommand (database)', function () {
             '--no-clear-cache' => true,
             '--force' => true,
         ])
-            ->expectsOutputToContain('in sync')
+            ->expectsOutputToContain('will run after import')
             ->assertSuccessful();
     });
 });
