@@ -406,9 +406,7 @@ describe('PushRemoteCommand (database)', function () {
             ->expectsOutputToContain('Database push preview: local → remote')
             ->expectsOutputToContain('Tables to sync')
             ->expectsOutputToContain('Excluded (preserved on remote)')
-            ->expectsOutputToContain('cache')
-            ->expectsOutputToContain('jobs')
-            ->expectsOutputToContain('sessions')
+            ->expectsOutputToContain('cache, jobs, sessions')
             ->assertSuccessful();
     });
 

@@ -476,7 +476,7 @@ trait InteractsWithRemote
             __($syncLabelKey),
             (string) $syncCount
         );
-        $this->components->bulletList($tablesToSync);
+        $this->line('  '.implode(', ', $tablesToSync));
 
         if ($direction === 'push' && ! $fullMode) {
             $staleRemoteTables = array_values(array_diff($targetTables, $sourceTables, $allExcluded));
@@ -487,7 +487,7 @@ trait InteractsWithRemote
 
                 $this->newLine();
                 $this->components->warn(trans_choice(__('remote-sync::messages.preview.stale_remote_tables'), $staleCount, ['count' => $staleCount]));
-                $this->components->bulletList($staleRemoteTables);
+                $this->line('  '.implode(', ', $staleRemoteTables));
             }
         }
 
@@ -511,7 +511,7 @@ trait InteractsWithRemote
                     __($excludedLabelKey),
                     (string) $excludedCount
                 );
-                $this->components->bulletList($existingExcluded);
+                $this->line('  '.implode(', ', $existingExcluded));
             }
         }
 
@@ -535,14 +535,24 @@ trait InteractsWithRemote
 
             if (! empty($localOnly)) {
                 $localCount = count($localOnly);
-                $this->line('  '.trans_choice(__('remote-sync::messages.preview.migrations_local_only'), $localCount, ['count' => $localCount]));
-                $this->components->bulletList($localOnly);
+                $this->components->twoColumnDetail(
+                    trans_choice(__('remote-sync::messages.preview.migrations_local_only'), $localCount, ['count' => $localCount]),
+                    ''
+                );
+                foreach ($localOnly as $migration) {
+                    $this->line('    - '.$migration);
+                }
             }
 
             if (! empty($remoteOnly)) {
                 $remoteCount = count($remoteOnly);
-                $this->line('  '.trans_choice(__('remote-sync::messages.preview.migrations_remote_only'), $remoteCount, ['count' => $remoteCount]));
-                $this->components->bulletList($remoteOnly);
+                $this->components->twoColumnDetail(
+                    trans_choice(__('remote-sync::messages.preview.migrations_remote_only'), $remoteCount, ['count' => $remoteCount]),
+                    ''
+                );
+                foreach ($remoteOnly as $migration) {
+                    $this->line('    - '.$migration);
+                }
             }
         } else {
             $this->components->twoColumnDetail(
