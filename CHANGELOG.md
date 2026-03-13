@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.1](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.4.1) (2026-03-13)
+
+### Features
+
+- add SSH host key verification before remote operations ([da2c93a](https://github.com/jorisnoo/laravel-remote-sync/commit/da2c93a15db7b38c262206d9b59c0de44c841eac))
 ## [0.4.0](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.4.0) (2026-03-10)
 
 ### Features
