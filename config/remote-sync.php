@@ -113,6 +113,7 @@ return [
     |
     | When set to an array of email addresses, only those users will be kept
     | in the local users table after a pull. All other users will be deleted.
+    | Supports wildcards using * (e.g. '*@example.com').
     | Set to false to disable filtering.
     |
     */
