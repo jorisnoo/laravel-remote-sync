@@ -9,7 +9,6 @@ use Noo\LaravelRemoteSync\Concerns\InteractsWithRemote;
 use Noo\LaravelRemoteSync\RemoteSyncService;
 use Spatie\DbSnapshots\Commands\Create as SnapshotCreate;
 
-use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\multiselect;
 use function Laravel\Prompts\spin;
 
@@ -87,12 +86,6 @@ class PullRemoteCommand extends Command
             $this->shouldDelete = $this->promptDeleteOption('local');
         }
 
-        if (! $this->option('force') && ! $this->confirmPull($this->getOperationsSummary($pullDatabase, $pullFiles))) {
-            $this->components->info(__('remote-sync::messages.info.operation_cancelled'));
-
-            return self::SUCCESS;
-        }
-
         $exitCode = self::SUCCESS;
 
         if ($pullDatabase) {
@@ -157,15 +150,17 @@ class PullRemoteCommand extends Command
 
         $this->snapshotName = $this->generateSnapshotName();
 
-        if (! $this->checkEmptyDatabaseAndOfferMigrations()) {
-            return self::FAILURE;
-        }
-
         if (! $this->fullImport) {
             $this->includeMigrations = true;
         }
 
         $this->fetchAndDisplayDatabasePreview();
+
+        if (! $this->option('force') && ! $this->confirmPull($this->getOperationsSummary(true, false))) {
+            $this->components->info(__('remote-sync::messages.info.operation_cancelled'));
+
+            return self::SUCCESS;
+        }
 
         $this->trap([SIGTERM, SIGINT], function () {
             $this->components->warn(__('remote-sync::messages.warnings.interrupt_cleanup'));
@@ -408,47 +403,6 @@ class PullRemoteCommand extends Command
         ]));
     }
 
-    protected function checkEmptyDatabaseAndOfferMigrations(): bool
-    {
-        if ($this->fullImport) {
-            return true;
-        }
-
-        if ($this->shouldSkipPrompts()) {
-            return true;
-        }
-
-        $existingTables = $this->syncService->getLocalTableNames();
-
-        if (! empty($existingTables)) {
-            return true;
-        }
-
-        $runMigrations = confirm(
-            label: __('remote-sync::prompts.empty_database.label'),
-            default: true,
-            hint: __('remote-sync::prompts.empty_database.hint'),
-        );
-
-        if (! $runMigrations) {
-            return true;
-        }
-
-        $this->components->info(__('remote-sync::messages.info.running_migrations'));
-
-        $exitCode = $this->call('migrate', ['--force' => true]);
-
-        if ($exitCode !== 0) {
-            $this->components->error(__('remote-sync::messages.errors.migrations_failed'));
-
-            return false;
-        }
-
-        $this->components->info(__('remote-sync::messages.info.migrations_completed'));
-
-        return true;
-    }
-
     protected function runMigrations(): void
     {
         $this->components->info(__('remote-sync::messages.info.running_migrations'));
@@ -477,6 +431,12 @@ class PullRemoteCommand extends Command
         }
 
         $this->analyzeAndDisplayFilesPreview($paths);
+
+        if (! $this->isDryRun && ! $this->option('force') && ! $this->confirmPull($this->getOperationsSummary(false, true))) {
+            $this->components->info(__('remote-sync::messages.info.operation_cancelled'));
+
+            return self::SUCCESS;
+        }
 
         if ($this->isDryRun) {
             $this->components->info(__('remote-sync::messages.info.dry_run_mode'));

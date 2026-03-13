@@ -67,7 +67,6 @@ return [
         'no_snapshots_to_cleanup' => 'No snapshots to cleanup.',
         'host_key_accepted' => 'Host key for [:host] has been saved.',
         'running_migrations' => 'Running migrations...',
-        'migrations_completed' => 'Migrations completed.',
         'cache_cleared' => 'Application cache cleared.',
         'local_snapshots_to_delete' => 'Local snapshots to delete (keeping :count most recent):',
         'remote_snapshots_to_delete' => 'Remote snapshots to delete from [:name] (keeping :count most recent):',
@@ -164,11 +163,6 @@ return [
 
     'push' => [
         'overwrite_warning' => 'You are about to push local :operation to [:name]. This will OVERWRITE remote data.',
-        'migration_mismatch_warning' => 'DANGER: Migration records differ between local and remote. Pushing to [:name] may cause data loss or schema corruption.',
-    ],
-
-    'pull' => [
-        'migration_mismatch_warning' => 'DANGER: Migration records differ between local and remote. Pulling from [:name] will overwrite your local migrations table.',
     ],
 
     /*

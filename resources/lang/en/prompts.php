@@ -16,8 +16,6 @@ return [
         'validation' => 'Type "yes" to confirm',
         'accept_host_key' => 'Do you want to trust this host [:host] and continue connecting?',
         'continue_without_driver' => 'Could not detect remote database driver. Continue anyway?',
-        'push_migration_mismatch' => 'Migrations are out of sync. This will also push the migrations table. Are you ABSOLUTELY SURE? Type "yes" to continue',
-        'pull_migration_mismatch' => 'Migrations are out of sync. This will also pull the migrations table. Are you ABSOLUTELY SURE? Type "yes" to continue',
     ],
 
     /*
@@ -46,36 +44,13 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Keep Snapshot Options
-    |--------------------------------------------------------------------------
-    */
-
-    'keep_snapshot' => [
-        'label' => 'Database: Keep the downloaded snapshot file after import?',
-        'no' => 'No',
-        'yes' => 'Yes',
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Empty Database Options
-    |--------------------------------------------------------------------------
-    */
-
-    'empty_database' => [
-        'label' => 'Your local database is empty. Run migrations first?',
-        'hint' => 'This will create the database schema before importing data',
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
     | Delete Options
     |--------------------------------------------------------------------------
     */
 
     'delete' => [
         'local_label' => 'Files: Delete all local files not present on remote?',
-        'remote_label' => 'Files: Delete files or remote which are not present locally?',
+        'remote_label' => 'Files: Delete files on remote which are not present locally?',
         'no' => 'No - keep these files',
         'yes' => 'Yes - mirror exactly',
     ],

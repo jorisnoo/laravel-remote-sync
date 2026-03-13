@@ -125,20 +125,14 @@ class PushRemoteCommand extends Command
 
         $this->fetchAndDisplayDatabasePreview();
 
-        if (! $this->option('force') && ! $this->confirmPush('database')) {
+        if ($this->hasMigrationMismatch()) {
+            $this->includeMigrations = true;
+        }
+
+        if (! $this->option('force') && ! $this->confirmPush($this->includeMigrations ? 'database (including migrations)' : 'database')) {
             $this->components->info(__('remote-sync::messages.info.operation_cancelled'));
 
             return self::SUCCESS;
-        }
-
-        if ($this->hasMigrationMismatch()) {
-            if (! $this->option('force') && ! $this->confirmMigrationMismatchPush()) {
-                $this->components->info(__('remote-sync::messages.info.operation_cancelled'));
-
-                return self::SUCCESS;
-            }
-
-            $this->includeMigrations = true;
         }
 
         $this->trap([SIGTERM, SIGINT], function () {
@@ -291,16 +285,6 @@ class PushRemoteCommand extends Command
         }
 
         $this->cleanupLocalSnapshotFile();
-    }
-
-    protected function confirmMigrationMismatchPush(): bool
-    {
-        $this->newLine();
-        $this->components->error(__('remote-sync::messages.push.migration_mismatch_warning', ['name' => $this->remote->name]));
-
-        return $this->confirmWithTypedYes(
-            __('remote-sync::prompts.confirm.push_migration_mismatch')
-        );
     }
 
     // Files push methods

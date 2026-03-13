@@ -257,20 +257,7 @@ trait InteractsWithRemote
 
     protected function promptKeepSnapshot(): bool
     {
-        if ($this->shouldSkipPrompts() || $this->option('keep-snapshot')) {
-            return (bool) $this->option('keep-snapshot');
-        }
-
-        $choice = select(
-            label: __('remote-sync::prompts.keep_snapshot.label'),
-            options: [
-                'no' => __('remote-sync::prompts.keep_snapshot.no'),
-                'yes' => __('remote-sync::prompts.keep_snapshot.yes'),
-            ],
-            default: 'no',
-        );
-
-        return $choice === 'yes';
+        return (bool) $this->option('keep-snapshot');
     }
 
     protected function promptDeleteOption(string $context = 'local'): bool
