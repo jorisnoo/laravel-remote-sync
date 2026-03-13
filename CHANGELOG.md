@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.5.0) (2026-03-13)
+
+### Features
+
+- run migrate after pull instead of comparing migrations ([85dea9c](https://github.com/jorisnoo/laravel-remote-sync/commit/85dea9ceb0972080788ff289c084f917f1ba127a))
+- clear application cache after database pull ([1aeada1](https://github.com/jorisnoo/laravel-remote-sync/commit/1aeada1887957f8315df4506a0c34265fd50b4ba))
+- add wildcard support for user email filtering ([cb015d1](https://github.com/jorisnoo/laravel-remote-sync/commit/cb015d1d8e449afbae468141af8b20077a181af4))
+- add SSH host key verification before remote operations ([da2c93a](https://github.com/jorisnoo/laravel-remote-sync/commit/da2c93a15db7b38c262206d9b59c0de44c841eac))
+
+### Bug Fixes
+
+- wildcard user filtering deleting all users ([4c94b13](https://github.com/jorisnoo/laravel-remote-sync/commit/4c94b13916143ddf4929765ee5d67b6eddc8f45e))
+
+### Code Refactoring
+
+- simplify pull/push confirmation flow and remove migration mismatch checks ([ce02689](https://github.com/jorisnoo/laravel-remote-sync/commit/ce026896a19f43668c2a213b8ad2b62431e67566))
+- revert preview bullet lists to inline comma-separated format ([980b109](https://github.com/jorisnoo/laravel-remote-sync/commit/980b1094483820fe3c36593c83df0d6121ce5c0a))
 ## [0.4.1](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.4.1) (2026-03-13)
 
 ### Features
