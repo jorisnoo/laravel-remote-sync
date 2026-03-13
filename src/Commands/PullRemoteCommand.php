@@ -388,13 +388,15 @@ class PullRemoteCommand extends Command
         }
 
         DB::table($usersTable)
-            ->whereNot(function ($query) use ($exactEmails, $wildcardPatterns) {
+            ->where(function ($outer) use ($exactEmails, $wildcardPatterns) {
                 if (! empty($exactEmails)) {
-                    $query->whereIn('email', $exactEmails);
+                    $outer->whereNotIn('email', $exactEmails);
                 }
 
-                foreach ($wildcardPatterns as $pattern) {
-                    $query->orWhere('email', 'like', $pattern);
+                if (! empty($wildcardPatterns)) {
+                    foreach ($wildcardPatterns as $pattern) {
+                        $outer->where('email', 'not like', $pattern);
+                    }
                 }
             })
             ->delete();
