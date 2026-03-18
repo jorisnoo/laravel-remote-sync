@@ -165,6 +165,8 @@ class PushRemoteCommand extends Command
         $this->cleanupLocalSnapshot();
         $this->cleanupRemoteSnapshot();
 
+        $this->runRemoteMigrations();
+
         $this->components->success(__('remote-sync::messages.success.database_pushed', ['name' => $this->remote->name]));
 
         return self::SUCCESS;
@@ -276,6 +278,24 @@ class PushRemoteCommand extends Command
         $this->components->info(__('remote-sync::messages.info.remote_snapshot_loaded'));
 
         return true;
+    }
+
+    protected function runRemoteMigrations(): void
+    {
+        try {
+            $result = spin(
+                callback: fn () => $this->syncService->runRemoteMigrations($this->remote),
+                message: __('remote-sync::messages.info.running_remote_migrations', ['name' => $this->remote->name])
+            );
+
+            if (! $result->successful()) {
+                $this->components->warn(__('remote-sync::messages.errors.remote_migrations_failed'));
+                $this->components->warn($result->errorOutput());
+            }
+        } catch (\Exception $e) {
+            $this->components->warn(__('remote-sync::messages.errors.remote_migrations_failed'));
+            $this->components->warn($e->getMessage());
+        }
     }
 
     protected function cleanupLocalSnapshot(): void

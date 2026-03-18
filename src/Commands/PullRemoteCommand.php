@@ -224,9 +224,7 @@ class PullRemoteCommand extends Command
 
         $excludedTables = config('remote-sync.exclude_tables', []);
 
-        if ($this->fullImport) {
-            $this->migrationDiff = $this->compareMigrations();
-        }
+        $this->migrationDiff = $this->compareMigrations();
 
         $this->displayDatabasePreview(
             $this->remoteTables,
@@ -415,6 +413,7 @@ class PullRemoteCommand extends Command
             }
         } catch (\Exception $e) {
             $this->components->warn(__('remote-sync::messages.errors.migrations_failed'));
+            $this->components->warn($e->getMessage());
         }
     }
 

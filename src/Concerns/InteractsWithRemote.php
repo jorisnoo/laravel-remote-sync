@@ -521,6 +521,25 @@ trait InteractsWithRemote
                 __('remote-sync::messages.preview.migrations'),
                 __('remote-sync::messages.preview.migrations_will_run')
             );
+
+            if (! empty($localOnly)) {
+                $localCount = count($localOnly);
+                $this->components->twoColumnDetail(
+                    trans_choice(__('remote-sync::messages.preview.migrations_local_only'), $localCount, ['count' => $localCount]),
+                    ''
+                );
+                foreach ($localOnly as $migration) {
+                    $this->line('    - '.$migration);
+                }
+            }
+
+            if (! empty($remoteOnly)) {
+                $remoteCount = count($remoteOnly);
+                $this->components->warn(trans_choice(__('remote-sync::messages.preview.migrations_remote_only_warning'), $remoteCount, ['count' => $remoteCount]));
+                foreach ($remoteOnly as $migration) {
+                    $this->line('    - '.$migration);
+                }
+            }
         } elseif ($fullMode) {
             $this->components->twoColumnDetail(
                 __('remote-sync::messages.preview.migrations'),

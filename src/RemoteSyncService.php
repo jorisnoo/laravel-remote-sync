@@ -386,6 +386,15 @@ PHP;
         return $this->executeRemoteCommand($remote, $command, $timeout);
     }
 
+    public function runRemoteMigrations(RemoteConfig $remote): ProcessResult
+    {
+        $escapedPath = escapeshellarg($remote->workingPath());
+        $command = "cd {$escapedPath} && php artisan migrate --force";
+        $timeout = config('remote-sync.timeouts.snapshot_load', 300);
+
+        return $this->executeRemoteCommand($remote, $command, $timeout);
+    }
+
     public function createRemoteBackup(RemoteConfig $remote, string $backupName, bool $includeMigrations = false): ProcessResult
     {
         $preservedTables = $includeMigrations ? [] : self::ALWAYS_PRESERVED_TABLES;
