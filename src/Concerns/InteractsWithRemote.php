@@ -620,13 +620,18 @@ trait InteractsWithRemote
             $this->components->bulletList($transferFiles);
         }
 
-        $this->components->twoColumnDetail(
-            __('remote-sync::messages.preview.files_to_delete'),
-            (string) $filesToDelete
-        );
-
         if (! empty($deleteFiles)) {
+            $deleteKey = $direction === 'push'
+                ? 'remote-sync::messages.warnings.files_to_delete_on_remote'
+                : 'remote-sync::messages.warnings.files_to_delete_locally';
+
+            $this->components->warn(trans_choice($deleteKey, $filesToDelete, ['count' => $filesToDelete, 'name' => $this->remote->name]));
             $this->components->bulletList($deleteFiles);
+        } else {
+            $this->components->twoColumnDetail(
+                __('remote-sync::messages.preview.files_to_delete'),
+                '0'
+            );
         }
 
         $this->newLine();

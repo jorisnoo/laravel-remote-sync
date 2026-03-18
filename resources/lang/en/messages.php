@@ -91,6 +91,8 @@ return [
         'no_paths_pull' => 'No paths configured for pulling.',
         'no_paths_push' => 'No paths configured for pushing.',
         'delete_warning' => "WARNING: Files on [:name] that don't exist locally will be DELETED.",
+        'files_to_delete_locally' => ':count local file will be deleted:|:count local files will be deleted:',
+        'files_to_delete_on_remote' => ':count file will be deleted on [:name]:|:count files will be deleted on [:name]:',
         'dry_run_no_delete' => 'Dry run mode - no files were deleted.',
         'local_path_not_exists' => 'Local path does not exist: :path',
     ],
