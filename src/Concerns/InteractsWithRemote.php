@@ -32,6 +32,9 @@ trait InteractsWithRemote
 
     protected bool $includeMigrations = false;
 
+    /** @var array{driver: string|null, tables: list<string>, migrations: list<string>}|null */
+    protected ?array $remoteDatabaseInfo = null;
+
     protected ?string $specificPath = null;
 
     protected int $filesToTransfer = 0;
@@ -336,14 +339,28 @@ trait InteractsWithRemote
         return 'remote-sync-'.date('Y-m-d-H-i-s').'-'.bin2hex(random_bytes(4));
     }
 
+    /**
+     * @return array{driver: string|null, tables: list<string>, migrations: list<string>}
+     */
+    protected function fetchRemoteDatabaseInfo(): array
+    {
+        if ($this->remoteDatabaseInfo !== null) {
+            return $this->remoteDatabaseInfo;
+        }
+
+        $this->remoteDatabaseInfo = spin(
+            callback: fn () => $this->syncService->getRemoteDatabaseInfo($this->remote),
+            message: __('remote-sync::messages.spinners.fetching_database_info')
+        );
+
+        return $this->remoteDatabaseInfo;
+    }
+
     protected function validateDatabaseCompatibility(string $direction): bool
     {
         $localDriver = config('database.connections.'.config('database.default').'.driver');
 
-        $remoteDriver = spin(
-            callback: fn () => $this->syncService->getRemoteDatabaseDriver($this->remote),
-            message: __('remote-sync::messages.spinners.detecting_driver')
-        );
+        $remoteDriver = $this->fetchRemoteDatabaseInfo()['driver'];
 
         if ($remoteDriver === null) {
             $this->components->warn(__('remote-sync::messages.warnings.driver_detection_failed'));
@@ -587,11 +604,7 @@ trait InteractsWithRemote
     protected function compareMigrations(): array
     {
         $localMigrations = $this->syncService->getLocalMigrationRecords();
-
-        $remoteMigrations = spin(
-            callback: fn () => $this->syncService->getRemoteMigrationRecords($this->remote),
-            message: __('remote-sync::messages.spinners.comparing_migrations')
-        );
+        $remoteMigrations = $this->fetchRemoteDatabaseInfo()['migrations'];
 
         return [
             'local_only' => array_values(array_diff($localMigrations, $remoteMigrations)),

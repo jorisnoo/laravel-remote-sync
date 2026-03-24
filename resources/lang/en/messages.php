@@ -119,11 +119,9 @@ return [
     'spinners' => [
         'creating_remote_snapshot' => 'Creating snapshot on [:name]...',
         'cleaning_remote_snapshot' => 'Cleaning up remote snapshot...',
-        'detecting_driver' => 'Detecting remote database driver...',
+        'fetching_database_info' => 'Fetching remote database info...',
         'creating_remote_backup' => 'Creating backup on [:name]...',
         'loading_remote_snapshot' => 'Loading snapshot on [:name]...',
-        'fetching_remote_table_info' => 'Fetching remote table info...',
-        'comparing_migrations' => 'Comparing migration records...',
         'verifying_host' => 'Verifying remote host...',
         'accepting_host_key' => 'Saving host key...',
         'analyzing_files_to_pull' => 'Analyzing files to pull...',

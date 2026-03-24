@@ -48,11 +48,9 @@ describe('PullRemoteCommand (files)', function () {
             $mock->shouldReceive('getRemote')->andReturn($remoteConfig);
             $mock->shouldReceive('checkHostKey')->andReturn('ok');
             $mock->shouldReceive('isAtomicDeployment')->andReturn(false);
-            $mock->shouldReceive('getRemoteDatabaseDriver')->andReturn(null);
-            $mock->shouldReceive('getRemoteTableNames')->andReturn([]);
+            $mock->shouldReceive('getRemoteDatabaseInfo')->andReturn(['driver' => null, 'tables' => [], 'migrations' => []]);
             $mock->shouldReceive('getLocalTableNames')->andReturn([]);
             $mock->shouldReceive('getLocalMigrationRecords')->andReturn([]);
-            $mock->shouldReceive('getRemoteMigrationRecords')->andReturn([]);
             $mock->shouldReceive('createRemoteSnapshot')->once()->andReturn($mockProcessResult);
             $mock->shouldReceive('getSnapshotPath')->andReturn(storage_path('snapshots'));
             $mock->shouldReceive('downloadSnapshot')->once()->andReturn($mockProcessResult);
@@ -90,11 +88,9 @@ describe('PullRemoteCommand (files)', function () {
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
-            $mock->shouldReceive('getRemoteDatabaseDriver')->andReturn(null);
-            $mock->shouldReceive('getRemoteTableNames')->andReturn([]);
+            $mock->shouldReceive('getRemoteDatabaseInfo')->andReturn(['driver' => null, 'tables' => [], 'migrations' => []]);
             $mock->shouldReceive('getLocalTableNames')->andReturn([]);
             $mock->shouldReceive('getLocalMigrationRecords')->andReturn([]);
-            $mock->shouldReceive('getRemoteMigrationRecords')->andReturn([]);
             $mock->shouldReceive('createRemoteSnapshot')->once()->andReturn($mockResult);
             $mock->shouldReceive('getSnapshotPath')->andReturn(storage_path('snapshots'));
             $mock->shouldReceive('downloadSnapshot')->once()->andReturn($mockResult);
@@ -142,11 +138,9 @@ describe('PullRemoteCommand (files)', function () {
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
-            $mock->shouldReceive('getRemoteDatabaseDriver')->andReturn(null);
-            $mock->shouldReceive('getRemoteTableNames')->andReturn([]);
+            $mock->shouldReceive('getRemoteDatabaseInfo')->andReturn(['driver' => null, 'tables' => [], 'migrations' => []]);
             $mock->shouldReceive('getLocalTableNames')->andReturn([]);
             $mock->shouldReceive('getLocalMigrationRecords')->andReturn([]);
-            $mock->shouldReceive('getRemoteMigrationRecords')->andReturn([]);
             $mock->shouldReceive('createRemoteSnapshot')->once()->andReturn($mockResult);
             $mock->shouldReceive('getSnapshotPath')->andReturn(storage_path('snapshots'));
             $mock->shouldReceive('downloadSnapshot')->once()->andReturn($mockResult);
@@ -196,11 +190,9 @@ describe('PullRemoteCommand (files)', function () {
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
-            $mock->shouldReceive('getRemoteDatabaseDriver')->andReturn(null);
-            $mock->shouldReceive('getRemoteTableNames')->andReturn([]);
+            $mock->shouldReceive('getRemoteDatabaseInfo')->andReturn(['driver' => null, 'tables' => [], 'migrations' => []]);
             $mock->shouldReceive('getLocalTableNames')->andReturn([]);
             $mock->shouldReceive('getLocalMigrationRecords')->andReturn([]);
-            $mock->shouldReceive('getRemoteMigrationRecords')->andReturn([]);
             $mock->shouldReceive('createRemoteSnapshot')->once()->andReturn($mockResult);
             $mock->shouldReceive('getSnapshotPath')->andReturn(storage_path('snapshots'));
             $mock->shouldReceive('downloadSnapshot')->once()->andReturn($mockResult);
@@ -254,11 +246,9 @@ describe('PullRemoteCommand (files)', function () {
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
-            $mock->shouldReceive('getRemoteDatabaseDriver')->andReturn(null);
-            $mock->shouldReceive('getRemoteTableNames')->andReturn([]);
+            $mock->shouldReceive('getRemoteDatabaseInfo')->andReturn(['driver' => null, 'tables' => [], 'migrations' => []]);
             $mock->shouldReceive('getLocalTableNames')->andReturn([]);
             $mock->shouldReceive('getLocalMigrationRecords')->andReturn([]);
-            $mock->shouldReceive('getRemoteMigrationRecords')->andReturn([]);
             $mock->shouldReceive('createRemoteSnapshot')->once()->andReturn($mockResult);
             $mock->shouldReceive('getSnapshotPath')->andReturn(storage_path('snapshots'));
             $mock->shouldReceive('downloadSnapshot')->once()->andReturn($mockResult);
@@ -311,11 +301,9 @@ describe('PullRemoteCommand (files)', function () {
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
-            $mock->shouldReceive('getRemoteDatabaseDriver')->andReturn(null);
-            $mock->shouldReceive('getRemoteTableNames')->andReturn([]);
+            $mock->shouldReceive('getRemoteDatabaseInfo')->andReturn(['driver' => null, 'tables' => [], 'migrations' => []]);
             $mock->shouldReceive('getLocalTableNames')->andReturn([]);
             $mock->shouldReceive('getLocalMigrationRecords')->andReturn([]);
-            $mock->shouldReceive('getRemoteMigrationRecords')->andReturn([]);
             $mock->shouldReceive('createRemoteSnapshot')->once()->andReturn($mockSuccessResult);
             $mock->shouldReceive('getSnapshotPath')->andReturn(storage_path('snapshots'));
             $mock->shouldReceive('downloadSnapshot')->once()->andReturn($mockSuccessResult);
@@ -368,11 +356,9 @@ describe('PullRemoteCommand (files)', function () {
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(true);
 
-            $mock->shouldReceive('getRemoteDatabaseDriver')->andReturn(null);
-            $mock->shouldReceive('getRemoteTableNames')->andReturn([]);
+            $mock->shouldReceive('getRemoteDatabaseInfo')->andReturn(['driver' => null, 'tables' => [], 'migrations' => []]);
             $mock->shouldReceive('getLocalTableNames')->andReturn([]);
             $mock->shouldReceive('getLocalMigrationRecords')->andReturn([]);
-            $mock->shouldReceive('getRemoteMigrationRecords')->andReturn([]);
             $mock->shouldReceive('createRemoteSnapshot')->once()->andReturn($mockResult);
             $mock->shouldReceive('getSnapshotPath')->andReturn(storage_path('snapshots'));
             $mock->shouldReceive('downloadSnapshot')->once()->andReturn($mockResult);

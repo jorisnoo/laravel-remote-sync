@@ -73,20 +73,14 @@ describe('PushRemoteCommand (database)', function () {
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
-            $mock->shouldReceive('getRemoteDatabaseDriver')
+            $mock->shouldReceive('getRemoteDatabaseInfo')
                 ->once()
-                ->andReturn(null);
+                ->andReturn(['driver' => null, 'tables' => [], 'migrations' => []]);
 
             $mock->shouldReceive('getLocalTableNames')
                 ->andReturn([]);
 
-            $mock->shouldReceive('getRemoteTableNames')
-                ->andReturn([]);
-
             $mock->shouldReceive('getLocalMigrationRecords')
-                ->andReturn([]);
-
-            $mock->shouldReceive('getRemoteMigrationRecords')
                 ->andReturn([]);
 
             $mock->shouldReceive('createRemoteBackup')
@@ -136,9 +130,9 @@ describe('PushRemoteCommand (database)', function () {
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
-            $mock->shouldReceive('getRemoteDatabaseDriver')
+            $mock->shouldReceive('getRemoteDatabaseInfo')
                 ->once()
-                ->andReturn('mysql');
+                ->andReturn(['driver' => 'mysql', 'tables' => [], 'migrations' => []]);
         });
 
         $this->artisan('remote-sync:push', ['remote' => 'staging', '--force' => true])
@@ -167,19 +161,13 @@ describe('PushRemoteCommand (database)', function () {
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
-            $mock->shouldReceive('getRemoteDatabaseDriver')
-                ->andReturn('sqlite');
+            $mock->shouldReceive('getRemoteDatabaseInfo')
+                ->andReturn(['driver' => 'sqlite', 'tables' => [], 'migrations' => []]);
 
             $mock->shouldReceive('getLocalTableNames')
                 ->andReturn([]);
 
-            $mock->shouldReceive('getRemoteTableNames')
-                ->andReturn([]);
-
             $mock->shouldReceive('getLocalMigrationRecords')
-                ->andReturn([]);
-
-            $mock->shouldReceive('getRemoteMigrationRecords')
                 ->andReturn([]);
 
             $mock->shouldReceive('createRemoteBackup')
@@ -230,19 +218,13 @@ describe('PushRemoteCommand (database)', function () {
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
-            $mock->shouldReceive('getRemoteDatabaseDriver')
-                ->andReturn('sqlite');
+            $mock->shouldReceive('getRemoteDatabaseInfo')
+                ->andReturn(['driver' => 'sqlite', 'tables' => [], 'migrations' => []]);
 
             $mock->shouldReceive('getLocalTableNames')
                 ->andReturn([]);
 
-            $mock->shouldReceive('getRemoteTableNames')
-                ->andReturn([]);
-
             $mock->shouldReceive('getLocalMigrationRecords')
-                ->andReturn([]);
-
-            $mock->shouldReceive('getRemoteMigrationRecords')
                 ->andReturn([]);
 
             $mock->shouldReceive('createRemoteBackup')
@@ -303,19 +285,13 @@ describe('PushRemoteCommand (database)', function () {
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
-            $mock->shouldReceive('getRemoteDatabaseDriver')
-                ->andReturn('sqlite');
+            $mock->shouldReceive('getRemoteDatabaseInfo')
+                ->andReturn(['driver' => 'sqlite', 'tables' => [], 'migrations' => []]);
 
             $mock->shouldReceive('getLocalTableNames')
                 ->andReturn([]);
 
-            $mock->shouldReceive('getRemoteTableNames')
-                ->andReturn([]);
-
             $mock->shouldReceive('getLocalMigrationRecords')
-                ->andReturn([]);
-
-            $mock->shouldReceive('getRemoteMigrationRecords')
                 ->andReturn([]);
 
             $mock->shouldReceive('createRemoteBackup')
@@ -364,19 +340,13 @@ describe('PushRemoteCommand (database)', function () {
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
-            $mock->shouldReceive('getRemoteDatabaseDriver')
-                ->andReturn('sqlite');
+            $mock->shouldReceive('getRemoteDatabaseInfo')
+                ->andReturn(['driver' => 'sqlite', 'tables' => ['users', 'posts', 'sessions', 'cache', 'jobs'], 'migrations' => []]);
 
             $mock->shouldReceive('getLocalTableNames')
                 ->andReturn(['users', 'posts', 'sessions', 'cache', 'jobs']);
 
-            $mock->shouldReceive('getRemoteTableNames')
-                ->andReturn(['users', 'posts', 'sessions', 'cache', 'jobs']);
-
             $mock->shouldReceive('getLocalMigrationRecords')
-                ->andReturn([]);
-
-            $mock->shouldReceive('getRemoteMigrationRecords')
                 ->andReturn([]);
 
             $mock->shouldReceive('createRemoteBackup')
@@ -432,20 +402,14 @@ describe('PushRemoteCommand (database)', function () {
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
-            $mock->shouldReceive('getRemoteDatabaseDriver')
-                ->andReturn('sqlite');
+            $mock->shouldReceive('getRemoteDatabaseInfo')
+                ->andReturn(['driver' => 'sqlite', 'tables' => ['users', 'posts', 'sessions', 'cache', 'migrations'], 'migrations' => ['2024_01_01_create_users', '2024_01_12_fix_users_index']]);
 
             $mock->shouldReceive('getLocalTableNames')
                 ->andReturn(['users', 'posts', 'sessions', 'cache', 'migrations']);
 
-            $mock->shouldReceive('getRemoteTableNames')
-                ->andReturn(['users', 'posts', 'sessions', 'cache', 'migrations']);
-
             $mock->shouldReceive('getLocalMigrationRecords')
                 ->andReturn(['2024_01_01_create_users', '2024_01_15_add_tags_table']);
-
-            $mock->shouldReceive('getRemoteMigrationRecords')
-                ->andReturn(['2024_01_01_create_users', '2024_01_12_fix_users_index']);
 
             $mock->shouldReceive('createRemoteBackup')
                 ->once()
@@ -510,19 +474,13 @@ describe('PushRemoteCommand (database)', function () {
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(true);
 
-            $mock->shouldReceive('getRemoteDatabaseDriver')
-                ->andReturn('sqlite');
+            $mock->shouldReceive('getRemoteDatabaseInfo')
+                ->andReturn(['driver' => 'sqlite', 'tables' => [], 'migrations' => []]);
 
             $mock->shouldReceive('getLocalTableNames')
                 ->andReturn([]);
 
-            $mock->shouldReceive('getRemoteTableNames')
-                ->andReturn([]);
-
             $mock->shouldReceive('getLocalMigrationRecords')
-                ->andReturn([]);
-
-            $mock->shouldReceive('getRemoteMigrationRecords')
                 ->andReturn([]);
 
             $mock->shouldReceive('createRemoteBackup')

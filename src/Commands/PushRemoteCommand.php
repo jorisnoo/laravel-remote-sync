@@ -207,11 +207,7 @@ class PushRemoteCommand extends Command
     protected function fetchAndDisplayDatabasePreview(): void
     {
         $this->localTables = $this->syncService->getLocalTableNames();
-
-        $this->remoteTables = spin(
-            callback: fn () => $this->syncService->getRemoteTableNames($this->remote),
-            message: __('remote-sync::messages.spinners.fetching_remote_table_info')
-        );
+        $this->remoteTables = $this->fetchRemoteDatabaseInfo()['tables'];
 
         $excludedTables = config('remote-sync.exclude_tables', []);
         $this->migrationDiff = $this->compareMigrations();

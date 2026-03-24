@@ -10,11 +10,13 @@ function mockSuccessfulPullFlow($mock, $mockProcessResult, $remoteConfig, array 
     $mock->shouldReceive('getRemote')->andReturn($remoteConfig);
     $mock->shouldReceive('checkHostKey')->andReturn('ok');
     $mock->shouldReceive('isAtomicDeployment')->andReturn($extras['isAtomic'] ?? false);
-    $mock->shouldReceive('getRemoteDatabaseDriver')->andReturn($extras['remoteDriver'] ?? null);
-    $mock->shouldReceive('getRemoteTableNames')->andReturn($extras['remoteTables'] ?? []);
+    $mock->shouldReceive('getRemoteDatabaseInfo')->andReturn([
+        'driver' => $extras['remoteDriver'] ?? null,
+        'tables' => $extras['remoteTables'] ?? [],
+        'migrations' => $extras['remoteMigrations'] ?? [],
+    ]);
     $mock->shouldReceive('getLocalTableNames')->andReturn($extras['localTables'] ?? []);
     $mock->shouldReceive('getLocalMigrationRecords')->andReturn($extras['localMigrations'] ?? []);
-    $mock->shouldReceive('getRemoteMigrationRecords')->andReturn($extras['remoteMigrations'] ?? []);
     $mock->shouldReceive('createRemoteSnapshot')->once()->andReturn($mockProcessResult);
     $mock->shouldReceive('getSnapshotPath')->andReturn(storage_path('snapshots'));
     $mock->shouldReceive('downloadSnapshot')->once()->andReturn($mockProcessResult);
@@ -102,9 +104,9 @@ describe('PullRemoteCommand (database)', function () {
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
-            $mock->shouldReceive('getRemoteDatabaseDriver')
+            $mock->shouldReceive('getRemoteDatabaseInfo')
                 ->once()
-                ->andReturn('mysql');
+                ->andReturn(['driver' => 'mysql', 'tables' => [], 'migrations' => []]);
         });
 
         $this->artisan('remote-sync:pull', ['remote' => 'production', '--force' => true])

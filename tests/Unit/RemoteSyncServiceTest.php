@@ -197,10 +197,10 @@ describe('RemoteSyncService', function () {
         });
     });
 
-    describe('getRemoteDatabaseDriver', function () {
-        it('parses driver from tinker output', function () {
+    describe('getRemoteDatabaseInfo', function () {
+        it('parses driver, tables, and migrations from tinker output', function () {
             Process::fake([
-                '*' => Process::result(output: 'mysql'),
+                '*' => Process::result(output: '{"driver":"mysql","tables":["users","posts"],"migrations":["2024_01_01_create_users"]}'),
             ]);
 
             $remote = new RemoteConfig(
@@ -209,12 +209,16 @@ describe('RemoteSyncService', function () {
                 path: '/var/www/app',
             );
 
-            $driver = $this->service->getRemoteDatabaseDriver($remote);
+            $info = $this->service->getRemoteDatabaseInfo($remote);
 
-            expect($driver)->toBe('mysql');
+            expect($info)->toBe([
+                'driver' => 'mysql',
+                'tables' => ['users', 'posts'],
+                'migrations' => ['2024_01_01_create_users'],
+            ]);
         });
 
-        it('returns null on failure', function () {
+        it('returns defaults on failure', function () {
             Process::fake([
                 '*' => Process::result(exitCode: 1, errorOutput: 'Command failed'),
             ]);
@@ -225,14 +229,14 @@ describe('RemoteSyncService', function () {
                 path: '/var/www/app',
             );
 
-            $driver = $this->service->getRemoteDatabaseDriver($remote);
+            $info = $this->service->getRemoteDatabaseInfo($remote);
 
-            expect($driver)->toBeNull();
+            expect($info)->toBe(['driver' => null, 'tables' => [], 'migrations' => []]);
         });
 
-        it('returns null for empty output', function () {
+        it('returns defaults for invalid JSON output', function () {
             Process::fake([
-                '*' => Process::result(output: ''),
+                '*' => Process::result(output: 'not json'),
             ]);
 
             $remote = new RemoteConfig(
@@ -241,14 +245,14 @@ describe('RemoteSyncService', function () {
                 path: '/var/www/app',
             );
 
-            $driver = $this->service->getRemoteDatabaseDriver($remote);
+            $info = $this->service->getRemoteDatabaseInfo($remote);
 
-            expect($driver)->toBeNull();
+            expect($info)->toBe(['driver' => null, 'tables' => [], 'migrations' => []]);
         });
 
         it('uses working path in command', function () {
             Process::fake([
-                '*' => Process::result(output: 'mysql'),
+                '*' => Process::result(output: '{"driver":"mysql","tables":[],"migrations":[]}'),
             ]);
 
             $remote = new RemoteConfig(
@@ -258,7 +262,7 @@ describe('RemoteSyncService', function () {
                 isAtomic: true,
             );
 
-            $this->service->getRemoteDatabaseDriver($remote);
+            $this->service->getRemoteDatabaseInfo($remote);
 
             Process::assertRan(function ($process) {
                 return str_contains($process->command[2], "cd '/var/www/app/current'");
@@ -394,11 +398,7 @@ describe('RemoteSyncService', function () {
     });
 
     describe('getRemoteSnapshotPath', function () {
-        it('returns correct path', function () {
-            Process::fake([
-                '*' => Process::result(output: 'snapshots'),
-            ]);
-
+        it('returns correct path using local config', function () {
             $remote = new RemoteConfig(
                 name: 'production',
                 host: 'user@example.com',
@@ -411,10 +411,6 @@ describe('RemoteSyncService', function () {
         });
 
         it('returns correct path for atomic deployment', function () {
-            Process::fake([
-                '*' => Process::result(output: 'snapshots'),
-            ]);
-
             $remote = new RemoteConfig(
                 name: 'production',
                 host: 'user@example.com',
@@ -427,9 +423,11 @@ describe('RemoteSyncService', function () {
             expect($path)->toBe('/var/www/app/current/storage/snapshots/test-snapshot.sql.gz');
         });
 
-        it('queries remote for snapshot subdirectory', function () {
-            Process::fake([
-                '*' => Process::result(output: 'custom-snapshots'),
+        it('uses custom disk config from local config', function () {
+            config()->set('db-snapshots.disk', 'custom-snapshots');
+            config()->set('filesystems.disks.custom-snapshots', [
+                'driver' => 'local',
+                'root' => storage_path('custom-snapshots'),
             ]);
 
             $remote = new RemoteConfig(
@@ -441,40 +439,6 @@ describe('RemoteSyncService', function () {
             $path = $this->service->getRemoteSnapshotPath($remote, 'test-snapshot');
 
             expect($path)->toBe('/var/www/app/storage/custom-snapshots/test-snapshot.sql.gz');
-        });
-
-        it('falls back to local config when remote query fails', function () {
-            Process::fake([
-                '*' => Process::result(exitCode: 1, errorOutput: 'Command failed'),
-            ]);
-
-            $remote = new RemoteConfig(
-                name: 'production',
-                host: 'user@example.com',
-                path: '/var/www/app',
-            );
-
-            $path = $this->service->getRemoteSnapshotPath($remote, 'test-snapshot');
-
-            expect($path)->toBe('/var/www/app/storage/snapshots/test-snapshot.sql.gz');
-        });
-
-        it('caches remote snapshot subdirectory per remote', function () {
-            Process::fake([
-                '*' => Process::result(output: 'custom-dir'),
-            ]);
-
-            $remote = new RemoteConfig(
-                name: 'production',
-                host: 'user@example.com',
-                path: '/var/www/app',
-            );
-
-            $this->service->getRemoteSnapshotPath($remote, 'first');
-            $this->service->getRemoteSnapshotPath($remote, 'second');
-
-            // Only one SSH call should be made (cached after first)
-            Process::assertRanTimes(fn ($process) => str_contains($process->command[2] ?? '', 'artisan tinker'), 1);
         });
     });
 
@@ -709,56 +673,6 @@ describe('RemoteSyncService', function () {
                 return str_contains($command, "--exclude='sessions'")
                     && str_contains($command, "--exclude='migrations'");
             });
-        });
-    });
-
-    describe('getRemoteMigrationRecords', function () {
-        it('parses migration names from tinker output', function () {
-            Process::fake([
-                '*' => Process::result(output: '["2024_01_01_create_users_table","2024_01_02_create_posts_table"]'),
-            ]);
-
-            $remote = new RemoteConfig(
-                name: 'production',
-                host: 'user@example.com',
-                path: '/var/www/app',
-            );
-
-            $migrations = $this->service->getRemoteMigrationRecords($remote);
-
-            expect($migrations)->toBe(['2024_01_01_create_users_table', '2024_01_02_create_posts_table']);
-        });
-
-        it('returns empty array on failure', function () {
-            Process::fake([
-                '*' => Process::result(exitCode: 1, errorOutput: 'Command failed'),
-            ]);
-
-            $remote = new RemoteConfig(
-                name: 'production',
-                host: 'user@example.com',
-                path: '/var/www/app',
-            );
-
-            $migrations = $this->service->getRemoteMigrationRecords($remote);
-
-            expect($migrations)->toBe([]);
-        });
-
-        it('returns empty array for invalid JSON output', function () {
-            Process::fake([
-                '*' => Process::result(output: 'not json'),
-            ]);
-
-            $remote = new RemoteConfig(
-                name: 'production',
-                host: 'user@example.com',
-                path: '/var/www/app',
-            );
-
-            $migrations = $this->service->getRemoteMigrationRecords($remote);
-
-            expect($migrations)->toBe([]);
         });
     });
 

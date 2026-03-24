@@ -14,9 +14,6 @@ class RemoteSyncService
     /** @var array<int, string> */
     public const ALWAYS_PRESERVED_TABLES = ['migrations'];
 
-    /** @var array<string, string> */
-    protected array $remoteSnapshotSubdirs = [];
-
     protected bool $useTty = true;
 
     public function withoutTty(): static
@@ -202,18 +199,46 @@ class RemoteSyncService
         return $process->run(array_merge(['rsync'], $options, [$source, $destinationPath]));
     }
 
-    public function getRemoteDatabaseDriver(RemoteConfig $remote): ?string
+    /**
+     * Get database driver, table names, and migration records from a remote database in a single SSH call.
+     *
+     * @return array{driver: string|null, tables: list<string>, migrations: list<string>}
+     */
+    public function getRemoteDatabaseInfo(RemoteConfig $remote): array
     {
-        $escapedPath = escapeshellarg($remote->workingPath());
-        $command = "cd {$escapedPath} && php artisan tinker --execute=\"echo config('database.connections.' . config('database.default') . '.driver');\"";
+        $default = ['driver' => null, 'tables' => [], 'migrations' => []];
 
-        $result = $this->executeRemoteCommand($remote, $command, 30);
+        $escapedPath = escapeshellarg($remote->workingPath());
+        $code = <<<'PHP'
+$driver = config('database.connections.' . config('database.default') . '.driver');
+$schemaBuilder = DB::connection()->getSchemaBuilder();
+$tables = method_exists($schemaBuilder, 'getCurrentSchemaName')
+    ? $schemaBuilder->getTableListing($schemaBuilder->getCurrentSchemaName(), schemaQualified: false)
+    : $schemaBuilder->getTableListing();
+$migrations = DB::table('migrations')->pluck('migration')->toArray();
+echo json_encode(['driver' => $driver, 'tables' => array_values($tables), 'migrations' => $migrations]);
+PHP;
+
+        $escapedCode = escapeshellarg($code);
+        $command = "cd {$escapedPath} && php artisan tinker --execute={$escapedCode}";
+
+        $result = $this->executeRemoteCommand($remote, $command, 60);
 
         if (! $result->successful()) {
-            return null;
+            return $default;
         }
 
-        return trim($result->output()) ?: null;
+        $decoded = json_decode(trim($result->output()), true);
+
+        if (! is_array($decoded)) {
+            return $default;
+        }
+
+        return [
+            'driver' => $decoded['driver'] ?? null,
+            'tables' => $decoded['tables'] ?? [],
+            'migrations' => $decoded['migrations'] ?? [],
+        ];
     }
 
     public function createRemoteSnapshot(RemoteConfig $remote, string $snapshotName, bool $full = false, bool $includeMigrations = false): ProcessResult
@@ -241,46 +266,9 @@ class RemoteSyncService
 
     public function getRemoteSnapshotPath(RemoteConfig $remote, string $snapshotName): string
     {
-        $subdir = $this->getRemoteSnapshotSubdirectory($remote);
+        $subdir = $this->getSnapshotSubdirectory();
 
         return "{$remote->storagePath()}/{$subdir}/{$snapshotName}.sql.gz";
-    }
-
-    public function getRemoteSnapshotSubdirectory(RemoteConfig $remote): string
-    {
-        if (isset($this->remoteSnapshotSubdirs[$remote->name])) {
-            return $this->remoteSnapshotSubdirs[$remote->name];
-        }
-
-        $escapedPath = escapeshellarg($remote->workingPath());
-        $code = <<<'PHP'
-$diskName = config('db-snapshots.disk', 'snapshots');
-$diskConfig = config("filesystems.disks.{$diskName}");
-if ($diskConfig && isset($diskConfig['root'])) {
-    $root = $diskConfig['root'];
-    $storagePath = storage_path();
-    if (str_starts_with($root, $storagePath)) {
-        echo ltrim(substr($root, strlen($storagePath)), '/');
-        return;
-    }
-}
-echo 'snapshots';
-PHP;
-
-        $escapedCode = escapeshellarg($code);
-        $command = "cd {$escapedPath} && php artisan tinker --execute={$escapedCode}";
-
-        $result = $this->executeRemoteCommand($remote, $command, 30);
-
-        if ($result->successful() && trim($result->output()) !== '') {
-            $subdir = trim($result->output());
-        } else {
-            $subdir = $this->getSnapshotSubdirectory();
-        }
-
-        $this->remoteSnapshotSubdirs[$remote->name] = $subdir;
-
-        return $subdir;
     }
 
     public function downloadSnapshot(RemoteConfig $remote, string $snapshotName, string $localPath): ProcessResult
@@ -315,7 +303,7 @@ PHP;
 
     public function listRemoteSnapshots(RemoteConfig $remote): ProcessResult
     {
-        $subdir = $this->getRemoteSnapshotSubdirectory($remote);
+        $subdir = $this->getSnapshotSubdirectory();
         $snapshotPath = "{$remote->storagePath()}/{$subdir}";
         $escapedSnapshotPath = escapeshellarg($snapshotPath);
         $command = "{ find {$escapedSnapshotPath} -maxdepth 1 -name '*.sql.gz' -exec stat -c '%Y %n' {} + 2>/dev/null || find {$escapedSnapshotPath} -maxdepth 1 -name '*.sql.gz' -exec stat -f '%m %N' {} + 2>/dev/null; } | sort -rn || true";
@@ -355,7 +343,7 @@ PHP;
 
     public function uploadSnapshot(RemoteConfig $remote, string $snapshotName, string $localPath): ProcessResult
     {
-        $subdir = $this->getRemoteSnapshotSubdirectory($remote);
+        $subdir = $this->getSnapshotSubdirectory();
         $remotePath = "{$remote->storagePath()}/{$subdir}/";
         $localFile = "{$localPath}/{$snapshotName}.sql.gz";
         $timeout = config('remote-sync.timeouts.snapshot_upload', 600);
@@ -464,42 +452,6 @@ PHP;
 
         return Process::timeout($timeout)
             ->run(array_merge(['rsync'], $options, [$sourcePath, $destination]));
-    }
-
-    /**
-     * Get table names from a remote database.
-     *
-     * @return array<int, string>
-     */
-    public function getRemoteTableNames(RemoteConfig $remote): array
-    {
-        $escapedPath = escapeshellarg($remote->workingPath());
-        $code = <<<'PHP'
-$schemaBuilder = DB::connection()->getSchemaBuilder();
-$tables = method_exists($schemaBuilder, 'getCurrentSchemaName')
-    ? $schemaBuilder->getTableListing($schemaBuilder->getCurrentSchemaName(), schemaQualified: false)
-    : $schemaBuilder->getTableListing();
-echo json_encode(array_values($tables));
-PHP;
-
-        $escapedCode = escapeshellarg($code);
-        $command = "cd {$escapedPath} && php artisan tinker --execute={$escapedCode}";
-
-        $result = $this->executeRemoteCommand($remote, $command, 60);
-
-        if (! $result->successful()) {
-            return [];
-        }
-
-        $output = trim($result->output());
-
-        $decoded = json_decode($output, true);
-
-        if (! is_array($decoded)) {
-            return [];
-        }
-
-        return $decoded;
     }
 
     /**
@@ -615,40 +567,6 @@ PHP;
         }
 
         return Process::timeout($timeout)->env($env)->run($command);
-    }
-
-    /**
-     * Get migration records from a remote database.
-     *
-     * @return array<int, string>
-     */
-    public function getRemoteMigrationRecords(RemoteConfig $remote): array
-    {
-        try {
-            $escapedPath = escapeshellarg($remote->workingPath());
-            $code = "echo json_encode(DB::table('migrations')->pluck('migration')->toArray());";
-
-            $escapedCode = escapeshellarg($code);
-            $command = "cd {$escapedPath} && php artisan tinker --execute={$escapedCode}";
-
-            $result = $this->executeRemoteCommand($remote, $command, 60);
-
-            if (! $result->successful()) {
-                return [];
-            }
-
-            $output = trim($result->output());
-
-            $decoded = json_decode($output, true);
-
-            if (! is_array($decoded)) {
-                return [];
-            }
-
-            return $decoded;
-        } catch (\Exception) {
-            return [];
-        }
     }
 
     /**
