@@ -4,6 +4,7 @@ namespace Noo\LaravelRemoteSync\Commands;
 
 use Illuminate\Console\Command;
 use Noo\LaravelRemoteSync\Concerns\InteractsWithRemote;
+use Noo\LaravelRemoteSync\Data\RemoteConfig;
 use Noo\LaravelRemoteSync\RemoteSyncService;
 use Spatie\DbSnapshots\Commands\Create as SnapshotCreate;
 
@@ -19,7 +20,11 @@ class PushRemoteCommand extends Command
         {--dry-run : Show what would be synced without making changes}
         {--delete : Delete remote files that do not exist locally}
         {--path= : Push only a specific path (relative to storage/)}
-        {--force : Skip confirmation prompt}';
+        {--force : Skip confirmation prompt}
+        {--remote-host= : SSH host for the remote (bypasses config lookup)}
+        {--remote-path= : Path on the remote (bypasses config lookup)}
+        {--database : Push database only}
+        {--files : Push files only}';
 
     protected $description = 'Push database and/or files to a remote environment';
 
@@ -31,30 +36,50 @@ class PushRemoteCommand extends Command
 
     public function handle(): int
     {
-        if (! $this->ensureNotProduction()) {
-            return self::FAILURE;
-        }
+        if ($this->option('remote-host') && $this->option('remote-path')) {
+            $this->syncService = app(RemoteSyncService::class);
 
-        $remoteName = $this->argument('remote') ?? $this->selectRemote(__('remote-sync::prompts.remote.push_label'));
+            if ($this->option('force')) {
+                $this->syncService->withoutTty();
+            }
 
-        if (! $remoteName) {
-            $this->components->error(__('remote-sync::messages.errors.no_remote_selected'));
+            $this->remote = new RemoteConfig(
+                name: 'zentrale-sync',
+                host: $this->option('remote-host'),
+                path: $this->option('remote-path'),
+                pushAllowed: true,
+            );
 
-            return self::FAILURE;
-        }
+            if ($this->remote->isAtomic === null) {
+                $isAtomic = $this->syncService->isAtomicDeployment($this->remote);
+                $this->remote = $this->remote->withAtomicDetection($isAtomic);
+            }
+        } else {
+            $remoteName = $this->argument('remote') ?? $this->selectRemote(__('remote-sync::prompts.remote.push_label'));
 
-        try {
-            if (! $this->initializeRemote($remoteName)) {
+            if (! $remoteName) {
+                $this->components->error(__('remote-sync::messages.errors.no_remote_selected'));
+
                 return self::FAILURE;
             }
-        } catch (\InvalidArgumentException $e) {
-            $this->components->error($e->getMessage());
 
-            return self::FAILURE;
-        }
+            try {
+                if (! $this->initializeRemote($remoteName)) {
+                    return self::FAILURE;
+                }
+            } catch (\InvalidArgumentException $e) {
+                $this->components->error($e->getMessage());
 
-        if (! $this->ensurePushAllowed()) {
-            return self::FAILURE;
+                return self::FAILURE;
+            }
+
+            if ($this->option('force')) {
+                $this->syncService->withoutTty();
+            }
+
+            if (! $this->ensurePushAllowed()) {
+                return self::FAILURE;
+            }
         }
 
         $operations = $this->selectOperations();
@@ -93,6 +118,13 @@ class PushRemoteCommand extends Command
 
     protected function selectOperations(): array
     {
+        if ($this->option('database') || $this->option('files')) {
+            return array_filter([
+                $this->option('database') ? 'database' : null,
+                $this->option('files') ? 'files' : null,
+            ]);
+        }
+
         $options = [
             'database' => __('remote-sync::prompts.operations.database'),
         ];
