@@ -59,6 +59,8 @@ describe('PushRemoteCommand (files)', function () {
 
             $mock->shouldReceive('checkHostKey')->andReturn('ok');
 
+            $mock->shouldReceive('withoutTty')->andReturnSelf();
+
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
@@ -102,6 +104,8 @@ describe('PushRemoteCommand (files)', function () {
                 ));
 
             $mock->shouldReceive('checkHostKey')->andReturn('ok');
+
+            $mock->shouldReceive('withoutTty')->andReturnSelf();
 
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
@@ -159,6 +163,8 @@ describe('PushRemoteCommand (files)', function () {
                 ));
 
             $mock->shouldReceive('checkHostKey')->andReturn('ok');
+
+            $mock->shouldReceive('withoutTty')->andReturnSelf();
 
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
@@ -221,6 +227,8 @@ describe('PushRemoteCommand (files)', function () {
 
             $mock->shouldReceive('checkHostKey')->andReturn('ok');
 
+            $mock->shouldReceive('withoutTty')->andReturnSelf();
+
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
@@ -278,6 +286,8 @@ describe('PushRemoteCommand (files)', function () {
 
             $mock->shouldReceive('checkHostKey')->andReturn('ok');
 
+            $mock->shouldReceive('withoutTty')->andReturnSelf();
+
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
@@ -333,6 +343,8 @@ describe('PushRemoteCommand (files)', function () {
 
             $mock->shouldReceive('checkHostKey')->andReturn('ok');
 
+            $mock->shouldReceive('withoutTty')->andReturnSelf();
+
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
@@ -385,6 +397,8 @@ describe('PushRemoteCommand (files)', function () {
                 ));
 
             $mock->shouldReceive('checkHostKey')->andReturn('ok');
+
+            $mock->shouldReceive('withoutTty')->andReturnSelf();
 
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
