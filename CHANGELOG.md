@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.0](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.6.0) (2026-03-26)
+
+### Features
+
+- add interactive confirmation for production environment operations ([1242e7d](https://github.com/jorisnoo/laravel-remote-sync/commit/1242e7d09040893c125d058f6788597b6fb8e312))
+- add direct remote config and selective sync options ([1397b51](https://github.com/jorisnoo/laravel-remote-sync/commit/1397b51d3776dac49152a34a439c5c896ff40e63))
+- show files to delete with warn styling in file sync preview ([6574ff7](https://github.com/jorisnoo/laravel-remote-sync/commit/6574ff707eab2ecb2f8af03f056c0c9e4901b0b8))
+- run migrations on remote after push ([70b8998](https://github.com/jorisnoo/laravel-remote-sync/commit/70b89988adc28f794debfb5f3beff4ddf641579a))
+
+### Code Refactoring
+
+- consolidate remote database info into single method call ([01c2ae3](https://github.com/jorisnoo/laravel-remote-sync/commit/01c2ae31323e909ee709e8648a54092770091030))
+
+### Continuous Integration
+
+- remove deprecated workflows and simplify dependabot config ([e8f14e5](https://github.com/jorisnoo/laravel-remote-sync/commit/e8f14e5ac671a5ea9d1ab95a082f7d741bcae06e))
 ## [0.5.0](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.5.0) (2026-03-13)
 
 ### Features
