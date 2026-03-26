@@ -12,14 +12,15 @@ beforeEach(function () {
 });
 
 describe('PullRemoteCommand (files)', function () {
-    it('refuses to run in production environment', function () {
+    it('warns and asks for confirmation in production environment', function () {
         app()->detectEnvironment(fn () => 'production');
         $this->setUpProductionRemote();
         config()->set('remote-sync.paths', ['app/public']);
 
         $this->artisan('remote-sync:pull', ['remote' => 'production'])
-            ->assertFailed()
-            ->expectsOutputToContain('This command cannot be run in production');
+            ->expectsOutputToContain('PRODUCTION environment')
+            ->expectsConfirmation('Are you sure you want to continue in production?', 'no')
+            ->assertSuccessful();
     });
 
     it('fails when remote is not configured', function () {

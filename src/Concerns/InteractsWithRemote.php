@@ -148,10 +148,16 @@ trait InteractsWithRemote
         return true;
     }
 
-    protected function ensureNotProduction(): bool
+    protected function warnIfProduction(): bool
     {
-        if (app()->isProduction()) {
-            $this->components->error(__('remote-sync::messages.errors.production_not_allowed'));
+        if (! app()->isProduction()) {
+            return true;
+        }
+
+        $this->components->error(__('remote-sync::messages.warnings.production_warning'));
+
+        if (! $this->confirm(__('remote-sync::prompts.confirm.production_continue'), false)) {
+            $this->components->info(__('remote-sync::messages.info.operation_cancelled'));
 
             return false;
         }

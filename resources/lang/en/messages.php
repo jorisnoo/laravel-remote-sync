@@ -95,6 +95,7 @@ return [
         'files_to_delete_on_remote' => ':count file will be deleted on [:name]:|:count files will be deleted on [:name]:',
         'dry_run_no_delete' => 'Dry run mode - no files were deleted.',
         'local_path_not_exists' => 'Local path does not exist: :path',
+        'production_warning' => 'You are running this command in a PRODUCTION environment. This can overwrite production data!',
     ],
 
     /*

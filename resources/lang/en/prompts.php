@@ -16,6 +16,7 @@ return [
         'validation' => 'Type "yes" to confirm',
         'accept_host_key' => 'Do you want to trust this host [:host] and continue connecting?',
         'continue_without_driver' => 'Could not detect remote database driver. Continue anyway?',
+        'production_continue' => 'Are you sure you want to continue in production?',
     ],
 
     /*

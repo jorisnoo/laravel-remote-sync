@@ -36,6 +36,10 @@ class PushRemoteCommand extends Command
 
     public function handle(): int
     {
+        if (! $this->warnIfProduction()) {
+            return self::SUCCESS;
+        }
+
         if ($this->option('remote-host') && $this->option('remote-path')) {
             $this->syncService = app(RemoteSyncService::class);
 

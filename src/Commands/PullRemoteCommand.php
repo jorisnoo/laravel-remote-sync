@@ -41,8 +41,8 @@ class PullRemoteCommand extends Command
 
     public function handle(): int
     {
-        if (! $this->ensureNotProduction()) {
-            return self::FAILURE;
+        if (! $this->warnIfProduction()) {
+            return self::SUCCESS;
         }
 
         $remoteName = $this->argument('remote') ?? $this->selectRemote();
