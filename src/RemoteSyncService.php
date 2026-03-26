@@ -411,7 +411,7 @@ PHP;
         string $destinationPath,
         array $options = []
     ): ProcessResult {
-        $defaultOptions = ['-avz', '--dry-run', '--itemize-changes'];
+        $defaultOptions = ['-avz', '--dry-run', '--itemize-changes', '--exclude=.*'];
 
         $excludePaths = config('remote-sync.exclude_paths', []);
         $excludeOptions = collect($excludePaths)
@@ -437,7 +437,7 @@ PHP;
         string $destinationPath,
         array $options = []
     ): ProcessResult {
-        $defaultOptions = ['-avz', '--dry-run', '--itemize-changes'];
+        $defaultOptions = ['-avz', '--dry-run', '--itemize-changes', '--exclude=.*'];
 
         $excludePaths = config('remote-sync.exclude_paths', []);
         $excludeOptions = collect($excludePaths)

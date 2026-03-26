@@ -71,6 +71,8 @@ describe('PushRemoteCommand (database)', function () {
 
             $mock->shouldReceive('checkHostKey')->andReturn('ok');
 
+            $mock->shouldReceive('withoutTty')->andReturnSelf();
+
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
@@ -128,6 +130,8 @@ describe('PushRemoteCommand (database)', function () {
 
             $mock->shouldReceive('checkHostKey')->andReturn('ok');
 
+            $mock->shouldReceive('withoutTty')->andReturnSelf();
+
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
@@ -158,6 +162,8 @@ describe('PushRemoteCommand (database)', function () {
                 ));
 
             $mock->shouldReceive('checkHostKey')->andReturn('ok');
+
+            $mock->shouldReceive('withoutTty')->andReturnSelf();
 
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
@@ -215,6 +221,8 @@ describe('PushRemoteCommand (database)', function () {
                 ));
 
             $mock->shouldReceive('checkHostKey')->andReturn('ok');
+
+            $mock->shouldReceive('withoutTty')->andReturnSelf();
 
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
@@ -283,6 +291,8 @@ describe('PushRemoteCommand (database)', function () {
 
             $mock->shouldReceive('checkHostKey')->andReturn('ok');
 
+            $mock->shouldReceive('withoutTty')->andReturnSelf();
+
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
 
@@ -337,6 +347,8 @@ describe('PushRemoteCommand (database)', function () {
                 ));
 
             $mock->shouldReceive('checkHostKey')->andReturn('ok');
+
+            $mock->shouldReceive('withoutTty')->andReturnSelf();
 
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
@@ -399,6 +411,8 @@ describe('PushRemoteCommand (database)', function () {
                 ));
 
             $mock->shouldReceive('checkHostKey')->andReturn('ok');
+
+            $mock->shouldReceive('withoutTty')->andReturnSelf();
 
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(false);
@@ -471,6 +485,8 @@ describe('PushRemoteCommand (database)', function () {
                 ->andReturn($remoteConfig);
 
             $mock->shouldReceive('checkHostKey')->andReturn('ok');
+
+            $mock->shouldReceive('withoutTty')->andReturnSelf();
 
             $mock->shouldReceive('isAtomicDeployment')
                 ->andReturn(true);
