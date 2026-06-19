@@ -86,6 +86,34 @@ class PullRemoteCommand extends Command
             $this->shouldDelete = $this->promptDeleteOption('local');
         }
 
+        if ($pullDatabase && ! $this->prepareDatabasePull()) {
+            return self::FAILURE;
+        }
+
+        $filePaths = [];
+
+        if ($pullFiles) {
+            $filePaths = $this->getConfiguredPaths();
+
+            if (empty($filePaths)) {
+                $this->components->warn(__('remote-sync::messages.warnings.no_paths_pull'));
+                $pullFiles = false;
+            } else {
+                $this->analyzeAndDisplayFilesPreview($filePaths);
+            }
+        }
+
+        // Files in dry-run mode make no changes, so they do not require confirmation.
+        $confirmFiles = $pullFiles && ! $this->isDryRun;
+
+        if (($pullDatabase || $confirmFiles)
+            && ! $this->option('force')
+            && ! $this->confirmPull($this->getOperationsSummary($pullDatabase, $confirmFiles))) {
+            $this->components->info(__('remote-sync::messages.info.operation_cancelled'));
+
+            return self::SUCCESS;
+        }
+
         $exitCode = self::SUCCESS;
 
         if ($pullDatabase) {
@@ -97,7 +125,7 @@ class PullRemoteCommand extends Command
         }
 
         if ($pullFiles) {
-            $exitCode = $this->executePullFiles();
+            $exitCode = $this->executePullFiles($filePaths);
         }
 
         return $exitCode;
@@ -142,10 +170,10 @@ class PullRemoteCommand extends Command
 
     // Database pull methods
 
-    protected function executePullDatabase(): int
+    protected function prepareDatabasePull(): bool
     {
         if (! $this->validateDatabaseCompatibility('pull')) {
-            return self::FAILURE;
+            return false;
         }
 
         $this->snapshotName = $this->generateSnapshotName();
@@ -156,12 +184,11 @@ class PullRemoteCommand extends Command
 
         $this->fetchAndDisplayDatabasePreview();
 
-        if (! $this->option('force') && ! $this->confirmPull($this->getOperationsSummary(true, false))) {
-            $this->components->info(__('remote-sync::messages.info.operation_cancelled'));
+        return true;
+    }
 
-            return self::SUCCESS;
-        }
-
+    protected function executePullDatabase(): int
+    {
         $this->trap([SIGTERM, SIGINT], function () {
             $this->components->warn(__('remote-sync::messages.warnings.interrupt_cleanup'));
             $this->cleanupRemoteSnapshot();
@@ -415,24 +442,11 @@ class PullRemoteCommand extends Command
 
     // Files pull methods
 
-    protected function executePullFiles(): int
+    /**
+     * @param  array<int, string>  $paths
+     */
+    protected function executePullFiles(array $paths): int
     {
-        $paths = $this->getConfiguredPaths();
-
-        if (empty($paths)) {
-            $this->components->warn(__('remote-sync::messages.warnings.no_paths_pull'));
-
-            return self::SUCCESS;
-        }
-
-        $this->analyzeAndDisplayFilesPreview($paths);
-
-        if (! $this->isDryRun && ! $this->option('force') && ! $this->confirmPull($this->getOperationsSummary(false, true))) {
-            $this->components->info(__('remote-sync::messages.info.operation_cancelled'));
-
-            return self::SUCCESS;
-        }
-
         if ($this->isDryRun) {
             $this->components->info(__('remote-sync::messages.info.dry_run_mode'));
 
