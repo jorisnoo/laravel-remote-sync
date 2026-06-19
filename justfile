@@ -1,12 +1,28 @@
-# Run Laravel Pint code formatter
+# List available recipes
+default:
+    @just --list
+
+# Install dependencies
+install:
+    composer install
+
+# Update dependencies
+update:
+    composer update
+
+# Fix code style
 lint:
     vendor/bin/pint
 
-# Run PHPStan static analysis
+# Check code style without fixing
+lint-check:
+    vendor/bin/pint --test
+
+# Run static analysis
 analyse:
     vendor/bin/phpstan analyse
 
-# Run Pest tests
+# Run tests
 test:
     vendor/bin/pest
 
@@ -14,5 +30,5 @@ test:
 test-coverage:
     vendor/bin/pest --coverage
 
-# Run all checks (lint, analyse, test)
-check: lint analyse test
+# Run all checks
+check: lint-check analyse test
