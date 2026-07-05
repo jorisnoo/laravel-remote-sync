@@ -13,6 +13,7 @@ Pull database and storage files from remote Laravel environments to your local m
 - SSH access to remote host (key-based auth recommended)
 - `rsync` installed locally and on remote
 - Remote server must have `spatie/laravel-db-snapshots` installed
+- If the remote server's default `php` binary does not satisfy the project, a compatible versioned binary such as `php8.5` should be available on `PATH`; remote artisan commands auto-detect it.
 
 ## Snapshot Configuration
 

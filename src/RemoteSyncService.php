@@ -16,6 +16,9 @@ class RemoteSyncService
 
     protected bool $useTty = true;
 
+    /** @var array<string, string> */
+    protected array $remotePhpBinaries = [];
+
     public function withoutTty(): static
     {
         $this->useTty = false;
@@ -157,6 +160,60 @@ class RemoteSyncService
         ]);
     }
 
+    protected function remoteArtisanCommand(RemoteConfig $remote, string $arguments): string
+    {
+        return escapeshellarg($this->detectRemotePhpBinary($remote)).' artisan '.$arguments;
+    }
+
+    protected function detectRemotePhpBinary(RemoteConfig $remote): string
+    {
+        $cacheKey = $remote->host.'|'.$remote->workingPath();
+
+        if (isset($this->remotePhpBinaries[$cacheKey])) {
+            return $this->remotePhpBinaries[$cacheKey];
+        }
+
+        $candidates = $this->remotePhpBinaryCandidates();
+        $escapedCandidates = collect($candidates)
+            ->map(fn (string $binary) => escapeshellarg($binary))
+            ->implode(' ');
+        $escapedPath = escapeshellarg($remote->workingPath());
+        $command = "cd {$escapedPath} && for php_binary in {$escapedCandidates}; do "
+            .'if command -v "$php_binary" >/dev/null 2>&1 && "$php_binary" -r \'if (file_exists("vendor/composer/platform_check.php")) { require "vendor/composer/platform_check.php"; }\' >/dev/null 2>&1; then '
+            .'printf "%s" "$php_binary"; exit 0; '
+            .'fi; '
+            .'done; exit 1';
+
+        $result = $this->executeRemoteCommand($remote, $command, 10);
+        $binary = trim($result->output());
+
+        if ($result->successful() && in_array($binary, $candidates, true)) {
+            return $this->remotePhpBinaries[$cacheKey] = $binary;
+        }
+
+        return $this->remotePhpBinaries[$cacheKey] = 'php';
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function remotePhpBinaryCandidates(): array
+    {
+        return [
+            'php',
+            'php8.5',
+            'php85',
+            'php8.4',
+            'php84',
+            'php8.3',
+            'php83',
+            'php8.2',
+            'php82',
+            'php8.1',
+            'php81',
+        ];
+    }
+
     public function isAtomicDeployment(RemoteConfig $remote): bool
     {
         $escapedPath = escapeshellarg("{$remote->path}/current");
@@ -220,7 +277,7 @@ echo json_encode(['driver' => $driver, 'tables' => array_values($tables), 'migra
 PHP;
 
         $escapedCode = escapeshellarg($code);
-        $command = "cd {$escapedPath} && php artisan tinker --execute={$escapedCode}";
+        $command = "cd {$escapedPath} && ".$this->remoteArtisanCommand($remote, "tinker --execute={$escapedCode}");
 
         $result = $this->executeRemoteCommand($remote, $command, 60);
 
@@ -258,7 +315,7 @@ PHP;
 
         $escapedPath = escapeshellarg($remote->workingPath());
         $escapedSnapshotName = escapeshellarg($snapshotName);
-        $command = "cd {$escapedPath} && php artisan snapshot:create {$escapedSnapshotName} {$excludeFlags} --compress";
+        $command = "cd {$escapedPath} && ".$this->remoteArtisanCommand($remote, trim("snapshot:create {$escapedSnapshotName} {$excludeFlags} --compress"));
         $timeout = config('remote-sync.timeouts.snapshot_create', 300);
 
         return $this->executeRemoteCommand($remote, $command, $timeout);
@@ -295,7 +352,7 @@ PHP;
     {
         $escapedPath = escapeshellarg($remote->workingPath());
         $escapedSnapshotName = escapeshellarg($snapshotName);
-        $command = "cd {$escapedPath} && php artisan snapshot:delete {$escapedSnapshotName} --no-interaction";
+        $command = "cd {$escapedPath} && ".$this->remoteArtisanCommand($remote, "snapshot:delete {$escapedSnapshotName} --no-interaction");
         $timeout = config('remote-sync.timeouts.snapshot_cleanup', 60);
 
         return $this->executeRemoteCommand($remote, $command, $timeout);
@@ -368,7 +425,7 @@ PHP;
     {
         $escapedPath = escapeshellarg($remote->workingPath());
         $escapedSnapshotName = escapeshellarg($snapshotName);
-        $command = "cd {$escapedPath} && php artisan snapshot:load {$escapedSnapshotName} --force --drop-tables=0";
+        $command = "cd {$escapedPath} && ".$this->remoteArtisanCommand($remote, "snapshot:load {$escapedSnapshotName} --force --drop-tables=0");
         $timeout = config('remote-sync.timeouts.snapshot_load', config('remote-sync.timeouts.snapshot_create', 300));
 
         return $this->executeRemoteCommand($remote, $command, $timeout);
@@ -377,7 +434,7 @@ PHP;
     public function runRemoteMigrations(RemoteConfig $remote): ProcessResult
     {
         $escapedPath = escapeshellarg($remote->workingPath());
-        $command = "cd {$escapedPath} && php artisan migrate --force";
+        $command = "cd {$escapedPath} && ".$this->remoteArtisanCommand($remote, 'migrate --force');
         $timeout = config('remote-sync.timeouts.snapshot_load', 300);
 
         return $this->executeRemoteCommand($remote, $command, $timeout);
@@ -396,7 +453,7 @@ PHP;
 
         $escapedPath = escapeshellarg($remote->workingPath());
         $escapedBackupName = escapeshellarg($backupName);
-        $command = "cd {$escapedPath} && php artisan snapshot:create {$escapedBackupName} {$excludeFlags} --compress";
+        $command = "cd {$escapedPath} && ".$this->remoteArtisanCommand($remote, trim("snapshot:create {$escapedBackupName} {$excludeFlags} --compress"));
         $timeout = config('remote-sync.timeouts.snapshot_create', 300);
 
         return $this->executeRemoteCommand($remote, $command, $timeout);

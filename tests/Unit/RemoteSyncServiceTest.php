@@ -268,6 +268,30 @@ describe('RemoteSyncService', function () {
                 return str_contains($process->command[2], "cd '/var/www/app/current'");
             });
         });
+
+        it('uses detected PHP binary in tinker command', function () {
+            Process::fake(function ($process) {
+                $command = implode(' ', $process->command);
+
+                if (str_contains($command, 'vendor/composer/platform_check.php')) {
+                    return Process::result(output: 'php8.5');
+                }
+
+                return Process::result(output: '{"driver":"mysql","tables":[],"migrations":[]}');
+            });
+
+            $remote = new RemoteConfig(
+                name: 'production',
+                host: 'user@example.com',
+                path: '/var/www/app',
+            );
+
+            $this->service->getRemoteDatabaseInfo($remote);
+
+            Process::assertRan(function ($process) {
+                return str_contains($process->command[2], "'php8.5' artisan tinker");
+            });
+        });
     });
 
     describe('createRemoteSnapshot', function () {
@@ -352,6 +376,30 @@ describe('RemoteSyncService', function () {
                 $command = $process->command[2];
 
                 return ! str_contains($command, '--exclude');
+            });
+        });
+
+        it('uses detected PHP binary in snapshot create command', function () {
+            Process::fake(function ($process) {
+                $command = implode(' ', $process->command);
+
+                if (str_contains($command, 'vendor/composer/platform_check.php')) {
+                    return Process::result(output: 'php8.5');
+                }
+
+                return Process::result();
+            });
+
+            $remote = new RemoteConfig(
+                name: 'production',
+                host: 'user@example.com',
+                path: '/var/www/app',
+            );
+
+            $this->service->createRemoteSnapshot($remote, 'test-snapshot', full: true);
+
+            Process::assertRan(function ($process) {
+                return str_contains($process->command[2], "'php8.5' artisan snapshot:create 'test-snapshot'");
             });
         });
     });
@@ -456,6 +504,32 @@ describe('RemoteSyncService', function () {
 
             Process::assertRan(function ($process) {
                 return str_contains($process->command[2], "snapshot:load 'test-snapshot' --force");
+            });
+        });
+    });
+
+    describe('runRemoteMigrations', function () {
+        it('uses detected PHP binary in migrate command', function () {
+            Process::fake(function ($process) {
+                $command = implode(' ', $process->command);
+
+                if (str_contains($command, 'vendor/composer/platform_check.php')) {
+                    return Process::result(output: 'php8.5');
+                }
+
+                return Process::result();
+            });
+
+            $remote = new RemoteConfig(
+                name: 'production',
+                host: 'user@example.com',
+                path: '/var/www/app',
+            );
+
+            $this->service->runRemoteMigrations($remote);
+
+            Process::assertRan(function ($process) {
+                return str_contains($process->command[2], "'php8.5' artisan migrate --force");
             });
         });
     });
