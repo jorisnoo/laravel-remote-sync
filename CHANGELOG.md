@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.2](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.6.2) (2026-07-06)
+
+### Features
+
+- auto-detect PHP binary version on remote servers ([b0fac45](https://github.com/jorisnoo/laravel-remote-sync/commit/b0fac45e06317499a6cb0353995515a9c14619e3))
+- **justfile:** add default recipe and install/update targets ([d292b07](https://github.com/jorisnoo/laravel-remote-sync/commit/d292b079855b202e7900da164475066f67541ac4))
+- exclude dotfiles from sync operations ([9a33db9](https://github.com/jorisnoo/laravel-remote-sync/commit/9a33db9b54382fdc88f1df523a996342070adb81))
+
+### Code Refactoring
+
+- **pull:** consolidate database and files confirmations into single prompt ([312e110](https://github.com/jorisnoo/laravel-remote-sync/commit/312e110217cdcf0f676b45e86c83e9ed65de2f93))
+
+### Tests
+
+- **push-files:** add withoutTty mock expectation ([1b14a6b](https://github.com/jorisnoo/laravel-remote-sync/commit/1b14a6bc845d6f799e60956f15b14d547dc05cb2))
+
+### Build System
+
+- **deps:** bump actions/checkout from 6 to 7 ([2dcdf4a](https://github.com/jorisnoo/laravel-remote-sync/commit/2dcdf4a3662445c111b318772006e590732cc8db))
+
+### Continuous Integration
+
+- simplify dependabot auto-merge workflow ([e9ed70f](https://github.com/jorisnoo/laravel-remote-sync/commit/e9ed70fc07fb5bfc3542835135b3c9c294a67420))
 ## [0.6.1](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.6.1) (2026-07-06)
 
 ### Features
