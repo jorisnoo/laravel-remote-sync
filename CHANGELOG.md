@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Features
 
-- auto-detect PHP binary version on remote servers ([69927b2](https://github.com/jorisnoo/laravel-remote-sync/commit/69927b2c86939fbf92e9f12e9d7bbcbbf00cb9f9))
+- auto-detect PHP binary version on remote servers ([b0fac45](https://github.com/jorisnoo/laravel-remote-sync/commit/b0fac45e06317499a6cb0353995515a9c14619e3))
 - **justfile:** add default recipe and install/update targets ([d292b07](https://github.com/jorisnoo/laravel-remote-sync/commit/d292b079855b202e7900da164475066f67541ac4))
 - exclude dotfiles from sync operations ([9a33db9](https://github.com/jorisnoo/laravel-remote-sync/commit/9a33db9b54382fdc88f1df523a996342070adb81))
 
@@ -17,6 +17,10 @@ All notable changes to this project will be documented in this file.
 ### Tests
 
 - **push-files:** add withoutTty mock expectation ([1b14a6b](https://github.com/jorisnoo/laravel-remote-sync/commit/1b14a6bc845d6f799e60956f15b14d547dc05cb2))
+
+### Build System
+
+- **deps:** bump actions/checkout from 6 to 7 ([2dcdf4a](https://github.com/jorisnoo/laravel-remote-sync/commit/2dcdf4a3662445c111b318772006e590732cc8db))
 
 ### Continuous Integration
 
