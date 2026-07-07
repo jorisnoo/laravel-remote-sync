@@ -18,7 +18,6 @@ use Noo\LaravelRemoteSync\Sync\SyncPlan;
 use RuntimeException;
 
 use function Laravel\Prompts\multiselect;
-use function Laravel\Prompts\spin;
 
 class PullCommand extends Command
 {
@@ -89,24 +88,21 @@ class PullCommand extends Command
             return self::SUCCESS;
         }
 
-        $rsync = app(Rsync::class, ['connection' => $connection, 'interactive' => $this->isInteractive()]);
+        $rsync = app(Rsync::class, ['connection' => $connection, 'interactive' => $this->isInteractive(), 'verbose' => $this->output->isVerbose()]);
         $importer = app(Importer::class);
         $snapshots = app(Snapshots::class, ['connection' => $connection, 'info' => $info]);
         $planner = new Planner($info, $rsync, $importer);
 
         try {
-            $plan = spin(
-                callback: fn (): SyncPlan => $planner->pull(
-                    database: $database,
-                    files: $files,
-                    full: (bool) $this->option('full'),
-                    backup: ! $this->option('no-backup'),
-                    keepSnapshot: (bool) $this->option('keep-snapshot'),
-                    delete: (bool) $this->option('delete'),
-                    paths: $paths,
-                ),
-                message: __('remote-sync::messages.spinners.building_plan'),
-            );
+            $plan = $this->buildPlan(fn (): SyncPlan => $planner->pull(
+                database: $database,
+                files: $files,
+                full: (bool) $this->option('full'),
+                backup: ! $this->option('no-backup'),
+                keepSnapshot: (bool) $this->option('keep-snapshot'),
+                delete: (bool) $this->option('delete'),
+                paths: $paths,
+            ));
         } catch (RuntimeException $e) {
             $this->components->error($e->getMessage());
 

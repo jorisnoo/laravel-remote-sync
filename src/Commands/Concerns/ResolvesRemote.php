@@ -166,6 +166,27 @@ trait ResolvesRemote
         return true;
     }
 
+    /**
+     * Build the sync plan behind a spinner. When the console is verbose (-v),
+     * the spinner is dropped so the file dry-run's live rsync output stays
+     * legible instead of fighting the animation.
+     *
+     * @param  Closure(): mixed  $callback
+     */
+    protected function buildPlan(Closure $callback): mixed
+    {
+        if ($this->output->isVerbose()) {
+            $this->components->info(__('remote-sync::messages.spinners.building_plan'));
+
+            return $callback();
+        }
+
+        return spin(
+            callback: $callback,
+            message: __('remote-sync::messages.spinners.building_plan'),
+        );
+    }
+
     protected function probeRemote(Connection $connection): ?RemoteInfo
     {
         try {

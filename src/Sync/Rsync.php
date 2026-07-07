@@ -13,6 +13,7 @@ class Rsync
     public function __construct(
         protected Connection $connection,
         protected bool $interactive = false,
+        protected bool $verbose = false,
     ) {}
 
     /**
@@ -52,8 +53,21 @@ class Rsync
         array $excludes = [],
         bool $delete = false
     ): FileChanges {
+        $options = ['-avz', '--dry-run', '--itemize-changes'];
+
+        if ($this->verbose) {
+            $options[] = '--stats';
+        }
+
+        $command = $this->command($direction, $remotePath, $localPath, $options, $excludes, $delete);
+
+        if ($this->verbose) {
+            fwrite(STDERR, '  $ '.implode(' ', $command).PHP_EOL);
+        }
+
         $result = Process::timeout($this->connection->transferTimeout())->run(
-            $this->command($direction, $remotePath, $localPath, ['-avz', '--dry-run', '--itemize-changes'], $excludes, $delete)
+            $command,
+            $this->verbose ? fn (string $type, string $buffer) => fwrite($type === 'err' ? STDERR : STDOUT, $buffer) : null
         );
 
         if (! $result->successful()) {
