@@ -77,7 +77,7 @@ class Snapshots
      *
      * @param  list<string>  $excludeTables
      */
-    public static function createLocal(string $name, array $excludeTables = []): int
+    public function createLocal(string $name, array $excludeTables = []): int
     {
         $arguments = ['name' => $name, '--compress' => true];
 

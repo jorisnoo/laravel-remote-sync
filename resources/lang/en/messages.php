@@ -9,6 +9,16 @@ return [
     */
 
     'errors' => [
+        'production_refused' => 'Refusing to run in production. Set remote-sync.allow_production to true if this machine is intentionally a sync source or target.',
+        'no_remotes_configured' => 'No remotes are configured. Add one to config/remote-sync.php.',
+        'ambiguous_remote' => 'Multiple remotes are configured (:names). Pass one explicitly or set REMOTE_SYNC_DEFAULT.',
+        'host_key_unknown_noninteractive' => 'The authenticity of host [:host] cannot be verified. Run interactively to review the fingerprint, or run: ssh -o StrictHostKeyChecking=accept-new :ssh_host exit',
+        'confirmation_required' => 'Confirmation required: re-run with --force.',
+        'snapshots_missing_on_remote' => 'spatie/laravel-db-snapshots is not installed on [:name]. Install it there to sync the database.',
+        'driver_mismatch' => 'Database driver mismatch: the remote uses [:remote] but this app uses [:local]. Cross-database sync is not supported.',
+        'corrupt_snapshot' => 'The downloaded snapshot failed its integrity check - nothing was imported.',
+        'failed_import' => 'Import failed: :error',
+        'failed_file_sync' => 'Failed to sync storage/:path: :error',
         'production_not_allowed' => 'This command cannot be run in production.',
         'push_not_allowed' => "Push is not allowed for remote [:name]. Set 'push_allowed' to true in config to enable.",
         'no_remote_selected' => 'No remote environment selected.',
@@ -44,6 +54,11 @@ return [
     */
 
     'info' => [
+        'dry_run_done' => 'Dry run - nothing was changed.',
+        'doctor_hint' => 'Run `php artisan remote-sync:doctor :name` for a full diagnosis.',
+        'restore_hint' => 'Your previous database was backed up. Restore it with: php artisan snapshot:load :name',
+        'snapshot_kept' => 'The downloaded snapshot was kept for inspection: :path',
+        'cleaned_up' => 'Removed :what.',
         'operation_cancelled' => 'Operation cancelled.',
         'creating_local_backup' => 'Creating local backup: :name',
         'remote_snapshot_created' => 'Remote snapshot created.',
@@ -51,7 +66,7 @@ return [
         'snapshot_downloaded' => 'Snapshot downloaded.',
         'loading_snapshot' => 'Loading snapshot into database...',
         'snapshot_loaded' => 'Snapshot loaded.',
-        'filter_users_applied' => 'Users table filtered: only :count allowed user(s) kept in :table.',
+        'filter_users_applied' => 'Users filtered: kept :kept, deleted :deleted.',
         'local_snapshot_removed' => 'Local snapshot file removed.',
         'remote_backup_created' => 'Remote backup created: :name',
         'creating_local_snapshot' => 'Creating local snapshot: :name',
@@ -84,6 +99,10 @@ return [
     */
 
     'warnings' => [
+        'no_paths_configured' => 'No storage paths are configured for file syncing.',
+        'migrations_failed' => 'Migrations failed - run `php artisan migrate` manually.',
+        'filter_users_skipped' => 'filter_users matched no users - skipped deleting anyone. Check your patterns in config/remote-sync.php.',
+        'cleanup_failed' => 'Could not clean up :what (:error).',
         'interrupt_cleanup' => 'Received interrupt signal, cleaning up...',
         'manual_cleanup_needed' => 'Failed to delete remote snapshot. You may need to manually clean up: :name',
         'unknown_host' => 'The authenticity of host [:host] cannot be verified. It is not in your known_hosts file.',
@@ -105,6 +124,8 @@ return [
     */
 
     'success' => [
+        'pulled' => 'Pulled :scope from [:name].',
+        'pushed' => 'Pushed :scope to [:name].',
         'database_pulled' => 'Database pulled from [:name].',
         'database_pushed' => 'Database pushed to [:name].',
         'files_pulled' => 'Files pulled from [:name].',
@@ -118,6 +139,8 @@ return [
     */
 
     'spinners' => [
+        'probing' => 'Checking [:name]...',
+        'building_plan' => 'Building sync plan...',
         'creating_remote_snapshot' => 'Creating snapshot on [:name]...',
         'cleaning_remote_snapshot' => 'Cleaning up remote snapshot...',
         'fetching_database_info' => 'Fetching remote database info...',
