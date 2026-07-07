@@ -36,8 +36,7 @@
     },
     "autoload": {
         "psr-4": {
-            "Noo\\LaravelRemoteSync\\": "src/",
-            "Noo\\LaravelRemoteSync\\Database\\Factories\\": "database/factories/"
+            "Noo\\LaravelRemoteSync\\": "src/"
         }
     },
     "autoload-dev": {

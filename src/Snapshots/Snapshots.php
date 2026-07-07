@@ -61,6 +61,29 @@ class Snapshots
         return static::localDir()."/{$name}.sql.gz";
     }
 
+    /**
+     * List local snapshot files, newest first.
+     *
+     * @return array<int, array{name: string, path: string, mtime: int}>
+     */
+    public static function listLocal(): array
+    {
+        $files = glob(static::localDir().'/*.sql.gz') ?: [];
+        $snapshots = [];
+
+        foreach ($files as $file) {
+            $snapshots[] = [
+                'name' => basename($file, '.sql.gz'),
+                'path' => $file,
+                'mtime' => (int) filemtime($file),
+            ];
+        }
+
+        usort($snapshots, fn (array $a, array $b) => $b['mtime'] <=> $a['mtime']);
+
+        return $snapshots;
+    }
+
     public static function deleteLocal(string $name): bool
     {
         $path = static::localPath($name);

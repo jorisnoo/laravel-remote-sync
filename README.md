@@ -4,24 +4,33 @@
 [![GitHub Tests Action Status](https://img.shields.io/github/actions/workflow/status/jorisnoo/laravel-remote-sync/run-tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/jorisnoo/laravel-remote-sync/actions?query=workflow%3Arun-tests+branch%3Amain)
 [![Total Downloads](https://img.shields.io/packagist/dt/jorisnoo/laravel-remote-sync.svg?style=flat-square)](https://packagist.org/packages/jorisnoo/laravel-remote-sync)
 
-Pull database and storage files from remote Laravel environments to your local machine. Uses [spatie/laravel-db-snapshots](https://github.com/spatie/laravel-db-snapshots) for database operations and rsync for file transfers.
+Pull a remote Laravel app's database and storage files to your local machine, or push them the other way. Database dumps use [spatie/laravel-db-snapshots](https://github.com/spatie/laravel-db-snapshots) on the remote; file transfers use rsync over SSH.
 
 ## Requirements
 
-- PHP 8.3+
-- Laravel 11 or 12
-- SSH access to remote host (key-based auth recommended)
-- `rsync` installed locally and on remote
-- Remote server must have `spatie/laravel-db-snapshots` installed
-- If the remote server's default `php` binary does not satisfy the project, a compatible versioned binary such as `php8.5` should be available on `PATH`; remote artisan commands auto-detect it.
+Locally:
 
-## Snapshot Configuration
+- PHP 8.3+, Laravel 11, 12, or 13
+- A `mysql` or `pgsql` database (imports pipe through the `mysql`/`psql` CLI)
+- `ssh`, `rsync`, and `gzip` on your PATH
+- SSH key access to the remote
 
-This package relies on [spatie/laravel-db-snapshots](https://github.com/spatie/laravel-db-snapshots) for database operations. You need to configure it on both local and remote environments.
+On each remote:
 
-### 1. Configure the snapshots disk
+- `spatie/laravel-db-snapshots` and `laravel/tinker` installed
+- `rsync`
+- A PHP binary that satisfies the app. The default `php` is tried first, then versioned binaries (`php8.5`, `php8.4`, ...). You can also pin one with `php_binary` in the config.
 
-Add a disk for storing snapshots in `config/filesystems.php`:
+The remote's snapshot location, database driver, and deployment layout are discovered automatically on every run - the remote's own configuration is what counts, so local and remote snapshot disks do not need to match.
+
+## Installation
+
+```bash
+composer require jorisnoo/laravel-remote-sync
+php artisan vendor:publish --tag="remote-sync-config"
+```
+
+Configure a snapshots disk for spatie/laravel-db-snapshots in `config/filesystems.php` (on both sides, but they may differ):
 
 ```php
 'disks' => [
@@ -32,43 +41,24 @@ Add a disk for storing snapshots in `config/filesystems.php`:
 ],
 ```
 
-### 2. Publish the db-snapshots config
+Then point your `.env` at the remote:
 
-```bash
-php artisan vendor:publish --provider="Spatie\DbSnapshots\DbSnapshotsServiceProvider"
+```env
+REMOTE_SYNC_PRODUCTION_HOST=forge@your-server.com
+REMOTE_SYNC_PRODUCTION_PATH=/home/forge/your-app.com
 ```
 
-### 3. Ensure config parity
-
-> **Important:** The snapshot filesystem configuration must be identical on both local and remote environments. This package uses your local `db-snapshots.disk` configuration to determine where snapshots are stored on the remote server. If the remote has a different snapshot path configured, pull operations will fail.
-
-## Installation
+Verify the whole setup before the first sync:
 
 ```bash
-composer require jorisnoo/laravel-remote-sync
+php artisan remote-sync:doctor
 ```
 
-Publish the config file:
-
-```bash
-php artisan vendor:publish --tag="remote-sync-config"
-```
+Doctor checks your local binaries and, for each configured remote, the SSH host key, application path, PHP binary, installed packages, rsync, and driver compatibility.
 
 ## Configuration
 
-Add your remote environments to `config/remote-sync.php` or use environment variables:
-
-```env
-REMOTE_SYNC_PRODUCTION_HOST=forge@your-server
-REMOTE_SYNC_PRODUCTION_PATH=/home/forge/your-app.com
-
-REMOTE_SYNC_STAGING_HOST=forge@staging-server
-REMOTE_SYNC_STAGING_PATH=/home/forge/staging.your-app.com
-
-REMOTE_SYNC_DEFAULT=production
-```
-
-### Config Options
+The published `config/remote-sync.php`:
 
 ```php
 return [
@@ -76,128 +66,112 @@ return [
         'production' => [
             'host' => env('REMOTE_SYNC_PRODUCTION_HOST'),
             'path' => env('REMOTE_SYNC_PRODUCTION_PATH'),
+            'push' => (bool) env('REMOTE_SYNC_PRODUCTION_PUSH', false),
+            // 'php_binary' => '/usr/bin/php8.4',
         ],
     ],
 
-    'default' => env('REMOTE_SYNC_DEFAULT', 'production'),
+    // Used when several remotes are configured and none is passed.
+    'default' => env('REMOTE_SYNC_DEFAULT'),
 
-    // Storage paths to sync (relative to storage/)
-    'paths' => [
-        'app',
-    ],
+    // Storage-relative paths synced by the files scope.
+    'paths' => ['app'],
 
-    // Tables to exclude from database snapshots
-    'exclude_tables' => [
-        'cache',
-        'cache_locks',
-        'sessions',
-    ],
+    // Extra rsync excludes. Dotfiles and snapshot directories are always excluded.
+    'exclude_paths' => [],
 
-    // Timeouts in seconds
+    // Synced as empty tables on pull, preserved on push. The migrations
+    // table is always synced and `migrate --force` runs after every import.
+    'exclude_tables' => ['cache', 'sessions', 'jobs', /* ... */],
+
+    // false, or emails / *-wildcards of users to KEEP locally after a pull.
+    'filter_users' => false,
+
+    // Pull and push refuse to run when app.env is production unless this is true.
+    'allow_production' => false,
+
     'timeouts' => [
-        'snapshot_create' => 300,
-        'snapshot_download' => 600,
-        'snapshot_cleanup' => 60,
-        'file_sync' => 1800,
+        'remote' => 300,      // short remote commands
+        'transfer' => 1800,   // dumps, imports, rsync transfers
     ],
 ];
 ```
 
-## Usage
+Add more remotes by repeating the pattern - the env var names follow the remote's key (`staging` reads `REMOTE_SYNC_STAGING_HOST`, and so on). Remotes with missing or placeholder values are rejected with a message naming the exact env var to set.
 
-### Interactive Pull
+## Pulling
 
 ```bash
 php artisan remote-sync:pull
 ```
 
-Prompts you to select a remote and what to pull (database, files, or both).
+Interactively this asks at most three things: which remote (only when several are configured), what to pull (database, files, or both), and one final confirmation - after showing you a plan of exactly what will happen: which tables are imported and truncated, which files are transferred, what a `--delete` pass would remove, and which backup is created.
 
-Options:
-- `--no-backup` - Skip creating a local backup before pulling
-- `--keep-snapshot` - Keep the downloaded snapshot file after loading
-- `--full` - Include all tables (ignores `exclude_tables` config) and drops all local tables before loading
+Everything else is a flag:
 
-### Pull Database Only
+| Flag | Effect |
+| --- | --- |
+| `--database` / `--files` | Select the scope (skips the prompt; neither means both) |
+| `--full` | Import all tables, dropping local tables first |
+| `--no-backup` | Skip the local `pre-pull-*` backup snapshot |
+| `--keep-snapshot` | Keep the downloaded snapshot file after import |
+| `--delete` | Delete local files that no longer exist on the remote |
+| `--path=app/public` | Sync only specific storage-relative paths (repeatable) |
+| `--dry-run` | Print the plan and exit without changing anything |
+| `--force` / `-f` | Answer the final confirmation with yes |
 
-```bash
-php artisan remote-sync:pull-db production
-```
+A standard pull creates a local backup, dumps the remote database (minus `exclude_tables`), downloads and integrity-checks the snapshot, imports it through the `mysql`/`psql` CLI, truncates the excluded tables, then runs `migrate --force` and `optimize:clear`. If the import fails, the downloaded snapshot is kept and the exact restore command for your backup is printed.
 
-Options:
-- `--no-backup` - Skip creating a local backup before pulling
-- `--keep-snapshot` - Keep the downloaded snapshot file after loading
-- `--full` - Include all tables (ignores `exclude_tables` config) and drops all local tables before loading
+Deletion is strictly opt-in: `--force` never implies `--delete`, and the plan preview tells you how many local-only files a `--delete` pass would remove before you commit to anything.
 
-### Pull Files Only
-
-```bash
-php artisan remote-sync:pull-files production
-```
-
-Options:
-- `--path=app/uploads` - Sync only a specific path
-- `--delete` - Delete local files that don't exist on remote
-
-### Push Commands
-
-Push local data to a remote (requires `push_allowed: true` in config):
+For a cron or CI refresh:
 
 ```bash
-php artisan remote-sync:push              # Interactive
-php artisan remote-sync:push-db     # Database only
-php artisan remote-sync:push-files        # Files only
+php artisan remote-sync:pull production --database --files --force
 ```
 
-### Cleanup Snapshots
+Without `--force`, non-interactive runs print the plan and exit with an error, so a misconfigured cron line cannot sync anything by accident.
 
-Remove old database snapshots from local and/or remote storage:
+## Pushing
+
+Pushing overwrites data on the remote, so it is stricter:
 
 ```bash
-php artisan remote-sync:cleanup-snapshots
+php artisan remote-sync:push staging --database
 ```
 
-Options:
-- `--local` - Only cleanup local snapshots
-- `--remote` - Only cleanup remote snapshots
-- `--keep=5` - Number of most recent snapshots to keep (default: 5)
-- `--force` - Skip confirmation prompt
-- `--dry-run` - Show what would be deleted without actually deleting
+- The remote must have `'push' => true` in its config.
+- Non-interactive runs must state the scope explicitly (`--database` and/or `--files`).
+- The interactive confirmation requires typing `yes`.
 
-Examples:
+A database push backs up the remote first (`pre-push-*`), uploads a local snapshot, loads it on the remote without dropping tables (excluded tables are preserved), and runs remote migrations. If the load fails, the restore command for the remote backup is printed. Flags mirror pull: `--no-backup`, `--delete`, `--path=`, `--dry-run`, `--force`.
+
+## Pruning snapshots
+
+Transfer snapshots are removed automatically after each run, but backups (`pre-pull-*`, `pre-push-*`) accumulate:
 
 ```bash
-# Cleanup both local and remote (interactive)
-php artisan remote-sync:cleanup-snapshots
-
-# Cleanup only local, keep 3 most recent
-php artisan remote-sync:cleanup-snapshots --local --keep=3
-
-# Cleanup only remote production snapshots
-php artisan remote-sync:cleanup-snapshots production --remote
-
-# Preview what would be deleted
-php artisan remote-sync:cleanup-snapshots --dry-run
-
-# Automated cleanup (cron-friendly)
-php artisan remote-sync:cleanup-snapshots production --force --keep=5
+php artisan remote-sync:prune                      # local + remote, keep the 5 newest
+php artisan remote-sync:prune --local --keep=3
+php artisan remote-sync:prune production --remote --dry-run
 ```
 
-## Atomic Deployments
+Prune only touches snapshots created by this package (`remote-sync-*`, `pre-pull-*`, `pre-push-*`). Pass `--all` to include your own spatie snapshots as well.
 
-The package automatically detects if your remote server uses atomic deployments (Envoyer, Laravel Deployer, etc.) by checking for a `/current` symlink. When detected, it uses the correct working path.
+## Safety
 
-- If `/current` exists → uses `{path}/current` as the working directory
-- If `/current` doesn't exist → uses `{path}` directly
+- Pull and push refuse to run when the local app environment is production; set `allow_production` to true only when that is intentional (the confirmation then requires a typed `yes`).
+- One plan preview and one confirmation before anything changes; `--dry-run` everywhere.
+- Backups are created by default on both directions, and every failure message includes the command to restore.
+- Unknown SSH hosts show their key fingerprint for review before connecting; changed host keys abort with a man-in-the-middle warning, and non-interactive runs never accept a new host key.
+- Interrupting a run (Ctrl+C) removes temporary snapshots on both sides.
+- `filter_users` refuses to act when its patterns would delete every user.
 
-If your path already ends in `/current`, detection is skipped and atomic mode is assumed.
+## Security notes
 
-## Safety Features
-
-- Commands refuse to run in production environment
-- Confirmation prompt before syncing
-- Local database backup created before pulling (unless `--no-backup`)
-- Graceful cleanup on interrupt (Ctrl+C)
+- Database passwords are handed to `mysql`/`psql` via the `MYSQL_PWD`/`PGPASSWORD` environment variables, never as command-line arguments.
+- Sync paths are validated against a strict character allowlist before being used in remote rsync specs.
+- Use SSH keys; the package never handles SSH passwords.
 
 ## Testing
 

@@ -2,144 +2,25 @@
 
 return [
 
-    /*
-    |--------------------------------------------------------------------------
-    | Confirmation Prompts
-    |--------------------------------------------------------------------------
-    */
-
     'confirm' => [
         'pull' => 'Replace your local :scope with data from [:name]?',
-        'typed_yes_suffix' => 'Type "yes" to continue',
         'push' => 'Push your local :scope to [:name]? This will OVERWRITE remote data. Type "yes" to continue',
-        'delete_remote' => 'Push local files to [:name] with deletion? Type "yes" to continue',
-        'cleanup' => 'Delete :summary? Type "yes" to continue',
+        'prune' => 'Delete :count snapshot?|Delete :count snapshots?',
+        'typed_yes_suffix' => 'Type "yes" to continue',
         'validation' => 'Type "yes" to confirm',
         'accept_host_key' => 'Do you want to trust this host [:host] and continue connecting?',
-        'continue_without_driver' => 'Could not detect remote database driver. Continue anyway?',
-        'production_continue' => 'Are you sure you want to continue in production?',
+        'continue_without_driver' => 'Could not detect the remote database driver. Continue anyway?',
     ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Backup Options
-    |--------------------------------------------------------------------------
-    */
-
-    'backup' => [
-        'label' => 'Database: Create a local backup before pulling?',
-        'yes' => 'Yes (recommended)',
-        'no' => 'No',
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Import Mode Options
-    |--------------------------------------------------------------------------
-    */
-
-    'import_mode' => [
-        'label' => 'Database: Import mode',
-        'standard' => 'Standard - without excluded tables (they will be truncated)',
-        'full' => 'Full - all tables (including excluded), exactly mirrors the remote db',
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Delete Options
-    |--------------------------------------------------------------------------
-    */
-
-    'delete' => [
-        'local_label' => 'Files: Delete all local files not present on remote?',
-        'remote_label' => 'Files: Delete files on remote which are not present locally?',
-        'no' => 'No - keep these files',
-        'yes' => 'Yes - mirror exactly',
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Dry Run Options
-    |--------------------------------------------------------------------------
-    */
-
-    'dry_run' => [
-        'label' => 'Files: Preview changes first?',
-        'no' => 'No - proceed directly',
-        'yes' => 'Yes - dry run first',
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Path Selection
-    |--------------------------------------------------------------------------
-    */
-
-    'paths' => [
-        'label' => 'Files: Which paths to pull?',
-        'all' => 'All configured paths (:paths)',
-        'specific' => 'Specific path only',
-        'enter_label' => 'Files: Enter path (relative to storage/)',
-        'placeholder' => 'app/public',
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Remote Selection
-    |--------------------------------------------------------------------------
-    */
 
     'remote' => [
         'label' => 'Select remote environment',
-        'push_label' => 'Select remote environment to push to',
     ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Operations Selection
-    |--------------------------------------------------------------------------
-    */
 
     'operations' => [
         'pull_label' => 'What would you like to pull?',
         'push_label' => 'What would you like to push?',
         'database' => 'Database',
         'files' => 'Files',
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Cleanup Targets
-    |--------------------------------------------------------------------------
-    */
-
-    'cleanup_targets' => [
-        'label' => 'Which snapshots to cleanup?',
-        'local' => 'Local snapshots',
-        'remote' => 'Remote snapshots',
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Keep Count
-    |--------------------------------------------------------------------------
-    */
-
-    'keep_count' => [
-        'label' => 'How many recent snapshots to keep?',
-        'validation' => 'Please enter a valid non-negative number',
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Preview Options
-    |--------------------------------------------------------------------------
-    */
-
-    'preview' => [
-        'label' => 'Preview before deleting?',
-        'yes' => 'Yes - show what will be deleted (recommended)',
-        'no' => 'No - delete immediately',
     ],
 
 ];
