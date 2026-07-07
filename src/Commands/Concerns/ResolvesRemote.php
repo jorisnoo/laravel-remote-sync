@@ -2,13 +2,16 @@
 
 namespace Noo\LaravelRemoteSync\Commands\Concerns;
 
+use Closure;
 use InvalidArgumentException;
 use Noo\LaravelRemoteSync\Remotes\Connection;
 use Noo\LaravelRemoteSync\Remotes\Probe;
 use Noo\LaravelRemoteSync\Remotes\Remote;
 use Noo\LaravelRemoteSync\Remotes\RemoteInfo;
 use Noo\LaravelRemoteSync\Remotes\RemoteRegistry;
+use Noo\LaravelRemoteSync\Snapshots\Importer;
 use Noo\LaravelRemoteSync\Support\CleanupStack;
+use Noo\LaravelRemoteSync\Support\StoragePath;
 use RuntimeException;
 
 use function Laravel\Prompts\confirm;
@@ -19,6 +22,9 @@ use function Laravel\Prompts\text;
 
 trait ResolvesRemote
 {
+    /** @var list<string> Guidance printed under a failed step (e.g. restore instructions). */
+    protected array $failureNotes = [];
+
     protected function isInteractive(): bool
     {
         return $this->input->isInteractive();
@@ -209,6 +215,96 @@ trait ResolvesRemote
         );
 
         return $response === 'yes';
+    }
+
+    protected function checkDatabasePreconditions(string $remoteName, RemoteInfo $info): bool
+    {
+        if (! $info->hasDbSnapshots) {
+            $this->components->error(__('remote-sync::messages.errors.snapshots_missing_on_remote', ['name' => $remoteName]));
+            $this->components->info(__('remote-sync::messages.info.doctor_hint', ['name' => $remoteName]));
+
+            return false;
+        }
+
+        if ($info->driver === null) {
+            $this->components->warn(__('remote-sync::messages.warnings.driver_detection_failed'));
+
+            if ($this->isInteractive() && ! $this->option('force')) {
+                return confirm(label: __('remote-sync::prompts.confirm.continue_without_driver'), default: false);
+            }
+
+            return true;
+        }
+
+        $localDriver = Importer::localDriver();
+
+        if (Importer::normalizeDriver($info->driver) !== $localDriver) {
+            $this->components->error(__('remote-sync::messages.errors.driver_mismatch', [
+                'remote' => $info->driver,
+                'local' => $localDriver,
+            ]));
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * @return list<string>|null null when a path fails validation
+     */
+    protected function resolvePaths(): ?array
+    {
+        $paths = $this->option('path') ?: config('remote-sync.paths', []);
+        $paths = array_values(array_unique(array_map(
+            fn (string $path) => StoragePath::normalize($path),
+            $paths
+        )));
+
+        foreach ($paths as $path) {
+            if (($error = StoragePath::validate($path)) !== null) {
+                $this->components->error($error);
+
+                return null;
+            }
+        }
+
+        return $paths;
+    }
+
+    /**
+     * Run numbered execution steps. Each step returns an error message or
+     * null; the first failure prints the error plus any queued failure
+     * notes and stops.
+     *
+     * @param  list<array{label: string, run: Closure(): ?string}>  $steps
+     */
+    protected function runSteps(array $steps): bool
+    {
+        $total = count($steps);
+
+        foreach ($steps as $index => $step) {
+            $number = $index + 1;
+            $error = null;
+
+            $this->components->task("{$number}/{$total} {$step['label']}", function () use ($step, &$error) {
+                $error = ($step['run'])();
+
+                return $error === null;
+            });
+
+            if ($error !== null) {
+                $this->components->error($error);
+
+                foreach ($this->failureNotes as $note) {
+                    $this->line("  {$note}");
+                }
+
+                return false;
+            }
+        }
+
+        return true;
     }
 
     protected function runCleanup(CleanupStack $cleanup): void

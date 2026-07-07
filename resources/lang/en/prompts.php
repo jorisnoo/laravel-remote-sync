@@ -11,7 +11,7 @@ return [
     'confirm' => [
         'pull' => 'Replace your local :scope with data from [:name]?',
         'typed_yes_suffix' => 'Type "yes" to continue',
-        'push' => 'Are you SURE you want to push to [:name]? Type "yes" to continue',
+        'push' => 'Push your local :scope to [:name]? This will OVERWRITE remote data. Type "yes" to continue',
         'delete_remote' => 'Push local files to [:name] with deletion? Type "yes" to continue',
         'cleanup' => 'Delete :summary? Type "yes" to continue',
         'validation' => 'Type "yes" to confirm',

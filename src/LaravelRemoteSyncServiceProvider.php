@@ -4,7 +4,7 @@ namespace Noo\LaravelRemoteSync;
 
 use Noo\LaravelRemoteSync\Commands\CleanupSnapshotsCommand;
 use Noo\LaravelRemoteSync\Commands\PullCommand;
-use Noo\LaravelRemoteSync\Commands\PushRemoteCommand;
+use Noo\LaravelRemoteSync\Commands\PushCommand;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 
@@ -18,7 +18,7 @@ class LaravelRemoteSyncServiceProvider extends PackageServiceProvider
             ->hasTranslations()
             ->hasCommands([
                 PullCommand::class,
-                PushRemoteCommand::class,
+                PushCommand::class,
                 CleanupSnapshotsCommand::class,
             ]);
     }

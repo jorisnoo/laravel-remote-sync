@@ -1,9 +1,6 @@
 <?php
 
 use Illuminate\Support\Facades\Process;
-use Mockery\MockInterface;
-use Noo\LaravelRemoteSync\Snapshots\Importer;
-use Noo\LaravelRemoteSync\Snapshots\Snapshots;
 
 function pullTestConfig(): void
 {
@@ -17,77 +14,6 @@ function pullTestConfig(): void
     config()->set('remote-sync.exclude_tables', ['cache', 'jobs']);
     config()->set('remote-sync.filter_users', false);
     config()->set('cache.default', 'array');
-}
-
-function pullProbeOutput(array $overrides = []): string
-{
-    $json = json_encode(array_merge([
-        'driver' => 'sqlite',
-        'tables' => ['users', 'posts', 'cache', 'migrations'],
-        'snapshot_dir' => '/home/forge/acme/storage/snapshots',
-    ], $overrides['json'] ?? []));
-
-    return implode("\n", [
-        'ATOMIC='.($overrides['atomic'] ?? '0'),
-        'PHP='.($overrides['php'] ?? 'php8.4'),
-        'RSYNC='.($overrides['rsync'] ?? '1'),
-        'SNAPSHOTS='.($overrides['snapshots'] ?? '1'),
-        "REMOTE_SYNC_JSON={$json}",
-    ]);
-}
-
-function fakePullProcesses(array $probeOverrides = [], array $custom = []): void
-{
-    Process::fake(function ($process) use ($probeOverrides, $custom) {
-        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
-
-        foreach ($custom as $needle => $result) {
-            if (str_contains($command, $needle)) {
-                return $result;
-            }
-        }
-
-        if (str_contains($command, 'BatchMode=yes')) {
-            return Process::result();
-        }
-
-        if (str_contains($command, 'BASE=')) {
-            return Process::result(output: pullProbeOutput($probeOverrides));
-        }
-
-        if (str_contains($command, '--dry-run')) {
-            return Process::result(output: ">f+++++++++ uploads/new.jpg\n*deleting   uploads/stale.jpg");
-        }
-
-        return Process::result();
-    });
-}
-
-function mockPullSnapshots($test): MockInterface
-{
-    $mock = Mockery::mock(Snapshots::class);
-    $mock->shouldReceive('createLocal')->andReturn(0)->byDefault();
-    $mock->shouldReceive('createRemote')->andReturn(Process::result())->byDefault();
-    $mock->shouldReceive('download')->andReturn(Process::result())->byDefault();
-    $mock->shouldReceive('deleteRemote')->andReturn(Process::result())->byDefault();
-
-    // bind() with a closure so parameterized app(Snapshots::class, [...]) still resolves the mock
-    app()->bind(Snapshots::class, fn () => $mock);
-
-    return $mock;
-}
-
-function mockPullImporter($test): MockInterface
-{
-    $mock = Mockery::mock(Importer::class);
-    $mock->shouldReceive('localTables')->andReturn(['users', 'cache', 'migrations'])->byDefault();
-    $mock->shouldReceive('import')->andReturn(Process::result())->byDefault();
-    $mock->shouldReceive('truncateExcluded')->andReturn(['cache'])->byDefault();
-    $mock->shouldReceive('filterUsers')->andReturn(null)->byDefault();
-
-    app()->bind(Importer::class, fn () => $mock);
-
-    return $mock;
 }
 
 beforeEach(function () {
@@ -117,7 +43,7 @@ describe('remote-sync:pull', function () {
         });
 
         it('fails non-interactively when the host key is unknown', function () {
-            fakePullProcesses(custom: [
+            fakeSyncProcesses(custom: [
                 'BatchMode=yes' => Process::result(exitCode: 255, errorOutput: 'Host key verification failed.'),
             ]);
 
@@ -127,7 +53,7 @@ describe('remote-sync:pull', function () {
         });
 
         it('refuses when the host key has changed', function () {
-            fakePullProcesses(custom: [
+            fakeSyncProcesses(custom: [
                 'BatchMode=yes' => Process::result(exitCode: 255, errorOutput: 'REMOTE HOST IDENTIFICATION HAS CHANGED'),
             ]);
 
@@ -137,10 +63,10 @@ describe('remote-sync:pull', function () {
         });
 
         it('aborts on a database driver mismatch before touching anything', function () {
-            fakePullProcesses(probeOverrides: ['json' => ['driver' => 'mysql']]);
-            $snapshots = mockPullSnapshots($this);
+            fakeSyncProcesses(probeOverrides: ['json' => ['driver' => 'mysql']]);
+            $snapshots = mockSnapshots();
             $snapshots->shouldNotReceive('createRemote');
-            mockPullImporter($this);
+            mockImporter();
 
             $this->artisan('remote-sync:pull', ['--database' => true, '--force' => true])
                 ->expectsOutputToContain('Database driver mismatch')
@@ -148,9 +74,9 @@ describe('remote-sync:pull', function () {
         });
 
         it('requires spatie/laravel-db-snapshots on the remote', function () {
-            fakePullProcesses(probeOverrides: ['snapshots' => '0']);
-            mockPullSnapshots($this);
-            mockPullImporter($this);
+            fakeSyncProcesses(probeOverrides: ['snapshots' => '0']);
+            mockSnapshots();
+            mockImporter();
 
             $this->artisan('remote-sync:pull', ['--database' => true, '--force' => true])
                 ->expectsOutputToContain('spatie/laravel-db-snapshots is not installed')
@@ -159,9 +85,9 @@ describe('remote-sync:pull', function () {
         });
 
         it('rejects invalid --path values', function () {
-            fakePullProcesses();
-            mockPullSnapshots($this);
-            mockPullImporter($this);
+            fakeSyncProcesses();
+            mockSnapshots();
+            mockImporter();
 
             $this->artisan('remote-sync:pull', [
                 '--files' => true,
@@ -173,9 +99,9 @@ describe('remote-sync:pull', function () {
         });
 
         it('requires --force when running non-interactively', function () {
-            fakePullProcesses();
-            mockPullSnapshots($this);
-            $importer = mockPullImporter($this);
+            fakeSyncProcesses();
+            mockSnapshots();
+            $importer = mockImporter();
             $importer->shouldNotReceive('import');
 
             $this->artisan('remote-sync:pull', ['--database' => true, '--no-interaction' => true])
@@ -186,10 +112,10 @@ describe('remote-sync:pull', function () {
 
     describe('dry run', function () {
         it('prints the plan and changes nothing', function () {
-            fakePullProcesses();
-            $snapshots = mockPullSnapshots($this);
+            fakeSyncProcesses();
+            $snapshots = mockSnapshots();
             $snapshots->shouldNotReceive('createRemote');
-            $importer = mockPullImporter($this);
+            $importer = mockImporter();
             $importer->shouldNotReceive('import');
 
             $this->artisan('remote-sync:pull', [
@@ -204,9 +130,9 @@ describe('remote-sync:pull', function () {
         });
 
         it('points at --delete when deletable files exist but deletion is off', function () {
-            fakePullProcesses();
-            mockPullSnapshots($this);
-            mockPullImporter($this);
+            fakeSyncProcesses();
+            mockSnapshots();
+            mockImporter();
 
             $this->artisan('remote-sync:pull', ['--files' => true, '--dry-run' => true, '--force' => true])
                 ->expectsOutputToContain('pass --delete to remove 1 local-only files')
@@ -216,9 +142,9 @@ describe('remote-sync:pull', function () {
 
     describe('execution', function () {
         it('pulls database and files end to end', function () {
-            fakePullProcesses();
-            $snapshots = mockPullSnapshots($this);
-            $importer = mockPullImporter($this);
+            fakeSyncProcesses();
+            $snapshots = mockSnapshots();
+            $importer = mockImporter();
 
             $snapshots->shouldReceive('createLocal')->once()->withArgs(fn ($name) => str_starts_with($name, 'pre-pull-'))->andReturn(0);
             $snapshots->shouldReceive('createRemote')->once()->withArgs(
@@ -246,9 +172,9 @@ describe('remote-sync:pull', function () {
         });
 
         it('mirrors deletions only with an explicit --delete', function () {
-            fakePullProcesses();
-            mockPullSnapshots($this);
-            mockPullImporter($this);
+            fakeSyncProcesses();
+            mockSnapshots();
+            mockImporter();
 
             $this->artisan('remote-sync:pull', ['--files' => true, '--delete' => true, '--force' => true])
                 ->assertSuccessful();
@@ -263,20 +189,20 @@ describe('remote-sync:pull', function () {
         });
 
         it('skips the backup with --no-backup', function () {
-            fakePullProcesses();
-            $snapshots = mockPullSnapshots($this);
+            fakeSyncProcesses();
+            $snapshots = mockSnapshots();
             $snapshots->shouldNotReceive('createLocal');
-            mockPullImporter($this);
+            mockImporter();
 
             $this->artisan('remote-sync:pull', ['--database' => true, '--no-backup' => true, '--force' => true])
                 ->assertSuccessful();
         });
 
         it('imports with dropped tables in full mode', function () {
-            fakePullProcesses();
-            $snapshots = mockPullSnapshots($this);
+            fakeSyncProcesses();
+            $snapshots = mockSnapshots();
             $snapshots->shouldReceive('createRemote')->once()->withArgs(fn ($name, $excludes) => $excludes === [])->andReturn(Process::result());
-            $importer = mockPullImporter($this);
+            $importer = mockImporter();
             $importer->shouldReceive('import')->once()->withArgs(fn ($name, $dropTables) => $dropTables === true)->andReturn(Process::result());
             $importer->shouldNotReceive('truncateExcluded');
 
@@ -286,9 +212,9 @@ describe('remote-sync:pull', function () {
         });
 
         it('keeps the snapshot and prints restore guidance when the import fails', function () {
-            fakePullProcesses();
-            $snapshots = mockPullSnapshots($this);
-            $importer = mockPullImporter($this);
+            fakeSyncProcesses();
+            $snapshots = mockSnapshots();
+            $importer = mockImporter();
             $importer->shouldReceive('import')->once()->andReturn(
                 Process::result(exitCode: 1, errorOutput: 'ERROR 1064 at line 2041')
             );
@@ -303,11 +229,11 @@ describe('remote-sync:pull', function () {
         });
 
         it('aborts before importing when the snapshot is corrupt', function () {
-            fakePullProcesses(custom: [
+            fakeSyncProcesses(custom: [
                 'gzip -t' => Process::result(exitCode: 1, errorOutput: 'unexpected end of file'),
             ]);
-            mockPullSnapshots($this);
-            $importer = mockPullImporter($this);
+            mockSnapshots();
+            $importer = mockImporter();
             $importer->shouldNotReceive('import');
 
             $this->artisan('remote-sync:pull', ['--database' => true, '--force' => true])
@@ -316,9 +242,9 @@ describe('remote-sync:pull', function () {
         });
 
         it('warns instead of deleting when filter_users matches nobody', function () {
-            fakePullProcesses();
-            mockPullSnapshots($this);
-            $importer = mockPullImporter($this);
+            fakeSyncProcesses();
+            mockSnapshots();
+            $importer = mockImporter();
             $importer->shouldReceive('filterUsers')->once()->andReturn(['kept' => 0, 'deleted' => 0, 'skipped' => true]);
 
             $this->artisan('remote-sync:pull', ['--database' => true, '--force' => true])
@@ -329,9 +255,9 @@ describe('remote-sync:pull', function () {
 
     describe('interactive flow', function () {
         it('asks for scope and one confirmation, defaulting to both', function () {
-            fakePullProcesses();
-            mockPullSnapshots($this);
-            mockPullImporter($this);
+            fakeSyncProcesses();
+            mockSnapshots();
+            mockImporter();
 
             $this->artisan('remote-sync:pull')
                 ->expectsChoice('What would you like to pull?', ['database', 'files'], [
@@ -348,9 +274,9 @@ describe('remote-sync:pull', function () {
                 'production' => ['host' => 'forge@prod.acme.test', 'path' => '/home/forge/acme'],
                 'staging' => ['host' => 'forge@staging.acme.test', 'path' => '/home/forge/acme'],
             ]);
-            fakePullProcesses();
-            mockPullSnapshots($this);
-            mockPullImporter($this);
+            fakeSyncProcesses();
+            mockSnapshots();
+            mockImporter();
 
             $this->artisan('remote-sync:pull', ['--database' => true])
                 ->expectsChoice('Select remote environment', 'staging', ['production', 'staging'])
