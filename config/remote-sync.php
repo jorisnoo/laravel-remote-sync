@@ -1,27 +1,27 @@
 <?php
 
 return [
+
     /*
     |--------------------------------------------------------------------------
     | Remote Environments
     |--------------------------------------------------------------------------
     |
-    | Define your remote environments here. Each environment should have
-    | a host (SSH connection string) and path (the application root path
-    | on the remote server).
+    | Each remote needs a host (SSH connection string) and a path (the app
+    | root on the server). The path may point at an atomic-deploy root; a
+    | /current layout is detected automatically. Set php_binary to a
+    | specific binary (e.g. /usr/bin/php8.4) to skip auto-detection.
+    |
+    | Pushing is disabled per remote unless push is set to true.
     |
     */
 
     'remotes' => [
         'production' => [
-            'host' => env('REMOTE_SYNC_PRODUCTION_HOST', 'forge@your-server'),
-            'path' => env('REMOTE_SYNC_PRODUCTION_PATH', '/home/forge/www.example.com'),
-            'push_allowed' => env('REMOTE_SYNC_PRODUCTION_PUSH_ALLOWED', false),
-        ],
-        'staging' => [
-            'host' => env('REMOTE_SYNC_STAGING_HOST', 'forge@your-server'),
-            'path' => env('REMOTE_SYNC_STAGING_PATH', '/home/forge/www.example.com'),
-            'push_allowed' => env('REMOTE_SYNC_STAGING_PUSH_ALLOWED', true),
+            'host' => env('REMOTE_SYNC_PRODUCTION_HOST'),
+            'path' => env('REMOTE_SYNC_PRODUCTION_PATH'),
+            'push' => (bool) env('REMOTE_SYNC_PRODUCTION_PUSH', false),
+            // 'php_binary' => '/usr/bin/php8.4',
         ],
     ],
 
@@ -30,19 +30,18 @@ return [
     | Default Remote
     |--------------------------------------------------------------------------
     |
-    | The default remote environment to use when none is specified.
+    | Used when no remote is given and more than one remote is configured.
     |
     */
 
-    'default' => env('REMOTE_SYNC_DEFAULT', 'production'),
+    'default' => env('REMOTE_SYNC_DEFAULT'),
 
     /*
     |--------------------------------------------------------------------------
     | Storage Paths to Sync
     |--------------------------------------------------------------------------
     |
-    | Paths relative to the remote storage/ directory that should be
-    | synced when running the files sync command.
+    | Paths relative to storage/ that are synced by the files scope.
     |
     */
 
@@ -55,23 +54,22 @@ return [
     | Excluded Paths
     |--------------------------------------------------------------------------
     |
-    | Patterns to exclude from file syncing. Supports wildcards.
-    | Examples: 'cache', '*.log', 'temp/**'
+    | Extra rsync exclude patterns (e.g. 'cache', '*.log', 'temp/**').
+    | Dotfiles are always excluded, and snapshot directories are excluded
+    | automatically wherever they actually live - no need to list them.
     |
     */
 
-    'exclude_paths' => [
-        'app/snapshots',
-    ],
+    'exclude_paths' => [],
 
     /*
     |--------------------------------------------------------------------------
     | Excluded Tables
     |--------------------------------------------------------------------------
     |
-    | Tables to exclude from database snapshots. These are typically
-    | cache tables, monitoring tables, or other tables that don't need
-    | to be synced.
+    | Tables synced as empty tables on pull and preserved on push. The
+    | migrations table is always synced, and migrate --force always runs
+    | after an import.
     |
     */
 
@@ -111,10 +109,9 @@ return [
     | Filter Users
     |--------------------------------------------------------------------------
     |
-    | When set to an array of email addresses, only those users will be kept
-    | in the local users table after a pull. All other users will be deleted.
-    | Supports wildcards using * (e.g. '*@example.com').
-    | Set to false to disable filtering.
+    | When set to an array of email addresses, only matching users are kept
+    | in the local users table after a pull; all others are deleted.
+    | Supports * wildcards (e.g. '*@example.com'). Set to false to disable.
     |
     */
 
@@ -122,19 +119,30 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Production Guard
+    |--------------------------------------------------------------------------
+    |
+    | Pull and push refuse to run when the local app environment is
+    | production. Set this to true if this machine is intentionally a sync
+    | source or target while running in production.
+    |
+    */
+
+    'allow_production' => false,
+
+    /*
+    |--------------------------------------------------------------------------
     | Timeouts
     |--------------------------------------------------------------------------
     |
-    | Timeout settings in seconds for various operations.
+    | In seconds. 'remote' covers short remote commands (probing, listing
+    | and deleting snapshots, migrations). 'transfer' covers data-sized
+    | operations (snapshot create/load/import and rsync transfers).
     |
     */
 
     'timeouts' => [
-        'snapshot_create' => 300,
-        'snapshot_load' => 300,
-        'snapshot_download' => 600,
-        'snapshot_upload' => 600,
-        'snapshot_cleanup' => 60,
-        'file_sync' => 1800,
+        'remote' => 300,
+        'transfer' => 1800,
     ],
 ];
