@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.0](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.7.0) (2026-07-08)
+
+### Features
+
+- add prune and doctor commands, delete legacy core, rewrite docs ([c1ed8de](https://github.com/jorisnoo/laravel-remote-sync/commit/c1ed8de32646c4eb3a9002af5e3c9035999a3f03))
+- add redesigned push command with hard push gate and explicit scope ([1342b49](https://github.com/jorisnoo/laravel-remote-sync/commit/1342b490ad4f1b2dbe57c4b1179ca09e95d0d60c))
+- add SyncPlan, Planner, PlanRenderer, and the redesigned pull command ([bdf5649](https://github.com/jorisnoo/laravel-remote-sync/commit/bdf56493f852eb64e56cce816c86b91853fd2117))
+- add Rsync builder, Snapshots lifecycle, Importer, CleanupStack, and StoragePath validation ([f2283d2](https://github.com/jorisnoo/laravel-remote-sync/commit/f2283d27d1235126f53751550af62fe3f2d2afa2))
+- add Connection and single-round-trip Probe with RemoteInfo ([0e361d9](https://github.com/jorisnoo/laravel-remote-sync/commit/0e361d94ed507c69150b4a75a68ffcd54d877cbd))
+- add Remote DTO, RemoteRegistry with placeholder validation, and v1 config schema ([bd879d5](https://github.com/jorisnoo/laravel-remote-sync/commit/bd879d5764824f28e4a0099e0a246d322c7246d4))
+
+### Code Refactoring
+
+- extract buildPlan method and add verbose rsync output ([eb3035f](https://github.com/jorisnoo/laravel-remote-sync/commit/eb3035fc1b856adf76d564f6090b8f3985eef28a))
 ## [0.6.2](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.6.2) (2026-07-06)
 
 ### Features
