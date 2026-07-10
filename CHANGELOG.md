@@ -2,6 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.1](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.7.1) (2026-07-10)
 ## [0.7.0](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.7.0) (2026-07-08)
 
 ### Features
