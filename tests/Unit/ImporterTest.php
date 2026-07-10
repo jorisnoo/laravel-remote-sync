@@ -118,8 +118,26 @@ describe('Importer', function () {
 
             $path = Snapshots::localPath('snap');
 
-            Process::assertRan(fn ($process) => $process->command === "gunzip -c '{$path}' | psql '--host=db.internal' '--port=5433' '--username=acme_user' 'acme'"
+            Process::assertRan(fn ($process) => $process->command === "gunzip -c '{$path}' | psql '-v' 'ON_ERROR_STOP=1' '--host=db.internal' '--port=5433' '--username=acme_user' 'acme'"
                 && ($process->environment['PGPASSWORD'] ?? null) === 'pg-secret');
+        });
+
+        it('reports a PostgreSQL statement error as an import failure', function () {
+            Process::fake(fn ($process) => str_contains($process->command, "'-v' 'ON_ERROR_STOP=1'")
+                ? Process::result(exitCode: 3, errorOutput: 'ERROR: relation "users" already exists')
+                : Process::result());
+            createSnapshotFile('snap');
+            config()->set('database.default', 'pgsql');
+            config()->set('database.connections.pgsql', [
+                'driver' => 'pgsql',
+                'database' => 'acme',
+            ]);
+
+            $result = (new Importer)->import('snap');
+
+            expect($result->successful())->toBeFalse()
+                ->and($result->exitCode())->toBe(3)
+                ->and($result->errorOutput())->toContain('relation "users" already exists');
         });
     });
 

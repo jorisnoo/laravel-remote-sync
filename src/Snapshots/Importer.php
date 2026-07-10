@@ -108,6 +108,8 @@ class Importer
         $connection = config('database.connections.'.config('database.default'));
 
         $args = [
+            '-v',
+            'ON_ERROR_STOP=1',
             '--host='.($connection['host'] ?? '127.0.0.1'),
             '--port='.($connection['port'] ?? 5432),
             '--username='.($connection['username'] ?? 'postgres'),

@@ -1,12 +1,14 @@
 <?php
 
+use Illuminate\Contracts\Console\Kernel;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Process;
 use Noo\LaravelRemoteSync\Remotes\Connection;
 use Noo\LaravelRemoteSync\Remotes\Remote;
 use Noo\LaravelRemoteSync\Remotes\RemoteInfo;
 use Noo\LaravelRemoteSync\Snapshots\Snapshots;
 
-function snapshotsFixture(): Snapshots
+function snapshotsFixture(string $driver = 'mysql'): Snapshots
 {
     $connection = new Connection(new Remote(
         name: 'production',
@@ -19,7 +21,7 @@ function snapshotsFixture(): Snapshots
         isAtomic: true,
         workingPath: '/home/forge/acme/current',
         snapshotDir: '/home/forge/acme/current/storage/snapshots',
-        driver: 'mysql',
+        driver: $driver,
         tables: ['users'],
         hasDbSnapshots: true,
         hasRsync: true,
@@ -108,6 +110,33 @@ describe('Snapshots', function () {
             snapshotsFixture()->createRemote('remote-sync-snap');
 
             Process::assertRan(fn ($process) => str_contains($process->command[2], "snapshot:create 'remote-sync-snap' --compress"));
+        });
+
+        it('adds replacement options to PostgreSQL remote snapshots', function () {
+            Process::fake();
+
+            snapshotsFixture('pgsql')->createRemote('remote-sync-snap', ['cache']);
+
+            Process::assertRan(fn ($process) => $process->command === [
+                'ssh',
+                'forge@prod.acme.test',
+                "cd '/home/forge/acme/current' && 'php8.4' artisan snapshot:create 'remote-sync-snap' --exclude='cache' --extraOptions='--clean' --extraOptions='--if-exists' --compress",
+            ]);
+        });
+
+        it('adds replacement options to PostgreSQL local snapshots', function () {
+            config()->set('database.default', 'pgsql');
+            config()->set('database.connections.pgsql.driver', 'pgsql');
+            $artisan = Mockery::mock(Kernel::class);
+            $artisan->shouldReceive('call')->once()->with('snapshot:create', [
+                'name' => 'remote-sync-snap',
+                '--compress' => true,
+                '--exclude' => ['cache'],
+                '--extraOptions' => ['--clean', '--if-exists'],
+            ])->andReturn(0);
+            Artisan::swap($artisan);
+
+            expect(snapshotsFixture('pgsql')->createLocal('remote-sync-snap', ['cache']))->toBe(0);
         });
 
         it('loads a snapshot on the remote without dropping tables', function () {

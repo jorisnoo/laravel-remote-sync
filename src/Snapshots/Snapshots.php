@@ -108,6 +108,12 @@ class Snapshots
             $arguments['--exclude'] = $excludeTables;
         }
 
+        $extraOptions = static::replacementDumpOptions(Importer::localDriver());
+
+        if ($extraOptions !== []) {
+            $arguments['--extraOptions'] = $extraOptions;
+        }
+
         return Artisan::call('snapshot:create', $arguments);
     }
 
@@ -132,6 +138,9 @@ class Snapshots
     {
         $arguments = collect(['snapshot:create', escapeshellarg($name)])
             ->merge(collect($excludeTables)->map(fn (string $table) => '--exclude='.escapeshellarg($table)))
+            ->merge(collect(static::replacementDumpOptions($this->info->driver))->map(
+                fn (string $option) => '--extraOptions='.escapeshellarg($option)
+            ))
             ->push('--compress')
             ->implode(' ');
 
@@ -145,6 +154,20 @@ class Snapshots
             'snapshot:load '.escapeshellarg($name).' --force --drop-tables=0',
             $this->connection->transferTimeout()
         );
+    }
+
+    /**
+     * PostgreSQL dumps do not include DROP statements by default. Add them so
+     * loading a snapshot replaces included objects instead of merging rows.
+     * Excluded tables are absent from the dump and therefore remain in place.
+     *
+     * @return list<string>
+     */
+    protected static function replacementDumpOptions(string $driver): array
+    {
+        return Importer::normalizeDriver($driver) === 'pgsql'
+            ? ['--clean', '--if-exists']
+            : [];
     }
 
     public function deleteRemote(string $name): ProcessResult
