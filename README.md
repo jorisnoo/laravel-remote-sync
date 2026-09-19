@@ -88,7 +88,7 @@ return [
     'filter_users' => false,
 
     // Pull and push refuse to run when app.env is production unless this is true.
-    'allow_production' => false,
+    'allow_production' => env('REMOTE_SYNC_ALLOW_PRODUCTION', false),
 
     'timeouts' => [
         'remote' => 300,      // short remote commands
@@ -160,7 +160,7 @@ Prune only touches snapshots created by this package (`remote-sync-*`, `pre-pull
 
 ## Safety
 
-- Pull and push refuse to run when the local app environment is production; set `allow_production` to true only when that is intentional (the confirmation then requires a typed `yes`).
+- Pull and push refuse to run when the local app environment is production; set `REMOTE_SYNC_ALLOW_PRODUCTION=true` in your `.env` only when that is intentional (the confirmation then requires a typed `yes`).
 - One plan preview and one confirmation before anything changes; `--dry-run` everywhere.
 - Backups are created by default on both directions, and every failure message includes the command to restore.
 - Unknown SSH hosts show their key fingerprint for review before connecting; changed host keys abort with a man-in-the-middle warning, and non-interactive runs never accept a new host key.

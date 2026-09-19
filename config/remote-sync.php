@@ -128,7 +128,7 @@ return [
     |
     */
 
-    'allow_production' => false,
+    'allow_production' => env('REMOTE_SYNC_ALLOW_PRODUCTION', false),
 
     /*
     |--------------------------------------------------------------------------
