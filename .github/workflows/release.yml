@@ -4,28 +4,38 @@ on:
   push:
     tags:
       - '[0-9]+.[0-9]+.[0-9]+'
+      - '[0-9]+.[0-9]+.[0-9]+-*'
 
 permissions:
   contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   release:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-
-      - name: Extract release notes
-        id: release_notes
-        run: |
-          VERSION="${{ github.ref_name }}"
-          awk "/^## \[${VERSION}\]/{flag=1; next} /^## \[/{flag=0} flag" CHANGELOG.md > release_notes.md
-          echo "" >> release_notes.md
-          echo "**Full Changelog:** https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md" >> release_notes.md
-
-      - name: Create release
-        run: gh release create "${{ github.ref_name }}" --notes-file release_notes.md
+      - uses: actions/checkout@v7
+      - name: Validate and extract release notes
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: |
+          python3 scripts/release.py "$RELEASE_VERSION" --notes > "$RUNNER_TEMP/release-notes.md"
+          printf '\n**Full Changelog:** https://github.com/%s/blob/%s/CHANGELOG.md\n' "$GITHUB_REPOSITORY" "$GITHUB_SHA" >> "$RUNNER_TEMP/release-notes.md"
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: |
+          args=(--verify-tag --title "$RELEASE_VERSION" --notes-file "$RUNNER_TEMP/release-notes.md")
+          if [[ "$RELEASE_VERSION" == *-* ]]; then
+            args+=(--prerelease --latest=false)
+          fi
+          if gh release view "$RELEASE_VERSION" > /dev/null 2>&1; then
+            echo "GitHub release already exists; keeping its notes and assets."
+          else
+            gh release create "$RELEASE_VERSION" "${args[@]}"
+          fi

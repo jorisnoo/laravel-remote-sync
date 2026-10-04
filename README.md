@@ -186,3 +186,7 @@ The MIT License (MIT). Please see [License File](LICENSE.md) for more informatio
 ---
 
 Built with [Claude Code](https://claude.ai/code).
+
+## Maintainer releases
+
+See [RELEASING.md](RELEASING.md) for versioning, changelog entries and the release command.

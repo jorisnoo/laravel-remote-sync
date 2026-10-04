@@ -1,0 +1,11 @@
+{
+  "branch": "main",
+  "sign_tag": true,
+  "version_files": [],
+  "checks": [
+    [
+      "composer",
+      "test"
+    ]
+  ]
+}

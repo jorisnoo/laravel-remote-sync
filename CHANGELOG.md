@@ -2,8 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.7.1](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.7.1) (2026-07-10)
-## [0.7.0](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.7.0) (2026-07-08)
+## [0.7.1](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/0.7.1) (2026-07-10)
+
+### Fixed
+
+- PostgreSQL snapshots replace included database objects instead of merging rows, while leaving excluded tables intact.
+- PostgreSQL imports stop on SQL statement errors and report the import as failed.
+
+## [0.7.0](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/0.7.0) (2026-07-08)
 
 ### Features
 
@@ -17,7 +23,7 @@ All notable changes to this project will be documented in this file.
 ### Code Refactoring
 
 - extract buildPlan method and add verbose rsync output ([eb3035f](https://github.com/jorisnoo/laravel-remote-sync/commit/eb3035fc1b856adf76d564f6090b8f3985eef28a))
-## [0.6.2](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.6.2) (2026-07-06)
+## [0.6.2](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/0.6.2) (2026-07-06)
 
 ### Features
 
@@ -63,7 +69,7 @@ All notable changes to this project will be documented in this file.
 ### Continuous Integration
 
 - simplify dependabot auto-merge workflow ([e9ed70f](https://github.com/jorisnoo/laravel-remote-sync/commit/e9ed70fc07fb5bfc3542835135b3c9c294a67420))
-## [0.6.0](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.6.0) (2026-03-26)
+## [0.6.0](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/0.6.0) (2026-03-26)
 
 ### Features
 
@@ -79,7 +85,7 @@ All notable changes to this project will be documented in this file.
 ### Continuous Integration
 
 - remove deprecated workflows and simplify dependabot config ([e8f14e5](https://github.com/jorisnoo/laravel-remote-sync/commit/e8f14e5ac671a5ea9d1ab95a082f7d741bcae06e))
-## [0.5.0](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.5.0) (2026-03-13)
+## [0.5.0](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/0.5.0) (2026-03-13)
 
 ### Features
 
@@ -96,17 +102,17 @@ All notable changes to this project will be documented in this file.
 
 - simplify pull/push confirmation flow and remove migration mismatch checks ([ce02689](https://github.com/jorisnoo/laravel-remote-sync/commit/ce026896a19f43668c2a213b8ad2b62431e67566))
 - revert preview bullet lists to inline comma-separated format ([980b109](https://github.com/jorisnoo/laravel-remote-sync/commit/980b1094483820fe3c36593c83df0d6121ce5c0a))
-## [0.4.1](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.4.1) (2026-03-13)
+## [0.4.1](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/0.4.1) (2026-03-13)
 
 ### Features
 
 - add SSH host key verification before remote operations ([da2c93a](https://github.com/jorisnoo/laravel-remote-sync/commit/da2c93a15db7b38c262206d9b59c0de44c841eac))
-## [0.4.0](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.4.0) (2026-03-10)
+## [0.4.0](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/0.4.0) (2026-03-10)
 
 ### Features
 
 - make rsync timeout configurable via remote-sync.timeouts.file_sync config ([88f8dcb](https://github.com/jorisnoo/laravel-remote-sync/commit/88f8dcb846231c224a6363c53efd51f498b451d3))
-## [0.3.9](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.3.9) (2026-03-09)
+## [0.3.9](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/0.3.9) (2026-03-09)
 
 ### Features
 
@@ -116,28 +122,28 @@ All notable changes to this project will be documented in this file.
 ### Bug Fixes
 
 - replace example comments with actual exclude path in remote-sync config ([ca7e965](https://github.com/jorisnoo/laravel-remote-sync/commit/ca7e9657a13dbc3fb9787bd71f7105c05a94313b))
-## [0.3.8](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.3.8) (2026-03-09)
+## [0.3.8](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/0.3.8) (2026-03-09)
 
 ### Features
 
 - add --force option to skip confirmation prompt in push command ([ae121a5](https://github.com/jorisnoo/laravel-remote-sync/commit/ae121a57f1c6e4c15d3a94e3ebee1c70e0782b2c))
-## [0.3.7](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.3.7) (2026-03-07)
+## [0.3.7](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/0.3.7) (2026-03-07)
 
 ### Features
 
 - add withoutTty option to make TTY usage configurable for rsync processes ([a53666d](https://github.com/jorisnoo/laravel-remote-sync/commit/a53666d36012dc6e1a4906d8827dc2b04341b21a))
-## [0.3.6](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.3.6) (2026-03-05)
+## [0.3.6](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/0.3.6) (2026-03-05)
 
 ### Features
 
 - add filter_users option to keep only allowed users after database pull ([517176a](https://github.com/jorisnoo/laravel-remote-sync/commit/517176abb0aabbdaee0d40cf55e94b5dfc1f7f0c))
 - add migration comparison preview, preserve migrations table during sync, and detect remote snapshot subdirectory ([862889d](https://github.com/jorisnoo/laravel-remote-sync/commit/862889d85e4261660f204ff35eea594f36b56327))
-## [0.3.5](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.3.5) (2026-02-11)
+## [0.3.5](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/0.3.5) (2026-02-11)
 
 ### Code Refactoring
 
 - load snapshots via direct CLI piping instead of artisan command and extract shared test helper ([4a91abd](https://github.com/jorisnoo/laravel-remote-sync/commit/4a91abd13efb45481636046200f264949498728c))
-## [0.3.4](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.3.4) (2026-02-11)
+## [0.3.4](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/0.3.4) (2026-02-11)
 
 ### Bug Fixes
 
@@ -146,7 +152,7 @@ All notable changes to this project will be documented in this file.
 ### Code Refactoring
 
 - extract selectRemote into InteractsWithRemote trait and add remote selection to individual commands ([73e5849](https://github.com/jorisnoo/laravel-remote-sync/commit/73e58491dc9894f190b164bf6fa67ff53891a44f))
-## [0.3.3](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.3.3) (2026-02-11)
+## [0.3.3](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/0.3.3) (2026-02-11)
 
 ### Features
 
@@ -168,7 +174,7 @@ All notable changes to this project will be documented in this file.
 ### Build System
 
 - add support URLs and author homepage for Packagist ([74f75ee](https://github.com/jorisnoo/laravel-remote-sync/commit/74f75eed30e782bb01aa5a1e488315ae961bc4a4))
-## [0.3.2](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.3.2) (2026-02-11)
+## [0.3.2](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/0.3.2) (2026-02-11)
 
 ### Features
 
@@ -190,7 +196,7 @@ All notable changes to this project will be documented in this file.
 ### Build System
 
 - add support URLs and author homepage for Packagist ([74f75ee](https://github.com/jorisnoo/laravel-remote-sync/commit/74f75eed30e782bb01aa5a1e488315ae961bc4a4))
-## [0.3.1](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.3.1) (2026-01-21)
+## [0.3.1](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/0.3.1) (2026-01-21)
 
 ### Features
 
@@ -208,7 +214,7 @@ All notable changes to this project will be documented in this file.
 
 - link to changelog in release file ([43d966a](https://github.com/jorisnoo/laravel-remote-sync/commit/43d966ab8d199a7f93c58bdb59cafa1131a27e95))
 - update release workflow ([c574102](https://github.com/jorisnoo/laravel-remote-sync/commit/c5741024883a2876b1b03dd37194f0d99ba2f596))
-## [0.3.0](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.3.0) (2026-01-21)
+## [0.3.0](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/0.3.0) (2026-01-21)
 
 ### Features
 
@@ -239,7 +245,7 @@ All notable changes to this project will be documented in this file.
 ### Styles
 
 - lint ([e5ef717](https://github.com/jorisnoo/laravel-remote-sync/commit/e5ef7171fc1380eec296ccc8e11ac0f4535cda34))
-## [0.2.2](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.2.2) (2026-01-20)
+## [0.2.2](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/0.2.2) (2026-01-20)
 
 ### Features
 
@@ -252,7 +258,7 @@ All notable changes to this project will be documented in this file.
 - try to prevent memory exhaustion ([0a8dade](https://github.com/jorisnoo/laravel-remote-sync/commit/0a8dade10c17d14e19d9e1b155cda93f4dd1b6bd))
 - get db snapshot storage from config ([e09a037](https://github.com/jorisnoo/laravel-remote-sync/commit/e09a037437acaa2fa659ae6fb97fcf4528ec6b79))
 - handle empty files array in config ([0c1a3ae](https://github.com/jorisnoo/laravel-remote-sync/commit/0c1a3aec43c94f4a1f13774fd231c86dc04e75da))
-## [0.2.1](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/v0.2.1) (2026-01-20)
+## [0.2.1](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/0.2.1) (2026-01-20)
 
 ### Bug Fixes
 
