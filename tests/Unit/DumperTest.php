@@ -37,13 +37,17 @@ describe('Dumper', function () {
     });
 
     it('dumps PostgreSQL in one pass that replaces tables on load', function () {
-        $passes = (new Dumper)->passes(credentials('pgsql'), exclude: ['sessions'], excludeData: ['cache']);
+        $dumper = Mockery::mock(Dumper::class)->makePartial()->shouldAllowMockingProtectedMethods();
+        $dumper->shouldReceive('ownedSequences')->with(['sessions'])->andReturn(['sessions_id_seq']);
+
+        $passes = $dumper->passes(credentials('pgsql'), exclude: ['sessions'], excludeData: ['cache']);
 
         expect($passes)->toHaveCount(1)->and($passes[0])->toBeInstanceOf(PostgreSql::class)
             ->and(dumpCommand($passes[0]))
             ->toContain('--clean --if-exists --no-owner --no-privileges')
             ->toContain("'--exclude-table-data=cache'")
-            ->toContain('-T sessions');
+            // The sequence an excluded table owns stays on the target too.
+            ->toContain('-T sessions -T sessions_id_seq');
     });
 
     it('rejects table names that are not plain identifiers', function () {

@@ -59,6 +59,7 @@ describe('Probe', function () {
         'no php' => ["WORK=/srv/acme\nPHP=\nRSYNC=1", '', "Set 'php_binary'"],
         'no rsync' => ["WORK=/srv/acme\nPHP=php\nRSYNC=0", '', 'rsync is not installed on [production]'],
         'not installed' => ["WORK=/srv/acme\nPHP=php\nRSYNC=1", 'ERROR  Command "remote-sync:info" is not defined.', 'remote-sync:info failed on [production]: ERROR  Command "remote-sync:info" is not defined. Install jorisnoo/laravel-remote-sync there'],
+        'artisan error on stdout' => ["WORK=/srv/acme\nPHP=php\nRSYNC=1\n\n   ERROR  There are no commands defined in the \"remote-sync\" namespace.", '', 'remote-sync:info failed on [production]: ERROR  There are no commands defined in the "remote-sync" namespace. Install jorisnoo/laravel-remote-sync'],
         'database down' => ["WORK=/srv/acme\nPHP=php\nRSYNC=1", "\n   Illuminate\\Database\\QueryException \n\n  SQLSTATE[HY000] [2002] Connection refused\n  at vendor/x.php:1", 'remote-sync:info failed on [production]: Illuminate\\Database\\QueryException SQLSTATE[HY000] [2002] Connection refused'],
     ]);
 

@@ -2,6 +2,7 @@
 
 namespace Noo\LaravelRemoteSync\Database;
 
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use RuntimeException;
 use Spatie\DbDumper\Compressors\GzipCompressor;
@@ -60,7 +61,7 @@ class Dumper
                 ->addExtraOption('--if-exists')
                 ->addExtraOption('--no-owner')
                 ->addExtraOption('--no-privileges')
-                ->excludeTables($exclude);
+                ->excludeTables([...$exclude, ...$this->ownedSequences($exclude)]);
 
             foreach ($excludeData as $table) {
                 $dumper->addExtraOption(escapeshellarg("--exclude-table-data={$table}"));
@@ -104,6 +105,32 @@ class Dumper
         }
 
         return $dumper;
+    }
+
+    /**
+     * pg_dump -T leaves out a table but not the sequence it owns. With
+     * --clean, the dump would then drop that sequence on the target,
+     * where the excluded table still depends on it.
+     *
+     * @param  list<string>  $tables
+     * @return list<string>
+     */
+    protected function ownedSequences(array $tables): array
+    {
+        if ($tables === []) {
+            return [];
+        }
+
+        $sequences = DB::select(
+            "select s.relname from pg_class s
+                join pg_depend d on d.objid = s.oid and d.classid = 'pg_class'::regclass and d.deptype in ('a', 'i')
+                join pg_class t on t.oid = d.refobjid
+                where s.relkind = 'S' and t.relnamespace = current_schema()::regnamespace
+                and t.relname in (".implode(', ', array_fill(0, count($tables), '?')).')',
+            $tables,
+        );
+
+        return array_map(fn (object $row) => $row->relname, $sequences);
     }
 
     protected function append(string $from, string $to): void

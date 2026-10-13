@@ -382,7 +382,8 @@ abstract class SyncCommand extends Command
             return null;
         }
 
-        $output = trim($result->errorOutput()) ?: trim($result->output());
+        // Drop the "ERROR" label an artisan child prints; ours adds its own.
+        $output = preg_replace('/^ERROR {2,}/', '', trim($result->errorOutput()) ?: trim($result->output()));
 
         return $output !== '' ? $output : "Exited with code {$result->exitCode()}.";
     }

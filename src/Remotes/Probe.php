@@ -52,7 +52,8 @@ class Probe
         return new RemoteInfo(
             workingPath: $values['WORK'],
             phpBinary: $values['PHP'],
-            app: $this->appInfo($remote, $values, trim($result->errorOutput()) ?: trim($output)),
+            // Artisan prints its errors to stdout, between the probe's own lines.
+            app: $this->appInfo($remote, $values, $result->errorOutput()."\n".preg_replace('/^[A-Z_]+=.*$/m', '', $output)),
         );
     }
 
