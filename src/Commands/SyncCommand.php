@@ -294,12 +294,14 @@ abstract class SyncCommand extends Command
             };
 
             if ($database->filterUsers) {
+                // Matching nobody only warns: the load is done, and migrate
+                // and cache:clear must still run.
                 $steps['Filtering users'] = function () {
-                    $result = app(UserFilter::class)->apply();
+                    if (app(UserFilter::class)->apply()['skipped'] ?? false) {
+                        $this->components->warn('filter_users matches no user, so none were deleted. Check the patterns in config/remote-sync.php.');
+                    }
 
-                    return $result !== null && $result['skipped']
-                        ? 'filter_users matches no user, so none were deleted. Check the patterns in config/remote-sync.php.'
-                        : null;
+                    return null;
                 };
             }
 

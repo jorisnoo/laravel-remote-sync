@@ -126,6 +126,23 @@ describe('pull', function () {
         expect(DB::table('users')->pluck('email')->all())->toBe(['jane@acme.test']);
     });
 
+    it('only warns when filter_users matches nobody, and still migrates', function () {
+        config()->set('remote-sync.filter_users', ['nobody@nowhere.test']);
+        Schema::create('users', function ($table) {
+            $table->id();
+            $table->string('email');
+        });
+        DB::table('users')->insert(['email' => 'jane@acme.test']);
+        fakeProcesses();
+
+        $this->artisan('remote-sync:pull', ['--database' => true, '--force' => true])
+            ->expectsOutputToContain('filter_users matches no user')
+            ->assertSuccessful();
+
+        expect(DB::table('users')->count())->toBe(1)
+            ->and(ranAt(LOCAL, 'migrate --force'))->toBeGreaterThan(-1);
+    });
+
     it('drops local-only tables, and says so in the plan', function () {
         useLocalInfo(['tables' => ['users', 'scratch']]);
         fakeProcesses();
