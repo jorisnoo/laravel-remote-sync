@@ -7,84 +7,65 @@ use Illuminate\Support\Facades\Process;
 
 class Connection
 {
+    /**
+     * Never wait at an invisible password or passphrase prompt: keys must be
+     * usable without input (ssh-agent, or no passphrase).
+     */
+    public const SSH_OPTIONS = ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10'];
+
     public function __construct(public readonly Remote $remote) {}
 
     public function run(string $command, ?int $timeout = null): ProcessResult
     {
-        return Process::timeout($timeout ?? $this->remoteTimeout())->run([
-            'ssh',
-            $this->remote->host,
-            $command,
-        ]);
+        return Process::timeout($timeout ?? self::remoteTimeout())
+            ->run(['ssh', ...self::SSH_OPTIONS, $this->remote->host, $command]);
     }
 
-    public function artisan(RemoteInfo $info, string $arguments, ?int $timeout = null): ProcessResult
+    /**
+     * The ssh command rsync should use, with the same options.
+     */
+    public static function shell(): string
     {
-        $php = escapeshellarg($info->phpBinary ?? 'php');
-        $path = escapeshellarg($info->workingPath);
-
-        return $this->run("cd {$path} && {$php} artisan {$arguments}", $timeout);
+        return implode(' ', ['ssh', ...self::SSH_OPTIONS]);
     }
 
-    public function remoteTimeout(): int
+    public static function remoteTimeout(): int
     {
         return (int) config('remote-sync.timeouts.remote', 300);
     }
 
-    public function transferTimeout(): int
+    public static function transferTimeout(): int
     {
         return (int) config('remote-sync.timeouts.transfer', 1800);
     }
 
-    /**
-     * @return string 'ok' if known/not an SSH key issue, 'unknown' if not in known_hosts, 'changed' if key mismatch
-     */
-    public function checkHostKey(): string
+    public function checkHostKey(): HostKey
     {
-        $result = Process::timeout(10)->run([
-            'ssh',
-            '-o', 'BatchMode=yes',
-            '-o', 'ConnectTimeout=5',
-            $this->remote->host,
-            'exit',
-        ]);
+        $error = Process::timeout(15)
+            ->run(['ssh', ...self::SSH_OPTIONS, $this->remote->host, 'exit'])
+            ->errorOutput();
 
-        $error = $result->errorOutput();
-
-        if (str_contains($error, 'REMOTE HOST IDENTIFICATION HAS CHANGED')) {
-            return 'changed';
-        }
-
-        if (str_contains($error, 'Host key verification failed')) {
-            return 'unknown';
-        }
-
-        return 'ok';
+        return match (true) {
+            str_contains($error, 'REMOTE HOST IDENTIFICATION HAS CHANGED') => HostKey::Changed,
+            str_contains($error, 'Host key verification failed') => HostKey::Unknown,
+            str_contains($error, 'Permission denied') => HostKey::AuthFailed,
+            default => HostKey::Trusted,
+        };
     }
 
     public function hostFingerprints(): ?string
     {
-        $hostname = $this->remote->hostname();
-
         $result = Process::timeout(10)->run(
-            'ssh-keyscan -t ed25519,rsa,ecdsa '.escapeshellarg($hostname).' 2>/dev/null | ssh-keygen -lf -'
+            'ssh-keyscan -t ed25519,rsa,ecdsa '.escapeshellarg($this->remote->hostname()).' 2>/dev/null | ssh-keygen -lf -'
         );
 
-        if ($result->successful() && trim($result->output()) !== '') {
-            return trim($result->output());
-        }
-
-        return null;
+        return $result->successful() && trim($result->output()) !== '' ? trim($result->output()) : null;
     }
 
     public function acceptHostKey(): bool
     {
         $result = Process::timeout(15)->run([
-            'ssh',
-            '-o', 'StrictHostKeyChecking=accept-new',
-            '-o', 'ConnectTimeout=10',
-            $this->remote->host,
-            'exit',
+            'ssh', '-o', 'StrictHostKeyChecking=accept-new', ...self::SSH_OPTIONS, $this->remote->host, 'exit',
         ]);
 
         return ! str_contains($result->errorOutput(), 'Host key verification failed');

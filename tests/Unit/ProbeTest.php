@@ -1,126 +1,73 @@
 <?php
 
 use Illuminate\Support\Facades\Process;
+use Noo\LaravelRemoteSync\Database\Inspector;
 use Noo\LaravelRemoteSync\Remotes\Connection;
 use Noo\LaravelRemoteSync\Remotes\Probe;
 use Noo\LaravelRemoteSync\Remotes\Remote;
+use Noo\LaravelRemoteSync\Remotes\RemoteInfo;
 
-function probeConnection(string $path = '/home/forge/acme', ?string $phpBinary = null): Connection
+function probe(?string $phpBinary = null): RemoteInfo
 {
-    return new Connection(new Remote(
-        name: 'production',
-        host: 'forge@prod.acme.test',
-        path: $path,
-        phpBinary: $phpBinary,
-    ));
-}
-
-function happyProbeOutput(): string
-{
-    return implode("\n", [
-        'ATOMIC=1',
-        'PHP=php8.4',
-        'RSYNC=1',
-        'SNAPSHOTS=1',
-        'REMOTE_SYNC_JSON='.json_encode([
-            'driver' => 'mysql',
-            'tables' => ['users', 'posts'],
-            'snapshot_dir' => '/home/forge/acme/shared/snapshots',
-        ]),
-    ]);
+    return (new Probe)->run(new Connection(new Remote(
+        name: 'production', host: 'forge@prod.acme.test', path: '/srv/acme', phpBinary: $phpBinary,
+    )));
 }
 
 describe('Probe', function () {
-    describe('command', function () {
-        it('tries every candidate binary when none is configured', function () {
-            $command = (new Probe)->command(probeConnection()->remote);
+    it('builds a script that tries every PHP candidate and runs remote-sync:info', function () {
+        $script = (new Probe)->script(new Remote(name: 'production', host: 'h', path: '/srv/acme'));
 
-            expect($command)
-                ->toContain("'php' 'php8.5' 'php85' 'php8.4'")
-                ->toContain('platform_check.php')
-                ->toContain('artisan tinker --execute=')
-                ->toContain('snapshot_dir');
-        });
-
-        it('only tries the configured php_binary when set', function () {
-            $command = (new Probe)->command(probeConnection(phpBinary: '/usr/bin/php8.4')->remote);
-
-            expect($command)
-                ->toContain("for candidate in '/usr/bin/php8.4'; do")
-                ->not->toContain("'php8.5'");
-        });
+        expect($script)
+            ->toContain("BASE='/srv/acme';")
+            ->toContain('"$BASE/current"')
+            ->toContain("'php' 'php8.5' 'php85' 'php8.4'")
+            ->toContain('platform_check.php')
+            ->toContain('artisan remote-sync:info');
     });
 
-    describe('run', function () {
-        it('parses a complete probe response', function () {
-            Process::fake(['*' => Process::result(output: happyProbeOutput())]);
+    it('only tries the configured php_binary', function () {
+        $script = (new Probe)->script(new Remote(name: 'production', host: 'h', path: '/srv/acme', phpBinary: '/usr/bin/php8.4'));
 
-            $info = (new Probe)->run(probeConnection());
-
-            expect($info->phpBinary)->toBe('php8.4')
-                ->and($info->isAtomic)->toBeTrue()
-                ->and($info->workingPath)->toBe('/home/forge/acme/current')
-                ->and($info->storagePath())->toBe('/home/forge/acme/current/storage')
-                ->and($info->snapshotDir)->toBe('/home/forge/acme/shared/snapshots')
-                ->and($info->driver)->toBe('mysql')
-                ->and($info->tables)->toBe(['users', 'posts'])
-                ->and($info->hasDbSnapshots)->toBeTrue()
-                ->and($info->hasRsync)->toBeTrue();
-        });
-
-        it('does not double-append current when the path already ends with it', function () {
-            Process::fake(['*' => Process::result(output: str_replace('ATOMIC=1', 'ATOMIC=0', happyProbeOutput()))]);
-
-            $info = (new Probe)->run(probeConnection(path: '/home/forge/acme/current'));
-
-            expect($info->workingPath)->toBe('/home/forge/acme/current')
-                ->and($info->isAtomic)->toBeTrue();
-        });
-
-        it('keeps the plain path for non-atomic layouts', function () {
-            Process::fake(['*' => Process::result(output: str_replace('ATOMIC=1', 'ATOMIC=0', happyProbeOutput()))]);
-
-            $info = (new Probe)->run(probeConnection());
-
-            expect($info->workingPath)->toBe('/home/forge/acme')
-                ->and($info->isAtomic)->toBeFalse();
-        });
-
-        it('survives a partial response with defensive defaults', function () {
-            Process::fake(['*' => Process::result(output: "ATOMIC=0\nPHP=\nRSYNC=0\nSNAPSHOTS=0")]);
-
-            $info = (new Probe)->run(probeConnection());
-
-            expect($info->phpBinary)->toBeNull()
-                ->and($info->driver)->toBeNull()
-                ->and($info->tables)->toBe([])
-                ->and($info->hasDbSnapshots)->toBeFalse()
-                ->and($info->hasRsync)->toBeFalse()
-                ->and($info->snapshotDir)->toBe('/home/forge/acme/storage/snapshots');
-        });
-
-        it('ignores garbage around the structured lines', function () {
-            $output = "Warning: something deprecated\n".happyProbeOutput()."\nnoise at the end";
-            Process::fake(['*' => Process::result(output: $output)]);
-
-            $info = (new Probe)->run(probeConnection());
-
-            expect($info->driver)->toBe('mysql')
-                ->and($info->phpBinary)->toBe('php8.4');
-        });
-
-        it('fails with an actionable message when the path does not exist', function () {
-            Process::fake(['*' => Process::result(output: 'REMOTE_SYNC_CD_FAILED', exitCode: 1)]);
-
-            expect(fn () => (new Probe)->run(probeConnection()))
-                ->toThrow(RuntimeException::class, "Cannot access '/home/forge/acme' on [production]");
-        });
-
-        it('fails with the ssh error when the host is unreachable', function () {
-            Process::fake(['*' => Process::result(exitCode: 255, errorOutput: 'Connection refused')]);
-
-            expect(fn () => (new Probe)->run(probeConnection()))
-                ->toThrow(RuntimeException::class, 'Cannot reach [production] (forge@prod.acme.test): Connection refused');
-        });
+        expect($script)->toContain("for candidate in '/usr/bin/php8.4'; do")->not->toContain("'php8.5'");
     });
+
+    it('returns the working path, PHP binary and app info', function () {
+        Process::fake(['*' => Process::result(output: probeOutput(['tables' => ['users']]))]);
+
+        $info = probe();
+
+        expect($info->workingPath)->toBe('/srv/acme/current')
+            ->and($info->phpBinary)->toBe('php8.4')
+            ->and($info->app->driver)->toBe('mysql')
+            ->and($info->app->tables)->toBe(['users']);
+    });
+
+    it('ignores noise around the expected lines', function () {
+        Process::fake(['*' => Process::result(output: "Deprecated: something\n".probeOutput()."\n")]);
+
+        expect(probe()->app->protocol)->toBe(Inspector::PROTOCOL);
+    });
+
+    it('explains each failure', function (string $output, string $error, string $message) {
+        Process::fake(['*' => Process::result(output: $output, errorOutput: $error, exitCode: 1)]);
+
+        expect(fn () => probe())->toThrow(RuntimeException::class, $message);
+    })->with([
+        'missing path' => ['REMOTE_SYNC_NO_PATH', '', "Cannot access '/srv/acme' on [production]: directory not found"],
+        'unreachable' => ['', 'ssh: Could not resolve hostname', 'Cannot reach [production] (forge@prod.acme.test): ssh: Could not resolve hostname'],
+        'no php' => ["WORK=/srv/acme\nPHP=\nRSYNC=1", '', "Set 'php_binary'"],
+        'no rsync' => ["WORK=/srv/acme\nPHP=php\nRSYNC=0", '', 'rsync is not installed on [production]'],
+        'not installed' => ["WORK=/srv/acme\nPHP=php\nRSYNC=1", 'ERROR  Command "remote-sync:info" is not defined.', 'remote-sync:info failed on [production]: ERROR  Command "remote-sync:info" is not defined. Install jorisnoo/laravel-remote-sync there'],
+        'database down' => ["WORK=/srv/acme\nPHP=php\nRSYNC=1", "\n   Illuminate\\Database\\QueryException \n\n  SQLSTATE[HY000] [2002] Connection refused\n  at vendor/x.php:1", 'remote-sync:info failed on [production]: Illuminate\\Database\\QueryException SQLSTATE[HY000] [2002] Connection refused'],
+    ]);
+
+    it('refuses a remote on another protocol version, naming the side to update', function (int $protocol, string $message) {
+        Process::fake(['*' => Process::result(output: probeOutput(['protocol' => $protocol]))]);
+
+        expect(fn () => probe())->toThrow(RuntimeException::class, $message);
+    })->with([
+        'remote older' => [Inspector::PROTOCOL - 1, 'deploy the newer jorisnoo/laravel-remote-sync to [production]'],
+        'remote newer' => [Inspector::PROTOCOL + 1, 'update jorisnoo/laravel-remote-sync locally'],
+    ]);
 });

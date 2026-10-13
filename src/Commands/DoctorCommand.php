@@ -3,91 +3,83 @@
 namespace Noo\LaravelRemoteSync\Commands;
 
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Process;
 use InvalidArgumentException;
+use Noo\LaravelRemoteSync\Database\AppInfo;
+use Noo\LaravelRemoteSync\Database\Dumps;
+use Noo\LaravelRemoteSync\Database\Inspector;
 use Noo\LaravelRemoteSync\Remotes\Connection;
+use Noo\LaravelRemoteSync\Remotes\HostKey;
 use Noo\LaravelRemoteSync\Remotes\Probe;
 use Noo\LaravelRemoteSync\Remotes\RemoteRegistry;
-use Noo\LaravelRemoteSync\Snapshots\Importer;
-use Noo\LaravelRemoteSync\Snapshots\Snapshots;
 use RuntimeException;
+use Symfony\Component\Process\ExecutableFinder;
+use Throwable;
 
 class DoctorCommand extends Command
 {
     protected $signature = 'remote-sync:doctor
         {remote? : Check a single remote (default: all configured remotes)}';
 
-    protected $description = 'Check local and remote prerequisites for remote-sync';
+    protected $description = 'Check the local and remote prerequisites for remote-sync';
 
     protected bool $healthy = true;
 
-    public function handle(): int
+    public function handle(Inspector $inspector, RemoteRegistry $registry): int
     {
         $this->healthy = true;
 
-        $this->checkLocal();
-
-        $registry = app(RemoteRegistry::class);
-        $names = $this->argument('remote') !== null
-            ? [$this->argument('remote')]
-            : $registry->names();
+        $local = $this->checkLocal($inspector);
+        $names = $this->argument('remote') !== null ? [$this->argument('remote')] : $registry->names();
 
         if ($names === []) {
-            $this->failCheck('Remotes', 'none configured in config/remote-sync.php');
+            $this->check('Remotes', false, 'none configured in config/remote-sync.php');
         }
 
         foreach ($names as $name) {
-            $this->checkRemote($registry, $name);
+            $this->checkRemote($registry, $name, $local);
         }
 
         $this->newLine();
 
-        if ($this->healthy) {
-            $this->components->success('Everything looks good.');
+        if (! $this->healthy) {
+            $this->components->error('Some checks failed: fix the items marked FAIL above.');
 
-            return self::SUCCESS;
+            return self::FAILURE;
         }
 
-        $this->components->error('Some checks failed - fix the items marked FAIL above.');
+        $this->components->success('Everything looks good.');
 
-        return self::FAILURE;
+        return self::SUCCESS;
     }
 
-    protected function checkLocal(): void
+    protected function checkLocal(Inspector $inspector): ?AppInfo
     {
         $this->newLine();
-        $this->components->info('Local environment');
+        $this->components->info('Local');
 
-        $driver = Importer::localDriver();
+        $finder = new ExecutableFinder;
 
-        if (in_array($driver, ['mysql', 'pgsql'], true)) {
-            $this->passCheck('Database driver', $driver);
-            $client = $driver === 'mysql' ? 'mysql' : 'psql';
-            $this->checkLocalBinary($client);
-        } else {
-            $this->failCheck('Database driver', "{$driver} (imports need mysql or pgsql)");
+        foreach (['ssh', 'rsync'] as $binary) {
+            $this->check($binary, $finder->find($binary) !== null, 'found', 'not found on PATH');
         }
 
-        foreach (['gzip', 'rsync', 'ssh'] as $binary) {
-            $this->checkLocalBinary($binary);
+        try {
+            $info = $inspector->inspect();
+        } catch (Throwable $e) {
+            $this->check('Database', false, '', $e->getMessage());
+
+            return null;
         }
 
-        $snapshotDir = Snapshots::localDir();
-        $writable = is_dir($snapshotDir) ? is_writable($snapshotDir) : is_writable(dirname($snapshotDir));
+        $this->checkDatabase($info);
 
-        $writable
-            ? $this->passCheck('Snapshot directory', $snapshotDir)
-            : $this->failCheck('Snapshot directory', "{$snapshotDir} is not writable");
+        $directory = storage_path(Dumps::DIRECTORY);
+        $this->check('Dump directory', is_writable(is_dir($directory) ? $directory : storage_path()), $directory, "{$directory} is not writable");
+
+        return $info;
     }
 
-    protected function checkLocalBinary(string $binary): void
-    {
-        Process::timeout(10)->run("command -v {$binary}")->successful()
-            ? $this->passCheck($binary, 'found')
-            : $this->failCheck($binary, 'not found on PATH');
-    }
-
-    protected function checkRemote(RemoteRegistry $registry, string $name): void
+    protected function checkRemote(RemoteRegistry $registry, string $name, ?AppInfo $local): void
     {
         $this->newLine();
         $this->components->info("Remote [{$name}]");
@@ -95,69 +87,61 @@ class DoctorCommand extends Command
         try {
             $remote = $registry->get($name);
         } catch (InvalidArgumentException $e) {
-            $this->failCheck('Configuration', $e->getMessage());
+            $this->check('Configuration', false, '', $e->getMessage());
 
             return;
         }
 
-        $this->passCheck('Configuration', "{$remote->host}:{$remote->path}");
+        $this->check('Configuration', true, "{$remote->host}:{$remote->path}");
 
         $connection = new Connection($remote);
+        $hostKey = $connection->checkHostKey();
 
-        switch ($connection->checkHostKey()) {
-            case 'changed':
-                $this->failCheck('Host key', 'CHANGED - possible man-in-the-middle, check ~/.ssh/known_hosts');
+        $this->check('SSH', $hostKey === HostKey::Trusted, 'connected', match ($hostKey) {
+            HostKey::Changed => 'host key CHANGED: possible man-in-the-middle, check ~/.ssh/known_hosts',
+            HostKey::Unknown => 'unknown host key: connect once interactively (e.g. remote-sync:pull) to trust it',
+            default => 'key authentication failed: load your key with ssh-add',
+        });
 
-                return;
-            case 'unknown':
-                $this->failCheck('Host key', 'unknown - connect once interactively (e.g. remote-sync:pull) to trust it');
-
-                return;
-            default:
-                $this->passCheck('Host key', 'known');
+        if ($hostKey !== HostKey::Trusted) {
+            return;
         }
 
         try {
             $info = app(Probe::class)->run($connection);
         } catch (RuntimeException $e) {
-            $this->failCheck('Connection', $e->getMessage());
+            $this->check('Application', false, '', $e->getMessage());
 
             return;
         }
 
-        $this->passCheck('Application path', $info->workingPath.($info->isAtomic ? ' (atomic deployment)' : ''));
+        $this->check('Application', true, "{$info->workingPath} ({$info->app->environment})");
+        $this->check('PHP', true, $info->phpBinary);
+        $this->check('remote-sync', true, 'protocol '.$info->app->protocol);
+        $this->checkDatabase($info->app, $local);
+    }
 
-        $info->phpBinary !== null
-            ? $this->passCheck('PHP binary', $info->phpBinary)
-            : $this->failCheck('PHP binary', "none of the known binaries work - set 'php_binary' for this remote");
+    protected function checkDatabase(AppInfo $info, ?AppInfo $local = null): void
+    {
+        if (! $info->supportsDatabaseSync()) {
+            $this->check('Database', false, '', "{$info->driver}: only mysql and pgsql can be synced");
 
-        $info->hasDbSnapshots
-            ? $this->passCheck('spatie/laravel-db-snapshots', 'installed')
-            : $this->failCheck('spatie/laravel-db-snapshots', 'not installed on the remote');
-
-        $info->hasRsync
-            ? $this->passCheck('rsync', 'found')
-            : $this->failCheck('rsync', 'not found on the remote');
-
-        if ($info->driver === null) {
-            $this->failCheck('Database driver', 'could not be detected (is laravel/tinker installed on the remote?)');
-        } elseif (Importer::normalizeDriver($info->driver) === Importer::localDriver()) {
-            $this->passCheck('Database driver', "{$info->driver} (matches local)");
-        } else {
-            $this->failCheck('Database driver', "{$info->driver} does not match local ".Importer::localDriver());
+            return;
         }
 
-        $this->passCheck('Snapshot directory', $info->snapshotDir);
+        if ($local !== null && $local->driver !== $info->driver) {
+            $this->check('Database', false, '', "{$info->driver} does not match the local {$local->driver}");
+        } else {
+            $this->check('Database', true, $info->driver);
+        }
+
+        $this->check('Database tools', $info->missingBinaries === [], 'found', 'missing: '.implode(', ', $info->missingBinaries));
     }
 
-    protected function passCheck(string $check, string $detail): void
+    protected function check(string $name, bool $passed, string $detail, string $failure = ''): void
     {
-        $this->components->twoColumnDetail($check, "<fg=green>OK</> {$detail}");
-    }
+        $this->healthy = $this->healthy && $passed;
 
-    protected function failCheck(string $check, string $detail): void
-    {
-        $this->healthy = false;
-        $this->components->twoColumnDetail($check, "<fg=red>FAIL</> {$detail}");
+        $this->components->twoColumnDetail($name, $passed ? "<fg=green>OK</> {$detail}" : "<fg=red>FAIL</> {$failure}");
     }
 }

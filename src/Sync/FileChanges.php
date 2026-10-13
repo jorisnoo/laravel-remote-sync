@@ -13,21 +13,24 @@ readonly class FileChanges
         public array $deletions = [],
     ) {}
 
-    public function transferCount(): int
+    /**
+     * Parse `rsync --itemize-changes` output: "*deleting path" lines are
+     * deletions; file and symlink lines are transfers; directories and
+     * rsync's own summary lines are ignored.
+     */
+    public static function fromItemized(string $output): self
     {
-        return count($this->transfers);
-    }
+        $transfers = [];
+        $deletions = [];
 
-    public function deletionCount(): int
-    {
-        return count($this->deletions);
-    }
+        foreach (preg_split('/\r?\n/', $output) ?: [] as $line) {
+            if (preg_match('/^\*deleting\s+(.+)$/', $line, $match)) {
+                $deletions[] = $match[1];
+            } elseif (preg_match('/^[<>ch.][fL]\S* (.+?)(?: -> .*)?$/', $line, $match)) {
+                $transfers[] = $match[1];
+            }
+        }
 
-    public function merge(self $other): self
-    {
-        return new self(
-            [...$this->transfers, ...$other->transfers],
-            [...$this->deletions, ...$other->deletions],
-        );
+        return new self($transfers, $deletions);
     }
 }

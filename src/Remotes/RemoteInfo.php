@@ -2,26 +2,16 @@
 
 namespace Noo\LaravelRemoteSync\Remotes;
 
+use Noo\LaravelRemoteSync\Database\AppInfo;
+
 readonly class RemoteInfo
 {
     /**
-     * @param  string|null  $phpBinary  Detected or configured PHP binary; null when detection failed.
-     * @param  string  $snapshotDir  Absolute path where spatie/laravel-db-snapshots writes on the remote.
-     * @param  list<string>  $tables
+     * @param  string  $workingPath  The app root; path/current for atomic deployments.
      */
     public function __construct(
-        public ?string $phpBinary,
-        public bool $isAtomic,
         public string $workingPath,
-        public string $snapshotDir,
-        public ?string $driver,
-        public array $tables,
-        public bool $hasDbSnapshots,
-        public bool $hasRsync,
+        public string $phpBinary,
+        public AppInfo $app,
     ) {}
-
-    public function storagePath(): string
-    {
-        return "{$this->workingPath}/storage";
-    }
 }

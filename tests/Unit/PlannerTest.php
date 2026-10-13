@@ -1,164 +1,133 @@
 <?php
 
 use Illuminate\Support\Facades\Process;
-use Illuminate\Support\Facades\Schema;
+use Noo\LaravelRemoteSync\Database\Inspector;
 use Noo\LaravelRemoteSync\Remotes\Connection;
 use Noo\LaravelRemoteSync\Remotes\Remote;
 use Noo\LaravelRemoteSync\Remotes\RemoteInfo;
-use Noo\LaravelRemoteSync\Snapshots\Importer;
 use Noo\LaravelRemoteSync\Sync\Direction;
+use Noo\LaravelRemoteSync\Sync\LocalEndpoint;
 use Noo\LaravelRemoteSync\Sync\Planner;
+use Noo\LaravelRemoteSync\Sync\RemoteEndpoint;
 use Noo\LaravelRemoteSync\Sync\Rsync;
 
-function makePlanner(?RemoteInfo $info = null): Planner
+/**
+ * @param  array<string, mixed>  $local
+ * @param  array<string, mixed>  $remote
+ */
+function planner(Direction $direction, array $local = [], array $remote = []): Planner
 {
-    $connection = new Connection(new Remote(
-        name: 'staging',
-        host: 'forge@staging.acme.test',
-        path: '/home/forge/acme',
-    ));
+    useLocalInfo($local);
 
-    $info ??= plannerInfo();
-
-    return new Planner($info, new Rsync($connection), new Importer);
-}
-
-function plannerInfo(string $snapshotDir = '/home/forge/acme/storage/snapshots'): RemoteInfo
-{
-    return new RemoteInfo(
-        phpBinary: 'php8.4',
-        isAtomic: false,
-        workingPath: '/home/forge/acme',
-        snapshotDir: $snapshotDir,
-        driver: 'mysql',
-        tables: ['users', 'posts', 'cache', 'jobs', 'migrations'],
-        hasDbSnapshots: true,
-        hasRsync: true,
+    $localEndpoint = new LocalEndpoint(app(Inspector::class));
+    $remoteEndpoint = new RemoteEndpoint(
+        new Connection(new Remote(name: 'staging', host: 'forge@staging.acme.test', path: '/srv/acme')),
+        new RemoteInfo('/srv/acme/current', 'php8.4', appInfo($remote)),
     );
+
+    return $direction === Direction::Pull
+        ? new Planner($remoteEndpoint, $localEndpoint, new Rsync)
+        : new Planner($localEndpoint, $remoteEndpoint, new Rsync);
 }
 
-describe('Planner', function () {
-    beforeEach(function () {
-        config()->set('remote-sync.exclude_tables', ['cache', 'jobs']);
-        config()->set('remote-sync.filter_users', false);
+beforeEach(fn () => syncConfig());
+
+describe('pull', function () {
+    it('copies excluded tables as structure only and drops local-only tables', function () {
+        $plan = planner(Direction::Pull, local: ['tables' => ['users', 'cache', 'scratch']])->database(Direction::Pull);
+
+        expect($plan->replace)->toBe(['users', 'posts', 'migrations'])
+            ->and($plan->empty)->toBe(['cache', 'jobs'])
+            ->and($plan->drop)->toBe(['scratch'])
+            ->and($plan->dumpOptions)->toBe(['--exclude-data=cache', '--exclude-data=jobs'])
+            ->and($plan->fresh)->toBeTrue()
+            ->and($plan->transfer)->toStartWith('remote-sync-')
+            ->and($plan->backup)->toStartWith('pre-pull-');
     });
 
-    describe('pull', function () {
-        it('plans a standard database pull without excluded tables', function () {
-            Schema::create('cache', fn ($table) => $table->increments('id'));
-            Schema::create('jobs', fn ($table) => $table->increments('id'));
+    it('never excludes the migrations table, even when configured', function () {
+        $plan = planner(Direction::Pull)->database(Direction::Pull);
 
-            $plan = makePlanner()->pull(database: true, files: false);
-
-            expect($plan->direction)->toBe(Direction::Pull)
-                ->and($plan->tablesToSync)->toBe(['users', 'posts', 'migrations'])
-                ->and($plan->dumpExcludes)->toBe(['cache', 'jobs'])
-                ->and($plan->tablesToTruncate)->toBe(['cache', 'jobs'])
-                ->and($plan->snapshotName)->toStartWith('remote-sync-')
-                ->and($plan->backupName)->toStartWith('pre-pull-');
-        });
-
-        it('keeps every table in full mode', function () {
-            $plan = makePlanner()->pull(database: true, files: false, full: true);
-
-            expect($plan->tablesToSync)->toBe(['users', 'posts', 'cache', 'jobs', 'migrations'])
-                ->and($plan->dumpExcludes)->toBe([])
-                ->and($plan->tablesToTruncate)->toBe([]);
-        });
-
-        it('imports excluded tables missing locally and truncates them afterwards', function () {
-            // A fresh local database: the excluded tables still need their structure.
-            Schema::create('cache', fn ($table) => $table->increments('id'));
-
-            $plan = makePlanner()->pull(database: true, files: false);
-
-            expect($plan->dumpExcludes)->toBe(['cache'])
-                ->and($plan->tablesToSync)->toBe(['users', 'posts', 'jobs', 'migrations'])
-                ->and($plan->tablesToTruncate)->toBe(['cache', 'jobs']);
-        });
-
-        it('skips the backup name when backups are disabled', function () {
-            $plan = makePlanner()->pull(database: true, files: false, backup: false);
-
-            expect($plan->backupName)->toBe('');
-        });
-
-        it('records filter_users rules only for database pulls', function () {
-            config()->set('remote-sync.filter_users', ['*@acme.test']);
-
-            $withDb = makePlanner()->pull(database: true, files: false);
-            expect($withDb->filterUsers)->toBe(['*@acme.test']);
-
-            Process::fake(['*' => Process::result(output: '')]);
-            $filesOnly = makePlanner()->pull(database: false, files: true, paths: ['app']);
-            expect($filesOnly->filterUsers)->toBeNull();
-        });
-
-        it('always dry-runs with --delete so deletable files are discovered', function () {
-            Process::fake(['*' => Process::result(output: "*deleting   stale.jpg\n>f+++++++++ new.jpg")]);
-
-            $plan = makePlanner()->pull(database: false, files: true, delete: false, paths: ['app']);
-
-            Process::assertRan(fn ($process) => in_array('--dry-run', $process->command, true)
-                && in_array('--delete', $process->command, true));
-
-            expect($plan->delete)->toBeFalse()
-                ->and($plan->totalDeletions())->toBe(1)
-                ->and($plan->totalTransfers())->toBe(1);
-        });
-
-        it('excludes the remote snapshot dir when it lives inside a synced path', function () {
-            Process::fake(['*' => Process::result(output: '')]);
-
-            $info = plannerInfo(snapshotDir: '/home/forge/acme/storage/app/snapshots');
-
-            $plan = makePlanner($info)->pull(database: false, files: true, paths: ['app']);
-
-            expect($plan->fileExcludes['app'])->toBe(['/snapshots']);
-
-            Process::assertRan(fn ($process) => in_array('--exclude=/snapshots', $process->command, true));
-        });
-
-        it('adds no snapshot excludes when snapshots live outside storage', function () {
-            Process::fake(['*' => Process::result(output: '')]);
-
-            config()->set('filesystems.disks.snapshots.root', '/somewhere/else/snapshots');
-            $info = plannerInfo(snapshotDir: '/home/forge/acme/database/snapshots');
-
-            $plan = makePlanner($info)->pull(database: false, files: true, paths: ['app']);
-
-            expect($plan->fileExcludes['app'])->toBe([]);
-        });
-
-        it('surfaces dry-run failures with path context', function () {
-            Process::fake(['*' => Process::result(exitCode: 23, errorOutput: 'No such file or directory')]);
-
-            expect(fn () => makePlanner()->pull(database: false, files: true, paths: ['app']))
-                ->toThrow(RuntimeException::class, 'Could not analyze files for storage/app');
-        });
+        expect($plan->replace)->toContain('migrations')->and($plan->empty)->not->toContain('migrations');
     });
 
-    describe('push', function () {
-        it('plans a database push preserving excluded remote tables', function () {
-            Schema::create('users', fn ($table) => $table->increments('id'));
-            Schema::create('cache', fn ($table) => $table->increments('id'));
+    it('copies every row with --full', function () {
+        $plan = planner(Direction::Pull)->database(Direction::Pull, full: true);
 
-            $plan = makePlanner()->push(database: true, files: false);
+        expect($plan->replace)->toBe(['users', 'posts', 'cache', 'jobs', 'migrations'])
+            ->and($plan->empty)->toBe([])
+            ->and($plan->dumpOptions)->toBe([]);
+    });
 
-            expect($plan->direction)->toBe(Direction::Push)
-                ->and($plan->tablesToSync)->toBe(['users'])
-                ->and($plan->tablesToTruncate)->toBe(['cache', 'jobs'])
-                ->and($plan->backupName)->toStartWith('pre-push-');
-        });
+    it('warns about a missing backup and about filter_users', function () {
+        config()->set('remote-sync.filter_users', ['*@acme.test']);
 
-        it('treats a missing local path as an empty transfer', function () {
-            Process::fake();
+        $plan = planner(Direction::Pull)->database(Direction::Pull, backup: false);
 
-            $plan = makePlanner()->push(database: false, files: true, paths: ['does-not-exist-'.uniqid()]);
+        expect($plan->backup)->toBeNull()
+            ->and($plan->filterUsers)->toBeTrue()
+            ->and($plan->warnings)->toBe([
+                'Without a backup, the current local database cannot be restored.',
+                'Only users matching *@acme.test are kept.',
+            ]);
+    });
+});
 
-            expect($plan->totalTransfers())->toBe(0);
+describe('push', function () {
+    it('leaves excluded tables out of the dump and keeps the remote copies', function () {
+        $plan = planner(Direction::Push, remote: ['tables' => ['users', 'cache', 'sessions_old']])->database(Direction::Push);
 
-            Process::assertNothingRan();
-        });
+        expect($plan->replace)->toBe(['users', 'posts', 'migrations'])
+            ->and($plan->preserve)->toBe(['cache'])
+            ->and($plan->drop)->toBe([])
+            ->and($plan->dumpOptions)->toBe(['--exclude=cache', '--exclude=jobs'])
+            ->and($plan->fresh)->toBeFalse()
+            ->and($plan->filterUsers)->toBeFalse()
+            ->and($plan->backup)->toStartWith('pre-push-');
+    });
+
+    it('refuses when the remote has migrations this app does not', function () {
+        $planner = planner(Direction::Push, remote: ['migrations' => ['0001_create_users_table', '0002_create_posts_table', '0003_add_flags']]);
+
+        expect(fn () => $planner->database(Direction::Push))
+            ->toThrow(RuntimeException::class, '[staging] has migrations this app does not: 0003_add_flags.');
+    });
+
+    it('warns about local migrations the remote has not run, and about production', function () {
+        $plan = planner(
+            Direction::Push,
+            local: ['migrations' => ['0001_create_users_table', '0002_create_posts_table', '0003_add_flags']],
+            remote: ['environment' => 'production'],
+        )->database(Direction::Push);
+
+        expect($plan->warnings)->toBe([
+            'Migrations not yet run on [staging] will be recorded as run: 0003_add_flags.',
+            '[staging] is a production environment.',
+        ]);
+    });
+});
+
+describe('files', function () {
+    it('previews each path from source to target', function () {
+        Process::fake(['*' => Process::result(output: ">f+++++++++ new.jpg\n*deleting   stale.jpg\n")]);
+
+        $plan = planner(Direction::Pull)->files(['app', 'app/public'], delete: true);
+
+        expect($plan->paths())->toBe(['app', 'app/public'])
+            ->and($plan->transfers())->toBe(['new.jpg', 'new.jpg'])
+            ->and($plan->deletions())->toBe(['stale.jpg', 'stale.jpg'])
+            ->and($plan->delete)->toBeTrue();
+
+        Process::assertRan(fn ($process) => array_slice($process->command, -2) === [
+            'forge@staging.acme.test:/srv/acme/releases/7/storage/app/public/',
+            storage_path('app/public').'/',
+        ]);
+    });
+
+    it('names the path when a preview fails', function () {
+        Process::fake(['*' => Process::result(exitCode: 23, errorOutput: 'No such file or directory')]);
+
+        expect(fn () => planner(Direction::Push)->files(['app']))
+            ->toThrow(RuntimeException::class, 'Could not compare storage/app: No such file or directory');
     });
 });

@@ -1,127 +1,75 @@
 <?php
 
 use Illuminate\Support\Facades\Process;
-use Noo\LaravelRemoteSync\Remotes\Connection;
-use Noo\LaravelRemoteSync\Remotes\Remote;
-use Noo\LaravelRemoteSync\Sync\Direction;
+use Noo\LaravelRemoteSync\Sync\FileChanges;
 use Noo\LaravelRemoteSync\Sync\Rsync;
 
-function rsyncFixture(bool $interactive = false): Rsync
-{
-    $connection = new Connection(new Remote(
-        name: 'production',
-        host: 'forge@prod.acme.test',
-        path: '/home/forge/acme',
-    ));
-
-    return new Rsync($connection, interactive: $interactive);
-}
-
-function itemizedOutput(): string
-{
-    return implode("\n", [
-        'receiving incremental file list',
-        '>f+++++++++ uploads/a.jpg',
-        '>f.st...... uploads/b.jpg',
-        'cd+++++++++ uploads/nested/',
-        '*deleting   old/gone.jpg',
-        '',
-        'sent 123 bytes  received 456 bytes',
-    ]);
-}
-
 describe('Rsync', function () {
-    describe('transfer', function () {
-        it('pulls from the remote to the local path', function () {
-            Process::fake();
+    beforeEach(fn () => config()->set('remote-sync.exclude_paths', ['cache', '*.log']));
 
-            rsyncFixture()->transfer(Direction::Pull, '/remote/storage/app/', '/local/storage/app/');
+    it('copies a single file without excludes', function () {
+        Process::fake();
 
-            Process::assertRan(fn ($process) => $process->command === [
-                'rsync', '-avz', '--partial', '--exclude=.*',
-                'forge@prod.acme.test:/remote/storage/app/',
-                '/local/storage/app/',
-            ]);
-        });
+        (new Rsync)->copy('host:/a/dump.sql.gz', '/b/dump.sql.gz');
 
-        it('pushes from the local path to the remote', function () {
-            Process::fake();
-
-            rsyncFixture()->transfer(Direction::Push, '/remote/storage/app/', '/local/storage/app/');
-
-            Process::assertRan(fn ($process) => $process->command === [
-                'rsync', '-avz', '--partial', '--exclude=.*',
-                '/local/storage/app/',
-                'forge@prod.acme.test:/remote/storage/app/',
-            ]);
-        });
-
-        it('only mirrors deletions when asked to', function () {
-            Process::fake();
-
-            rsyncFixture()->transfer(Direction::Pull, '/r/', '/l/', delete: true);
-
-            Process::assertRan(fn ($process) => in_array('--delete', $process->command, true));
-        });
-
-        it('merges configured and per-transfer excludes without duplicates', function () {
-            Process::fake();
-            config()->set('remote-sync.exclude_paths', ['*.log', 'tmp']);
-
-            rsyncFixture()->transfer(Direction::Pull, '/r/', '/l/', excludes: ['snapshots', 'tmp']);
-
-            Process::assertRan(fn ($process) => array_values(array_filter(
-                $process->command,
-                fn ($arg) => str_starts_with($arg, '--exclude=')
-            )) === ['--exclude=.*', '--exclude=*.log', '--exclude=tmp', '--exclude=snapshots']);
-        });
-
-        it('shows live progress only in interactive mode', function () {
-            Process::fake();
-
-            rsyncFixture(interactive: true)->transfer(Direction::Pull, '/r/', '/l/');
-
-            Process::assertRan(fn ($process) => in_array('--info=progress2', $process->command, true));
-        });
+        Process::assertRan(fn ($process) => $process->command === [
+            'rsync', '-e', 'ssh -o BatchMode=yes -o ConnectTimeout=10', '-az', '--partial', 'host:/a/dump.sql.gz', '/b/dump.sql.gz',
+        ]);
     });
 
-    describe('dryRun', function () {
-        it('runs rsync with dry-run and itemize flags and parses the result', function () {
-            Process::fake(['*' => Process::result(output: itemizedOutput())]);
+    it('syncs directories without dotfiles or excluded paths, deleting only when asked', function () {
+        Process::fake();
 
-            $changes = rsyncFixture()->dryRun(Direction::Pull, '/r/', '/l/', delete: true);
+        (new Rsync)->sync('host:/a/', '/b/', delete: false);
+        (new Rsync)->sync('/b/', 'host:/a/', delete: true);
 
-            Process::assertRan(fn ($process) => in_array('--dry-run', $process->command, true)
-                && in_array('--itemize-changes', $process->command, true)
-                && ! in_array('--partial', $process->command, true));
-
-            expect($changes->transfers)->toBe(['uploads/a.jpg', 'uploads/b.jpg'])
-                ->and($changes->deletions)->toBe(['old/gone.jpg'])
-                ->and($changes->transferCount())->toBe(2)
-                ->and($changes->deletionCount())->toBe(1);
-        });
-
-        it('throws with the rsync error when the dry run fails', function () {
-            Process::fake(['*' => Process::result(exitCode: 23, errorOutput: 'rsync: link_stat failed')]);
-
-            expect(fn () => rsyncFixture()->dryRun(Direction::Pull, '/r/', '/l/'))
-                ->toThrow(RuntimeException::class, 'rsync: link_stat failed');
-        });
+        Process::assertRan(fn ($process) => $process->command === [
+            'rsync', '-e', 'ssh -o BatchMode=yes -o ConnectTimeout=10', '-az', '--partial',
+            '--exclude=.*', '--exclude=cache', '--exclude=*.log', 'host:/a/', '/b/',
+        ]);
+        Process::assertRan(fn ($process) => in_array('--delete', $process->command, true) && end($process->command) === 'host:/a/');
     });
 
-    describe('parse', function () {
-        it('ignores directories and summary lines', function () {
-            $changes = rsyncFixture()->parse(itemizedOutput());
+    it('shows progress when interactive', function () {
+        Process::fake();
 
-            expect($changes->transfers)->not->toContain('uploads/nested/')
-                ->and($changes->transferCount())->toBe(2);
-        });
+        (new Rsync(interactive: true))->sync('host:/a/', '/b/', delete: false);
 
-        it('returns empty changes for empty output', function () {
-            $changes = rsyncFixture()->parse('');
+        Process::assertRan(fn ($process) => in_array('--info=progress2', $process->command, true));
+    });
 
-            expect($changes->transferCount())->toBe(0)
-                ->and($changes->deletionCount())->toBe(0);
-        });
+    it('previews with --delete so the plan can count deletable files', function () {
+        Process::fake(['*' => Process::result(output: ">f+++++++++ a.jpg\n*deleting   b.jpg\n")]);
+
+        $changes = (new Rsync)->preview('host:/a/', '/b/');
+
+        expect($changes->transfers)->toBe(['a.jpg'])->and($changes->deletions)->toBe(['b.jpg']);
+        Process::assertRan(fn ($process) => in_array('--dry-run', $process->command, true) && in_array('--delete', $process->command, true));
+    });
+
+    it('throws when a preview fails', function () {
+        Process::fake(['*' => Process::result(exitCode: 23, errorOutput: 'change_dir "/a" failed: No such file or directory')]);
+
+        expect(fn () => (new Rsync)->preview('host:/a/', '/b/'))->toThrow(RuntimeException::class, 'No such file or directory');
+    });
+});
+
+describe('FileChanges', function () {
+    it('parses itemized output', function () {
+        $changes = FileChanges::fromItemized(implode("\n", [
+            'receiving incremental file list',
+            'created directory /b',
+            '>f+++++++++ uploads/a.jpg',
+            '>f.st...... uploads/with space.jpg',
+            'cd+++++++++ uploads/nested/',
+            'cL+++++++++ uploads/link.jpg -> a.jpg',
+            '*deleting   old/gone.jpg',
+            '',
+            'sent 123 bytes  received 456 bytes',
+            'total size is 0  speedup is 0.00 (DRY RUN)',
+        ]));
+
+        expect($changes->transfers)->toBe(['uploads/a.jpg', 'uploads/with space.jpg', 'uploads/link.jpg'])
+            ->and($changes->deletions)->toBe(['old/gone.jpg']);
     });
 });
