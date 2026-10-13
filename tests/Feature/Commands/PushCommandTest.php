@@ -139,6 +139,18 @@ describe('remote-sync:push', function () {
                 ->assertFailed();
         });
 
+        it('fails when remote migrations fail', function () {
+            fakeSyncProcesses(custom: [
+                'artisan migrate --force' => Process::result(exitCode: 1, errorOutput: 'SQLSTATE[42S21]'),
+            ]);
+            mockSnapshots();
+            mockImporter();
+
+            $this->artisan('remote-sync:push', ['--database' => true, '--force' => true])
+                ->expectsOutputToContain('Migrations failed on the remote')
+                ->assertFailed();
+        });
+
         it('pushes files without deleting unless --delete is given', function () {
             fakeSyncProcesses();
             mockSnapshots();

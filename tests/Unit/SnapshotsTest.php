@@ -179,6 +179,10 @@ describe('Snapshots', function () {
             snapshotsFixture()->upload('remote-sync-snap');
 
             Process::assertRan(fn ($process) => $process->command === [
+                'ssh', 'forge@prod.acme.test', "mkdir -p '/home/forge/acme/current/storage/snapshots'",
+            ]);
+
+            Process::assertRan(fn ($process) => $process->command === [
                 'rsync', '-az', '--partial',
                 Snapshots::localPath('remote-sync-snap'),
                 'forge@prod.acme.test:/home/forge/acme/current/storage/snapshots/',

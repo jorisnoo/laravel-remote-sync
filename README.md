@@ -120,7 +120,7 @@ Everything else is a flag:
 | `--dry-run` | Print the plan and exit without changing anything |
 | `--force` / `-f` | Answer the final confirmation with yes |
 
-A standard pull creates a local backup, dumps the remote database (minus `exclude_tables`), downloads and integrity-checks the snapshot, imports it through the `mysql`/`psql` CLI, truncates the excluded tables, then runs `migrate --force` and `optimize:clear`. If the import fails, the downloaded snapshot is kept and the exact restore command for your backup is printed.
+A standard pull creates a local backup, dumps the remote database (minus `exclude_tables`), downloads and integrity-checks the snapshot, imports it through the `mysql`/`psql` CLI, truncates the excluded tables, then runs `migrate --force` and `optimize:clear`. Excluded tables that do not exist locally yet (for example on a fresh database) are pulled once for their structure and emptied right after. If the import or the migrations fail, the command fails; after a failed import the downloaded snapshot is kept and the exact restore command for your backup is printed.
 
 Deletion is strictly opt-in: `--force` never implies `--delete`, and the plan preview tells you how many local-only files a `--delete` pass would remove before you commit to anything.
 
@@ -144,7 +144,7 @@ php artisan remote-sync:push staging --database
 - Non-interactive runs must state the scope explicitly (`--database` and/or `--files`).
 - The interactive confirmation requires typing `yes`.
 
-A database push backs up the remote first (`pre-push-*`), uploads a local snapshot, loads it on the remote without dropping tables (excluded tables are preserved), and runs remote migrations. If the load fails, the restore command for the remote backup is printed. Flags mirror pull: `--no-backup`, `--delete`, `--path=`, `--dry-run`, `--force`.
+A database push backs up the remote first (`pre-push-*`), uploads a local snapshot, loads it on the remote without dropping tables (excluded tables are preserved), and runs remote migrations (a failure there fails the command). If the load fails, the restore command for the remote backup is printed. Flags mirror pull: `--no-backup`, `--delete`, `--path=`, `--dry-run`, `--force`.
 
 ## Pruning snapshots
 

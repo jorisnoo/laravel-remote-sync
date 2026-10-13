@@ -30,13 +30,19 @@ class Planner
         array $paths = []
     ): SyncPlan {
         $excluded = Importer::excludedTables();
+        $localTables = ($database && ! $full) ? $this->importer->localTables() : [];
+
+        // Only excluded tables that already exist locally stay out of the dump.
+        // Missing ones are imported and then truncated, so a fresh database
+        // still gets their structure (the synced migrations table claims it).
+        $dumpExcludes = array_values(array_intersect($excluded, $localTables));
 
         $tablesToSync = $database
-            ? ($full ? $this->info->tables : array_values(array_diff($this->info->tables, $excluded)))
+            ? array_values(array_diff($this->info->tables, $dumpExcludes))
             : [];
 
         $tablesToTruncate = ($database && ! $full)
-            ? array_values(array_intersect($excluded, $this->importer->localTables()))
+            ? array_values(array_intersect($excluded, array_unique([...$localTables, ...$this->info->tables])))
             : [];
 
         [$fileChanges, $fileExcludes] = $files
@@ -56,6 +62,7 @@ class Planner
             paths: $files ? $paths : [],
             tablesToSync: $tablesToSync,
             tablesToTruncate: $tablesToTruncate,
+            dumpExcludes: $dumpExcludes,
             fileChanges: $fileChanges,
             fileExcludes: $fileExcludes,
             filterUsers: ($database && is_array($filterUsers) && $filterUsers !== []) ? array_values($filterUsers) : null,

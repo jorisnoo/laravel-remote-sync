@@ -45,10 +45,15 @@ describe('Planner', function () {
 
     describe('pull', function () {
         it('plans a standard database pull without excluded tables', function () {
+            Schema::create('cache', fn ($table) => $table->increments('id'));
+            Schema::create('jobs', fn ($table) => $table->increments('id'));
+
             $plan = makePlanner()->pull(database: true, files: false);
 
             expect($plan->direction)->toBe(Direction::Pull)
                 ->and($plan->tablesToSync)->toBe(['users', 'posts', 'migrations'])
+                ->and($plan->dumpExcludes)->toBe(['cache', 'jobs'])
+                ->and($plan->tablesToTruncate)->toBe(['cache', 'jobs'])
                 ->and($plan->snapshotName)->toStartWith('remote-sync-')
                 ->and($plan->backupName)->toStartWith('pre-pull-');
         });
@@ -57,14 +62,19 @@ describe('Planner', function () {
             $plan = makePlanner()->pull(database: true, files: false, full: true);
 
             expect($plan->tablesToSync)->toBe(['users', 'posts', 'cache', 'jobs', 'migrations'])
+                ->and($plan->dumpExcludes)->toBe([])
                 ->and($plan->tablesToTruncate)->toBe([]);
         });
 
-        it('only plans to truncate excluded tables that exist locally', function () {
-            // The sqlite test database has no tables, so nothing can be truncated.
+        it('imports excluded tables missing locally and truncates them afterwards', function () {
+            // A fresh local database: the excluded tables still need their structure.
+            Schema::create('cache', fn ($table) => $table->increments('id'));
+
             $plan = makePlanner()->pull(database: true, files: false);
 
-            expect($plan->tablesToTruncate)->toBe([]);
+            expect($plan->dumpExcludes)->toBe(['cache'])
+                ->and($plan->tablesToSync)->toBe(['users', 'posts', 'jobs', 'migrations'])
+                ->and($plan->tablesToTruncate)->toBe(['cache', 'jobs']);
         });
 
         it('skips the backup name when backups are disabled', function () {

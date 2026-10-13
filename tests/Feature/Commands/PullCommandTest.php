@@ -148,7 +148,8 @@ describe('remote-sync:pull', function () {
 
             $snapshots->shouldReceive('createLocal')->once()->withArgs(fn ($name) => str_starts_with($name, 'pre-pull-'))->andReturn(0);
             $snapshots->shouldReceive('createRemote')->once()->withArgs(
-                fn ($name, $excludes) => str_starts_with($name, 'remote-sync-') && $excludes === ['cache', 'jobs']
+                // jobs does not exist locally, so it is dumped for its structure.
+                fn ($name, $excludes) => str_starts_with($name, 'remote-sync-') && $excludes === ['cache']
             )->andReturn(Process::result());
             $snapshots->shouldReceive('download')->once()->andReturn(Process::result());
             $importer->shouldReceive('import')->once()->withArgs(
@@ -225,6 +226,18 @@ describe('remote-sync:pull', function () {
                 ->expectsOutputToContain('Import failed: ERROR 1064')
                 ->expectsOutputToContain('php artisan snapshot:load pre-pull-')
                 ->expectsOutputToContain('kept for inspection')
+                ->assertFailed();
+        });
+
+        it('prints restore guidance when post-import cleanup throws', function () {
+            fakeSyncProcesses();
+            mockSnapshots();
+            $importer = mockImporter();
+            $importer->shouldReceive('truncateExcluded')->once()->andThrow(new RuntimeException('cannot truncate cache'));
+
+            $this->artisan('remote-sync:pull', ['--database' => true, '--force' => true])
+                ->expectsOutputToContain('cannot truncate cache')
+                ->expectsOutputToContain('php artisan snapshot:load pre-pull-')
                 ->assertFailed();
         });
 

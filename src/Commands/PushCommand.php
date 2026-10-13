@@ -303,13 +303,9 @@ class PushCommand extends Command
             $steps[] = [
                 'label' => "Running migrations on [{$remoteName}]",
                 'run' => function () use ($connection, $info): ?string {
-                    $result = $connection->artisan($info, 'migrate --force');
-
-                    if (! $result->successful()) {
-                        $this->components->warn(__('remote-sync::messages.errors.remote_migrations_failed'));
-                    }
-
-                    return null;
+                    return $connection->artisan($info, 'migrate --force')->successful()
+                        ? null
+                        : __('remote-sync::messages.errors.remote_migrations_failed');
                 },
             ];
         }

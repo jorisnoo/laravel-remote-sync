@@ -16,6 +16,7 @@ use Noo\LaravelRemoteSync\Sync\PlanRenderer;
 use Noo\LaravelRemoteSync\Sync\Rsync;
 use Noo\LaravelRemoteSync\Sync\SyncPlan;
 use RuntimeException;
+use Throwable;
 
 use function Laravel\Prompts\multiselect;
 
@@ -219,10 +220,7 @@ class PullCommand extends Command
             $steps[] = [
                 'label' => "Creating snapshot on [{$remoteName}]",
                 'run' => function () use ($snapshots, $plan, $cleanup, $remoteName): ?string {
-                    $result = $snapshots->createRemote(
-                        $plan->snapshotName,
-                        $plan->full ? [] : Importer::excludedTables()
-                    );
+                    $result = $snapshots->createRemote($plan->snapshotName, $plan->dumpExcludes);
 
                     if (! $result->successful()) {
                         return __('remote-sync::messages.errors.failed_remote_snapshot', ['error' => trim($result->errorOutput())]);
@@ -269,23 +267,23 @@ class PullCommand extends Command
                 'run' => function () use ($importer, $plan, $cleanup): ?string {
                     try {
                         $result = $importer->import($plan->snapshotName, dropTables: $plan->full);
-                    } catch (RuntimeException $e) {
+
+                        if (! $result->successful()) {
+                            $this->noteImportFailure($plan, $cleanup);
+
+                            return __('remote-sync::messages.errors.failed_import', ['error' => trim($result->errorOutput())]);
+                        }
+
+                        if (! $plan->full) {
+                            $importer->truncateExcluded();
+                        }
+
+                        $filtered = $importer->filterUsers();
+                    } catch (Throwable $e) {
                         $this->noteImportFailure($plan, $cleanup);
 
                         return $e->getMessage();
                     }
-
-                    if (! $result->successful()) {
-                        $this->noteImportFailure($plan, $cleanup);
-
-                        return __('remote-sync::messages.errors.failed_import', ['error' => trim($result->errorOutput())]);
-                    }
-
-                    if (! $plan->full) {
-                        $importer->truncateExcluded();
-                    }
-
-                    $filtered = $importer->filterUsers();
 
                     if ($filtered !== null && $filtered['skipped']) {
                         $this->components->warn(__('remote-sync::messages.warnings.filter_users_skipped'));
@@ -303,13 +301,11 @@ class PullCommand extends Command
             $steps[] = [
                 'label' => 'Running migrations and clearing caches',
                 'run' => function (): ?string {
-                    if ($this->callSilently('migrate', ['--force' => true]) !== 0) {
-                        $this->components->warn(__('remote-sync::messages.warnings.migrations_failed'));
-                    }
+                    $migrated = $this->callSilently('migrate', ['--force' => true]) === 0;
 
                     $this->callSilently('optimize:clear');
 
-                    return null;
+                    return $migrated ? null : __('remote-sync::messages.errors.migrations_failed');
                 },
             ];
         }

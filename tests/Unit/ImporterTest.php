@@ -82,6 +82,21 @@ describe('Importer', function () {
                 && ($process->environment['MYSQL_PWD'] ?? null) === 'secret');
         });
 
+        it('reads connection details from DB_URL', function () {
+            Process::fake();
+            createSnapshotFile('snap');
+            config()->set('database.default', 'mysql');
+            config()->set('database.connections.mysql', [
+                'driver' => 'mysql',
+                'url' => 'mysql://acme_user:secret@db.internal:3307/acme',
+            ]);
+
+            (new Importer)->import('snap');
+
+            Process::assertRan(fn ($process) => str_contains($process->command, "mysql '--host=db.internal' '--port=3307' '--user=acme_user' 'acme'")
+                && ($process->environment['MYSQL_PWD'] ?? null) === 'secret');
+        });
+
         it('prefers the unix socket when configured', function () {
             Process::fake();
             createSnapshotFile('snap');

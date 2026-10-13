@@ -197,6 +197,9 @@ class Snapshots
 
     public function upload(string $name): ProcessResult
     {
+        // The directory only exists once spatie has written a snapshot there.
+        $this->connection->run('mkdir -p '.escapeshellarg($this->info->snapshotDir));
+
         return Process::timeout($this->connection->transferTimeout())->run([
             'rsync',
             '-az',

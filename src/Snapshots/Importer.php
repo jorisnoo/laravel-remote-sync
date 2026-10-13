@@ -77,7 +77,7 @@ class Importer
 
     protected function importViaMysql(string $snapshotPath, int $timeout): ProcessResult
     {
-        $connection = config('database.connections.'.config('database.default'));
+        $connection = $this->connectionConfig();
 
         $args = [];
 
@@ -105,7 +105,7 @@ class Importer
 
     protected function importViaPsql(string $snapshotPath, int $timeout): ProcessResult
     {
-        $connection = config('database.connections.'.config('database.default'));
+        $connection = $this->connectionConfig();
 
         $args = [
             '-v',
@@ -126,6 +126,17 @@ class Importer
         }
 
         return Process::timeout($timeout)->env($env)->run($command);
+    }
+
+    /**
+     * The resolved connection config, including values parsed from DB_URL,
+     * which the raw config array does not contain.
+     *
+     * @return array<string, mixed>
+     */
+    protected function connectionConfig(): array
+    {
+        return DB::connection()->getConfig();
     }
 
     /**

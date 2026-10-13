@@ -8,6 +8,7 @@ readonly class SyncPlan
      * @param  list<string>  $paths  Storage-relative paths in the files scope.
      * @param  list<string>  $tablesToSync
      * @param  list<string>  $tablesToTruncate  Truncated locally after a pull / preserved on the remote for a push.
+     * @param  list<string>  $dumpExcludes  Tables left out of the pulled snapshot.
      * @param  array<string, FileChanges>  $fileChanges  Keyed by storage-relative path.
      * @param  array<string, list<string>>  $fileExcludes  Extra rsync excludes, keyed by storage-relative path.
      * @param  list<string>|null  $filterUsers
@@ -23,6 +24,7 @@ readonly class SyncPlan
         public array $paths = [],
         public array $tablesToSync = [],
         public array $tablesToTruncate = [],
+        public array $dumpExcludes = [],
         public array $fileChanges = [],
         public array $fileExcludes = [],
         public ?array $filterUsers = null,

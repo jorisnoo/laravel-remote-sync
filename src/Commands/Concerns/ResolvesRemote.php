@@ -13,6 +13,7 @@ use Noo\LaravelRemoteSync\Snapshots\Importer;
 use Noo\LaravelRemoteSync\Support\CleanupStack;
 use Noo\LaravelRemoteSync\Support\StoragePath;
 use RuntimeException;
+use Throwable;
 
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\select;
@@ -309,7 +310,11 @@ trait ResolvesRemote
             $error = null;
 
             $this->components->task("{$number}/{$total} {$step['label']}", function () use ($step, &$error) {
-                $error = ($step['run'])();
+                try {
+                    $error = ($step['run'])();
+                } catch (Throwable $e) {
+                    $error = $e->getMessage();
+                }
 
                 return $error === null;
             });
