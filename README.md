@@ -178,6 +178,10 @@ php artisan remote-sync:prune production --remote --dry-run
 - Sync paths, dump names and table names are validated against strict allowlists before they reach a shell.
 - The package never handles SSH passwords.
 
+## How it behaves in detail
+
+[docs/sync-behavior.md](docs/sync-behavior.md) describes every case: what each step does, what happens when it fails, and which table ends up how.
+
 ## Testing
 
 ```bash
