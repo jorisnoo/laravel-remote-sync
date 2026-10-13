@@ -12,7 +12,8 @@ return [
     | /current layout is detected automatically. Set php_binary to a
     | specific binary (e.g. /usr/bin/php8.4) to skip auto-detection.
     |
-    | Pushing is disabled per remote unless push is set to true.
+    | Pushing is disabled per remote unless push is set to true. The remote
+    | app needs this package installed as a regular (not dev) dependency.
     |
     */
 
@@ -55,8 +56,8 @@ return [
     |--------------------------------------------------------------------------
     |
     | Extra rsync exclude patterns (e.g. 'cache', '*.log', 'temp/**').
-    | Dotfiles are always excluded, and snapshot directories are excluded
-    | automatically wherever they actually live - no need to list them.
+    | Dotfiles are always excluded. Excluded files are never deleted on the
+    | target, even with --delete.
     |
     */
 
@@ -67,9 +68,9 @@ return [
     | Excluded Tables
     |--------------------------------------------------------------------------
     |
-    | Tables synced as empty tables on pull and preserved on push. The
-    | migrations table is always synced, and migrate --force always runs
-    | after an import.
+    | Tables whose rows never travel. A pull recreates them empty, with the
+    | remote's structure; a push leaves the remote's copy untouched. The
+    | migrations table is never excluded.
     |
     */
 
@@ -135,9 +136,9 @@ return [
     | Timeouts
     |--------------------------------------------------------------------------
     |
-    | In seconds. 'remote' covers short remote commands (probing, listing
-    | and deleting snapshots, migrations). 'transfer' covers data-sized
-    | operations (snapshot create/load/import and rsync transfers).
+    | In seconds. 'remote' covers short ssh commands (probing, removing
+    | dumps). 'transfer' covers everything sized by the data: dumping,
+    | loading, migrating and rsync transfers.
     |
     */
 

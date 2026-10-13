@@ -4,9 +4,7 @@ namespace Noo\LaravelRemoteSync\Sync;
 
 use Illuminate\Console\OutputStyle;
 use Illuminate\Console\View\Components\Factory;
-use Noo\LaravelRemoteSync\Remotes\Remote;
-use Noo\LaravelRemoteSync\Remotes\RemoteInfo;
-use Noo\LaravelRemoteSync\Snapshots\Importer;
+use Symfony\Component\Console\Formatter\OutputFormatter;
 
 class PlanRenderer
 {
@@ -19,111 +17,69 @@ class PlanRenderer
         $this->components = new Factory($output);
     }
 
-    public function render(Remote $remote, RemoteInfo $info, SyncPlan $plan): void
+    public function render(Plan $plan, Endpoint $source, Endpoint $target, string $remote): void
     {
-        $verb = $plan->direction === Direction::Pull ? 'Pull from' : 'Push to';
-
         $this->output->newLine();
-        $this->components->info("{$verb} {$remote->name} ({$remote->host}:{$info->workingPath})");
+        $this->components->info(($plan->direction === Direction::Pull ? 'Pull from ' : 'Push to ').$remote);
 
         if ($plan->database) {
-            $this->renderDatabase($info, $plan);
+            $this->renderDatabase($plan->database, $source, $target);
         }
 
         if ($plan->files) {
-            $this->renderFiles($remote, $plan);
+            $this->renderFiles($plan->files, $target);
         }
 
-        $target = $plan->direction === Direction::Pull ? 'Local' : "Remote [{$remote->name}]";
-        $this->components->warn("{$target} {$plan->scopeSummary()} listed above will be replaced.");
+        foreach ($plan->warnings() as $warning) {
+            $this->components->warn($warning);
+        }
+
+        $this->components->warn("The {$target->label()} {$plan->scope()} listed above will be replaced.");
     }
 
-    protected function renderDatabase(RemoteInfo $info, SyncPlan $plan): void
+    protected function renderDatabase(DatabasePlan $database, Endpoint $source, Endpoint $target): void
     {
-        $localDriver = Importer::localDriver();
-        $remoteDriver = $info->driver ?? 'unknown';
+        $this->output->writeln("  <options=bold>Database</>  ({$source->info()->driver}, {$source->label()} -> {$target->label()})");
 
-        [$from, $to] = $plan->direction === Direction::Pull
-            ? [$remoteDriver, $localDriver]
-            : [$localDriver, $remoteDriver];
-
-        $this->output->writeln("  <options=bold>Database</>  ({$from} -> {$to})");
-
-        $syncLabel = $plan->full ? 'Import (full)' : 'Import';
-        $this->detail($syncLabel, count($plan->tablesToSync).' tables');
-        $this->list($plan->tablesToSync);
-
-        if ($plan->tablesToTruncate !== []) {
-            $truncateLabel = $plan->direction === Direction::Pull
-                ? 'Truncate after import'
-                : 'Preserved on remote';
-            $this->detail($truncateLabel, count($plan->tablesToTruncate).' tables');
-            $this->list($plan->tablesToTruncate);
-        }
-
-        if ($plan->filterUsers !== null) {
-            $this->components->warn(
-                'Users filter: keep '.implode(', ', $plan->filterUsers).' - all other users are deleted after import.'
-            );
-        }
-
-        if ($plan->direction === Direction::Pull) {
-            $this->detail('Local backup', $plan->backup ? $plan->backupName : 'skipped (--no-backup)');
-            $this->detail('After import', 'migrate --force, optimize:clear');
-
-            if ($plan->full) {
-                $this->components->warn('All local tables will be DROPPED before import.');
-            }
-
-            if ($plan->full && ! $plan->backup) {
-                $this->components->warn('Running --full without a backup: a failed import cannot be undone.');
-            }
-        } else {
-            $this->detail('Remote backup', $plan->backup ? $plan->backupName : 'skipped (--no-backup)');
-            $this->detail('After load', 'migrate --force on the remote');
-        }
+        $this->tables('Replace', $database->replace);
+        $this->tables('Recreate empty', $database->empty);
+        $this->tables('Keep as is', $database->preserve);
+        $this->tables('Drop', $database->drop);
+        $this->detail('Backup first', $database->backup ?? 'skipped (--no-backup)');
+        $this->detail('Afterwards', 'migrate, cache:clear');
 
         $this->output->newLine();
     }
 
-    protected function renderFiles(Remote $remote, SyncPlan $plan): void
+    protected function renderFiles(FilesPlan $files, Endpoint $target): void
     {
-        $paths = implode(', ', array_map(fn (string $path) => "storage/{$path}", $plan->paths));
-
+        $paths = implode(', ', array_map(fn (string $path) => "storage/{$path}", $files->paths()));
         $this->output->writeln("  <options=bold>Files</>  ({$paths})");
 
-        $transfers = [];
+        $this->detail('Transfer', count($files->transfers()).' files');
+        $this->list($files->transfers());
 
-        foreach ($plan->fileChanges as $changes) {
-            $transfers = [...$transfers, ...$changes->transfers];
-        }
+        $deletions = $files->deletions();
 
-        $this->detail('Transfer', count($transfers).' files');
-        $this->list($transfers);
-
-        $deletions = $plan->totalDeletions();
-        $deleteTarget = $plan->direction === Direction::Pull ? 'locally' : "on [{$remote->name}]";
-
-        if ($plan->delete && $deletions > 0) {
-            $this->components->warn("Delete {$deleteTarget}: {$deletions} files");
-
-            $deletionList = [];
-
-            foreach ($plan->fileChanges as $changes) {
-                $deletionList = [...$deletionList, ...$changes->deletions];
-            }
-
-            $this->list($deletionList);
-        } elseif ($plan->delete) {
-            $this->detail("Delete {$deleteTarget}", '0 files');
-        } elseif ($deletions > 0) {
-            $only = $plan->direction === Direction::Pull ? 'local-only' : 'remote-only';
-            $this->detail("Delete {$deleteTarget}", "0 (pass --delete to remove {$deletions} {$only} files)");
-        } else {
-            $this->detail("Delete {$deleteTarget}", '0 files');
+        if ($files->delete) {
+            $this->detail('Delete', count($deletions).' files');
+            $this->list($deletions);
+        } elseif ($deletions !== []) {
+            $this->detail('Delete', 'none (--delete would remove '.count($deletions)." files only on {$target->label()})");
         }
 
         $this->output->newLine();
+    }
+
+    /**
+     * @param  list<string>  $tables
+     */
+    protected function tables(string $label, array $tables): void
+    {
+        if ($tables !== []) {
+            $this->detail($label, count($tables).' tables');
+            $this->list($tables);
+        }
     }
 
     protected function detail(string $label, string $value): void
@@ -140,13 +96,12 @@ class PlanRenderer
             return;
         }
 
-        $shown = array_slice($items, 0, self::LIST_CAP);
-        $line = implode(', ', $shown);
+        $line = implode(', ', array_slice($items, 0, self::LIST_CAP));
 
         if (count($items) > self::LIST_CAP) {
             $line .= ' (+'.(count($items) - self::LIST_CAP).' more)';
         }
 
-        $this->output->writeln("    <fg=gray>{$line}</>");
+        $this->output->writeln('    <fg=gray>'.OutputFormatter::escape($line).'</>');
     }
 }
