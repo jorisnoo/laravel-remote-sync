@@ -2,6 +2,8 @@
 
 namespace Noo\LaravelRemoteSync\Support;
 
+use Noo\LaravelRemoteSync\Database\Dumps;
+
 class StoragePath
 {
     /**
@@ -18,6 +20,10 @@ class StoragePath
 
         if (! preg_match('#^[A-Za-z0-9](?:[A-Za-z0-9._-]|/(?!/))*$#', $path)) {
             return "Invalid path '{$path}': only letters, numbers, dots, dashes, underscores and single slashes are allowed.";
+        }
+
+        if ($path === Dumps::DIRECTORY || str_starts_with($path, Dumps::DIRECTORY.'/')) {
+            return "Invalid path '{$path}': storage/".Dumps::DIRECTORY.' holds database dumps and is never synced as files.';
         }
 
         return null;

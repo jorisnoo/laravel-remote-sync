@@ -2,134 +2,129 @@
 
 namespace Noo\LaravelRemoteSync\Remotes;
 
+use Noo\LaravelRemoteSync\Commands\InfoCommand;
+use Noo\LaravelRemoteSync\Database\AppInfo;
+use Noo\LaravelRemoteSync\Database\Inspector;
 use RuntimeException;
+use UnexpectedValueException;
 
+/**
+ * Learns everything about a remote in one ssh round trip: the app root, a
+ * working PHP binary, rsync, and the output of remote-sync:info.
+ */
 class Probe
 {
-    protected const CD_FAILED_MARKER = 'REMOTE_SYNC_CD_FAILED';
-
-    protected const JSON_MARKER = 'REMOTE_SYNC_JSON=';
+    protected const NO_PATH = 'REMOTE_SYNC_NO_PATH';
 
     /** @var list<string> */
     protected const PHP_CANDIDATES = [
-        'php',
-        'php8.5',
-        'php85',
-        'php8.4',
-        'php84',
-        'php8.3',
-        'php83',
-        'php8.2',
-        'php82',
-        'php8.1',
-        'php81',
+        'php', 'php8.5', 'php85', 'php8.4', 'php84', 'php8.3', 'php83',
     ];
 
+    /**
+     * @throws RuntimeException with a message that says what to fix
+     */
     public function run(Connection $connection): RemoteInfo
     {
         $remote = $connection->remote;
-        $result = $connection->run($this->command($remote));
+        $result = $connection->run($this->script($remote));
+        $output = $result->output();
+        $values = $this->values($output);
 
-        if (str_contains($result->output(), self::CD_FAILED_MARKER)) {
-            throw new RuntimeException(
-                "Cannot access '{$remote->path}' on [{$remote->name}]: directory not found. Check the remote's path configuration."
-            );
+        if (str_contains($output, self::NO_PATH)) {
+            throw new RuntimeException("Cannot access '{$remote->path}' on [{$remote->name}]: directory not found. Check its path in config/remote-sync.php.");
         }
 
-        if (! $result->successful()) {
-            $error = trim($result->errorOutput()) ?: trim($result->output());
+        if (! isset($values['WORK'])) {
+            $error = trim($result->errorOutput()) ?: "ssh exited with code {$result->exitCode()}";
 
             throw new RuntimeException("Cannot reach [{$remote->name}] ({$remote->host}): {$error}");
         }
 
-        return $this->parse($result->output(), $remote);
+        if (($values['PHP'] ?? '') === '') {
+            throw new RuntimeException("No working PHP binary found on [{$remote->name}]. Set 'php_binary' for it in config/remote-sync.php.");
+        }
+
+        if (($values['RSYNC'] ?? '') !== '1') {
+            throw new RuntimeException("rsync is not installed on [{$remote->name}].");
+        }
+
+        return new RemoteInfo(
+            workingPath: $values['WORK'],
+            phpBinary: $values['PHP'],
+            // Artisan prints its errors to stdout, between the probe's own lines.
+            app: $this->appInfo($remote, $values, $result->errorOutput()."\n".preg_replace('/^[A-Z_]+=.*$/m', '', $output)),
+        );
     }
 
-    public function command(Remote $remote): string
+    public function script(Remote $remote): string
     {
-        $candidates = $remote->phpBinary !== null
-            ? [$remote->phpBinary]
-            : self::PHP_CANDIDATES;
+        $candidates = implode(' ', array_map('escapeshellarg', $remote->phpBinary !== null ? [$remote->phpBinary] : self::PHP_CANDIDATES));
 
-        $escapedCandidates = implode(' ', array_map('escapeshellarg', $candidates));
-        $base = escapeshellarg($remote->path);
-        $tinker = escapeshellarg($this->tinkerCode());
-        $marker = self::CD_FAILED_MARKER;
+        // A candidate only counts if it passes the app's composer platform check.
+        $works = '"$candidate" -r \'if (is_file("vendor/composer/platform_check.php")) { require "vendor/composer/platform_check.php"; }\' >/dev/null 2>&1';
 
-        return "BASE={$base}; "
-            .'if [ -d "$BASE/current" ]; then WORK="$BASE/current"; ATOMIC=1; else WORK="$BASE"; ATOMIC=0; fi; '
-            ."cd \"\$WORK\" || { echo {$marker}; exit 1; }; "
-            .'echo "ATOMIC=$ATOMIC"; '
-            ."PHP=''; for candidate in {$escapedCandidates}; do "
-            .'if command -v "$candidate" >/dev/null 2>&1 && "$candidate" -r \'if (file_exists("vendor/composer/platform_check.php")) { require "vendor/composer/platform_check.php"; }\' >/dev/null 2>&1; then PHP="$candidate"; break; fi; '
-            .'done; '
-            .'echo "PHP=$PHP"; '
-            .'if command -v rsync >/dev/null 2>&1; then echo RSYNC=1; else echo RSYNC=0; fi; '
-            .'if [ -d vendor/spatie/laravel-db-snapshots ]; then echo SNAPSHOTS=1; else echo SNAPSHOTS=0; fi; '
-            .'if [ -n "$PHP" ]; then "$PHP" artisan tinker --execute='.$tinker.' 2>/dev/null; fi; '
-            .'exit 0';
+        return implode(' ', [
+            'BASE='.escapeshellarg($remote->path).';',
+            'if [ -d "$BASE/current" ]; then WORK="$BASE/current"; else WORK="$BASE"; fi;',
+            'cd "$WORK" 2>/dev/null || { echo '.self::NO_PATH.'; exit 1; };',
+            'echo "WORK=$WORK";',
+            "PHP=''; for candidate in {$candidates}; do",
+            'if command -v "$candidate" >/dev/null 2>&1 && '.$works.'; then PHP="$candidate"; break; fi;',
+            'done;',
+            'echo "PHP=$PHP";',
+            'if command -v rsync >/dev/null 2>&1; then echo RSYNC=1; else echo RSYNC=0; fi;',
+            'if [ -n "$PHP" ]; then "$PHP" artisan remote-sync:info; fi',
+        ]);
     }
 
-    protected function tinkerCode(): string
+    /**
+     * @return array<string, string>
+     */
+    protected function values(string $output): array
     {
-        return <<<'PHP'
-$driver = config('database.connections.'.config('database.default').'.driver');
-$schemaBuilder = DB::connection()->getSchemaBuilder();
-$tables = method_exists($schemaBuilder, 'getCurrentSchemaName')
-    ? $schemaBuilder->getTableListing($schemaBuilder->getCurrentSchemaName(), schemaQualified: false)
-    : $schemaBuilder->getTableListing();
-$disk = config('db-snapshots.disk', 'snapshots');
-$root = config('filesystems.disks.'.$disk.'.root');
-echo PHP_EOL.'REMOTE_SYNC_JSON='.json_encode(['driver' => $driver, 'tables' => array_values($tables), 'snapshot_dir' => $root]);
-PHP;
-    }
-
-    protected function parse(string $output, Remote $remote): RemoteInfo
-    {
-        $atomic = false;
-        $phpBinary = null;
-        $hasRsync = false;
-        $hasDbSnapshots = false;
-        $driver = null;
-        $tables = [];
-        $snapshotDir = null;
+        $values = [];
 
         foreach (preg_split('/\r?\n/', $output) ?: [] as $line) {
-            $line = trim($line);
-
-            if (str_starts_with($line, 'ATOMIC=')) {
-                $atomic = substr($line, strlen('ATOMIC=')) === '1';
-            } elseif (str_starts_with($line, 'PHP=')) {
-                $value = substr($line, strlen('PHP='));
-                $phpBinary = $value !== '' ? $value : null;
-            } elseif (str_starts_with($line, 'RSYNC=')) {
-                $hasRsync = substr($line, strlen('RSYNC=')) === '1';
-            } elseif (str_starts_with($line, 'SNAPSHOTS=')) {
-                $hasDbSnapshots = substr($line, strlen('SNAPSHOTS=')) === '1';
-            } elseif (str_starts_with($line, self::JSON_MARKER)) {
-                $decoded = json_decode(substr($line, strlen(self::JSON_MARKER)), true);
-
-                if (is_array($decoded)) {
-                    $driver = is_string($decoded['driver'] ?? null) ? $decoded['driver'] : null;
-                    $tables = array_values(array_filter($decoded['tables'] ?? [], 'is_string'));
-                    $snapshotDir = is_string($decoded['snapshot_dir'] ?? null) ? $decoded['snapshot_dir'] : null;
-                }
+            if (preg_match('/^([A-Z_]+)=(.*)$/', trim($line), $match)) {
+                $values[$match[1]] = $match[2];
             }
         }
 
-        $endsWithCurrent = str_ends_with($remote->path, '/current');
-        $isAtomic = $atomic || $endsWithCurrent;
-        $workingPath = ($atomic && ! $endsWithCurrent) ? "{$remote->path}/current" : $remote->path;
+        return $values;
+    }
 
-        return new RemoteInfo(
-            phpBinary: $phpBinary,
-            isAtomic: $isAtomic,
-            workingPath: $workingPath,
-            snapshotDir: $snapshotDir ?? "{$workingPath}/storage/snapshots",
-            driver: $driver,
-            tables: $tables,
-            hasDbSnapshots: $hasDbSnapshots,
-            hasRsync: $hasRsync,
-        );
+    /**
+     * @param  array<string, string>  $values
+     */
+    protected function appInfo(Remote $remote, array $values, string $error): AppInfo
+    {
+        if (! isset($values[InfoCommand::KEY])) {
+            $lines = array_values(array_filter(array_map('trim', preg_split('/\r?\n/', $error) ?: [])));
+            $missing = str_contains($error, 'not defined') || str_contains($error, 'no commands defined');
+
+            throw new RuntimeException(
+                "remote-sync:info failed on [{$remote->name}]: ".(implode(' ', array_slice($lines, 0, 2)) ?: 'no output.')
+                .($missing ? ' Install jorisnoo/laravel-remote-sync there as a regular (not require-dev) dependency and deploy.' : '')
+            );
+        }
+
+        try {
+            $info = AppInfo::fromArray((array) json_decode($values[InfoCommand::KEY], true));
+        } catch (UnexpectedValueException $e) {
+            throw new RuntimeException("[{$remote->name}]: {$e->getMessage()}");
+        }
+
+        $local = Inspector::PROTOCOL;
+
+        if ($info->protocol !== $local) {
+            $update = $info->protocol < $local
+                ? "deploy the newer jorisnoo/laravel-remote-sync to [{$remote->name}]"
+                : 'update jorisnoo/laravel-remote-sync locally';
+
+            throw new RuntimeException("[{$remote->name}] runs remote-sync protocol {$info->protocol}, this app runs {$local}: {$update}.");
+        }
+
+        return $info;
     }
 }

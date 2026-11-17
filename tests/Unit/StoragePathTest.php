@@ -28,6 +28,8 @@ describe('StoragePath', function () {
         '.hidden',
         '',
         'app&&x',
+        'remote-sync',
+        'remote-sync/old',
     ]);
 
     it('normalizes surrounding slashes', function () {

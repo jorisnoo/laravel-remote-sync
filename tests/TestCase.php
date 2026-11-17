@@ -4,7 +4,6 @@ namespace Noo\LaravelRemoteSync\Tests;
 
 use Noo\LaravelRemoteSync\LaravelRemoteSyncServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
-use Spatie\DbSnapshots\DbSnapshotsServiceProvider;
 
 class TestCase extends Orchestra
 {
@@ -12,7 +11,6 @@ class TestCase extends Orchestra
     {
         return [
             LaravelRemoteSyncServiceProvider::class,
-            DbSnapshotsServiceProvider::class,
         ];
     }
 
@@ -23,11 +21,6 @@ class TestCase extends Orchestra
             'driver' => 'sqlite',
             'database' => ':memory:',
             'prefix' => '',
-        ]);
-
-        config()->set('filesystems.disks.snapshots', [
-            'driver' => 'local',
-            'root' => storage_path('snapshots'),
         ]);
     }
 }

@@ -2,188 +2,147 @@
 
 namespace Noo\LaravelRemoteSync\Sync;
 
-use Noo\LaravelRemoteSync\Remotes\RemoteInfo;
-use Noo\LaravelRemoteSync\Snapshots\Importer;
-use Noo\LaravelRemoteSync\Snapshots\Snapshots;
+use Noo\LaravelRemoteSync\Database\Dumps;
+use Noo\LaravelRemoteSync\Database\Inspector;
+use Noo\LaravelRemoteSync\Database\UserFilter;
 use RuntimeException;
 
 class Planner
 {
     public function __construct(
-        protected RemoteInfo $info,
+        protected Endpoint $source,
+        protected Endpoint $target,
         protected Rsync $rsync,
-        protected Importer $importer,
     ) {}
 
     /**
-     * @param  list<string>  $paths
+     * Pull makes the local database equal to the remote's: excluded tables
+     * arrive as structure only, local-only tables are dropped, and migrate
+     * brings it up to the local code afterwards.
      *
-     * @throws RuntimeException when a files dry-run fails
+     * Push replaces the remote's copy of every non-excluded table and leaves
+     * its excluded tables (sessions, tokens, jobs) untouched.
+     *
+     * @throws RuntimeException when a push would erase remote migrations
      */
-    public function pull(
-        bool $database,
-        bool $files,
-        bool $full = false,
-        bool $backup = true,
-        bool $keepSnapshot = false,
-        bool $delete = false,
-        array $paths = []
-    ): SyncPlan {
-        $excluded = Importer::excludedTables();
+    public function database(Direction $direction, bool $full = false, bool $backup = true, bool $keepTransfer = false): DatabasePlan
+    {
+        $backupName = $backup ? Dumps::backupName($direction->value) : null;
 
-        $tablesToSync = $database
-            ? ($full ? $this->info->tables : array_values(array_diff($this->info->tables, $excluded)))
-            : [];
+        return $direction === Direction::Pull
+            ? $this->pullDatabase($full, $backupName, $keepTransfer)
+            : $this->pushDatabase($backupName, $keepTransfer);
+    }
 
-        $tablesToTruncate = ($database && ! $full)
-            ? array_values(array_intersect($excluded, $this->importer->localTables()))
-            : [];
+    protected function pullDatabase(bool $full, ?string $backup, bool $keepTransfer): DatabasePlan
+    {
+        $source = $this->source->info();
+        $empty = $full ? [] : $this->excludedTables($source->tables);
+        $warnings = [];
 
-        [$fileChanges, $fileExcludes] = $files
-            ? $this->analyzeFiles(Direction::Pull, $paths)
-            : [[], []];
+        if ($backup === null) {
+            $warnings[] = 'Without a backup, the current local database cannot be restored.';
+        }
 
-        $filterUsers = config('remote-sync.filter_users', false);
+        $patterns = UserFilter::patterns();
 
-        return new SyncPlan(
-            direction: Direction::Pull,
-            database: $database,
-            files: $files,
-            full: $full,
+        if ($patterns !== null) {
+            $warnings[] = 'Only users matching '.implode(', ', $patterns).' are kept.';
+        }
+
+        return new DatabasePlan(
+            transfer: Dumps::transferName(),
             backup: $backup,
-            keepSnapshot: $keepSnapshot,
-            delete: $delete,
-            paths: $files ? $paths : [],
-            tablesToSync: $tablesToSync,
-            tablesToTruncate: $tablesToTruncate,
-            fileChanges: $fileChanges,
-            fileExcludes: $fileExcludes,
-            filterUsers: ($database && is_array($filterUsers) && $filterUsers !== []) ? array_values($filterUsers) : null,
-            snapshotName: $database ? Snapshots::transferName() : '',
-            backupName: ($database && $backup) ? Snapshots::pullBackupName() : '',
+            fresh: true,
+            keepTransfer: $keepTransfer,
+            dumpOptions: array_map(fn (string $table) => "--exclude-data={$table}", $empty),
+            replace: array_values(array_diff($source->tables, $empty)),
+            empty: $empty,
+            drop: array_values(array_diff($this->target->info()->tables, $source->tables)),
+            filterUsers: $patterns !== null,
+            warnings: $warnings,
+        );
+    }
+
+    protected function pushDatabase(?string $backup, bool $keepTransfer): DatabasePlan
+    {
+        $source = $this->source->info();
+        $target = $this->target->info();
+        $excluded = $this->excludedTables($source->tables);
+        $warnings = [];
+
+        // The pushed migrations table replaces the remote's: migrations only
+        // the remote has would be forgotten and run again.
+        if (($ahead = array_values(array_diff($target->migrations, $source->migrations))) !== []) {
+            throw new RuntimeException(
+                "{$this->target->label()} has migrations this app does not: ".self::summarize($ahead).'. Update your code and pull first.'
+            );
+        }
+
+        if (($unrun = array_values(array_diff($source->migrations, $target->migrations))) !== []) {
+            $warnings[] = "Migrations not yet run on {$this->target->label()} will be recorded as run: ".self::summarize($unrun).'.';
+        }
+
+        if ($target->environment === 'production') {
+            $warnings[] = "{$this->target->label()} is a production environment.";
+        }
+
+        return new DatabasePlan(
+            transfer: Dumps::transferName(),
+            backup: $backup,
+            fresh: false,
+            keepTransfer: $keepTransfer,
+            dumpOptions: array_map(fn (string $table) => "--exclude={$table}", $excluded),
+            replace: array_values(array_diff($source->tables, $excluded)),
+            preserve: $this->excludedTables($target->tables),
+            warnings: $warnings,
         );
     }
 
     /**
-     * @param  list<string>  $paths
+     * @param  list<string>  $paths  Storage-relative paths.
      *
-     * @throws RuntimeException when a files dry-run fails
+     * @throws RuntimeException when a dry run fails, e.g. the source path is missing
      */
-    public function push(
-        bool $database,
-        bool $files,
-        bool $backup = true,
-        bool $delete = false,
-        array $paths = []
-    ): SyncPlan {
-        $excluded = Importer::excludedTables();
-
-        $localTables = $database ? $this->importer->localTables() : [];
-
-        $tablesToSync = $database
-            ? array_values(array_diff($localTables, $excluded))
-            : [];
-
-        $tablesToPreserve = $database
-            ? array_values(array_intersect($excluded, $this->info->tables))
-            : [];
-
-        [$fileChanges, $fileExcludes] = $files
-            ? $this->analyzeFiles(Direction::Push, $paths)
-            : [[], []];
-
-        return new SyncPlan(
-            direction: Direction::Push,
-            database: $database,
-            files: $files,
-            backup: $backup,
-            delete: $delete,
-            paths: $files ? $paths : [],
-            tablesToSync: $tablesToSync,
-            tablesToTruncate: $tablesToPreserve,
-            fileChanges: $fileChanges,
-            fileExcludes: $fileExcludes,
-            snapshotName: $database ? Snapshots::transferName() : '',
-            backupName: ($database && $backup) ? Snapshots::pushBackupName() : '',
-        );
-    }
-
-    /**
-     * Dry-run every path to discover transfers and deletable files. The
-     * dry-run always includes --delete so the preview can report what a
-     * deletion pass would remove, even when the user did not opt in.
-     *
-     * @param  list<string>  $paths
-     * @return array{0: array<string, FileChanges>, 1: array<string, list<string>>}
-     */
-    protected function analyzeFiles(Direction $direction, array $paths): array
+    public function files(array $paths, bool $delete = false): FilesPlan
     {
         $changes = [];
-        $excludes = [];
 
         foreach ($paths as $path) {
-            $localPath = storage_path($path);
-
-            if ($direction === Direction::Pull && ! is_dir($localPath)) {
-                mkdir($localPath, 0755, true);
-            }
-
-            if ($direction === Direction::Push && ! is_dir($localPath)) {
-                $changes[$path] = new FileChanges;
-                $excludes[$path] = [];
-
-                continue;
-            }
-
-            $excludes[$path] = $this->snapshotDirExcludesFor($path);
-
             try {
-                $changes[$path] = $this->rsync->dryRun(
-                    $direction,
-                    "{$this->info->storagePath()}/{$path}/",
-                    rtrim($localPath, '/').'/',
-                    excludes: $excludes[$path],
-                    delete: true,
+                $changes[$path] = $this->rsync->preview(
+                    $this->source->rsyncPath($this->source->storagePath($path).'/'),
+                    $this->target->rsyncPath($this->target->storagePath($path).'/'),
                 );
             } catch (RuntimeException $e) {
-                throw new RuntimeException("Could not analyze files for storage/{$path}: {$e->getMessage()}");
+                throw new RuntimeException("Could not compare storage/{$path}: {$e->getMessage()}");
             }
         }
 
-        return [$changes, $excludes];
+        return new FilesPlan($changes, $delete);
     }
 
     /**
-     * Exclude patterns keeping snapshot directories out of file syncs,
-     * wherever the local and remote snapshot disks actually live.
+     * The tables in $tables that are configured as excluded. The migrations
+     * table is never excluded.
      *
+     * @param  list<string>  $tables
      * @return list<string>
      */
-    protected function snapshotDirExcludesFor(string $path): array
+    protected function excludedTables(array $tables): array
     {
-        $candidates = [];
+        $excluded = array_diff(config('remote-sync.exclude_tables', []), [Inspector::migrationsTable()]);
 
-        $remoteStorage = $this->info->storagePath();
+        return array_values(array_intersect($tables, $excluded));
+    }
 
-        if (str_starts_with($this->info->snapshotDir, "{$remoteStorage}/")) {
-            $candidates[] = substr($this->info->snapshotDir, strlen($remoteStorage) + 1);
-        }
+    /**
+     * @param  list<string>  $items
+     */
+    public static function summarize(array $items, int $limit = 3): string
+    {
+        $shown = implode(', ', array_slice($items, 0, $limit));
 
-        $localDir = Snapshots::localDir();
-        $localStorage = storage_path();
-
-        if (str_starts_with($localDir, $localStorage.DIRECTORY_SEPARATOR)) {
-            $candidates[] = str_replace('\\', '/', substr($localDir, strlen($localStorage) + 1));
-        }
-
-        $excludes = [];
-
-        foreach (array_unique($candidates) as $storageRelative) {
-            if (str_starts_with($storageRelative, "{$path}/")) {
-                $excludes[] = '/'.substr($storageRelative, strlen($path) + 1);
-            }
-        }
-
-        return array_values(array_unique($excludes));
+        return count($items) > $limit ? $shown.' (+'.(count($items) - $limit).' more)' : $shown;
     }
 }
