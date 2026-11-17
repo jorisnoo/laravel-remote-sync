@@ -1,5 +1,5 @@
 name: dependabot-auto-merge
-on: pull_request_target
+on: pull_request
 
 permissions:
   pull-requests: write
@@ -9,11 +9,14 @@ jobs:
   dependabot:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    if: ${{ github.actor == 'dependabot[bot]' }}
+    # Gate on the PR author, not github.actor (which is whoever triggered the
+    # latest event). Same-repo branches only: fork PRs never get a write token.
+    if: >-
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository
     steps:
-
       - name: Auto-merge Dependabot PRs
         run: gh pr merge --auto --merge "$PR_URL"
         env:
-          PR_URL: ${{github.event.pull_request.html_url}}
-          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
