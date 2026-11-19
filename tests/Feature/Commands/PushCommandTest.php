@@ -134,8 +134,7 @@ describe('remote-sync:push', function () {
             $snapshots->shouldReceive('deleteRemote')->once()->andReturn(Process::result());
 
             $this->artisan('remote-sync:push', ['--database' => true, '--force' => true])
-                ->expectsOutputToContain('Failed to load snapshot on remote')
-                ->expectsOutputToContain('Snapshot file not found')
+                ->expectsOutputToContain('Failed to load snapshot on remote: Snapshot file not found')
                 ->expectsOutputToContain('php artisan remote-sync:load pre-push-')
                 ->assertFailed();
 
