@@ -6,6 +6,7 @@ use Illuminate\Console\Command;
 use Noo\LaravelRemoteSync\Commands\Concerns\ResolvesRemote;
 use Noo\LaravelRemoteSync\Remotes\Connection;
 use Noo\LaravelRemoteSync\Snapshots\Snapshots;
+use Throwable;
 
 use function Laravel\Prompts\confirm;
 
@@ -26,9 +27,26 @@ class PruneCommand extends Command
 
     public function handle(): int
     {
+        try {
+            return $this->prune();
+        } catch (Throwable $e) {
+            $this->components->error($e->getMessage() ?: $e::class);
+
+            return self::FAILURE;
+        }
+    }
+
+    private function prune(): int
+    {
         $pruneLocal = $this->option('local') || ! $this->option('remote');
         $pruneRemote = $this->option('remote') || ! $this->option('local');
-        $keep = max(0, (int) $this->option('keep'));
+        $keep = (string) $this->option('keep');
+        if (! ctype_digit($keep)) {
+            $this->components->error(__('remote-sync::messages.errors.invalid_keep'));
+
+            return self::FAILURE;
+        }
+        $keep = (int) $keep;
 
         $localVictims = $pruneLocal ? $this->prunable(Snapshots::listLocal(), $keep) : [];
 
@@ -36,13 +54,18 @@ class PruneCommand extends Command
         $remoteName = null;
         $remoteVictims = [];
 
-        if ($pruneRemote) {
-            $remote = $this->resolveRemote();
+        $remoteOptional = ! $this->option('remote') && $this->argument('remote') === null;
+        $remote = $pruneRemote ? $this->resolveRemote(warnOnFailure: $remoteOptional) : null;
 
-            if ($remote === null) {
+        if ($pruneRemote && $remote === null) {
+            if (! $remoteOptional) {
                 return self::FAILURE;
             }
 
+            $this->components->warn(__('remote-sync::messages.warnings.skipping_remote_prune'));
+        }
+
+        if ($remote !== null) {
             $connection = new Connection($remote);
 
             if (! $this->verifyHostKey($connection)) {
@@ -52,6 +75,12 @@ class PruneCommand extends Command
             $info = $this->probeRemote($connection);
 
             if ($info === null) {
+                return self::FAILURE;
+            }
+
+            if ($info->snapshotDir === '') {
+                $this->components->error("Cannot prune [{$remote->name}]: could not determine a local snapshots directory on the remote.");
+
                 return self::FAILURE;
             }
 

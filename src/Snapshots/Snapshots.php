@@ -3,10 +3,10 @@
 namespace Noo\LaravelRemoteSync\Snapshots;
 
 use Illuminate\Contracts\Process\ProcessResult;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Process;
 use Noo\LaravelRemoteSync\Remotes\Connection;
 use Noo\LaravelRemoteSync\Remotes\RemoteInfo;
+use RuntimeException;
 
 class Snapshots
 {
@@ -50,14 +50,25 @@ class Snapshots
 
     public static function localDir(): string
     {
+        return static::configuredLocalDir() ?? throw new RuntimeException('Configure the snapshots disk with the local driver and an absolute directory root.');
+    }
+
+    public static function configuredLocalDir(): ?string
+    {
         $disk = config('db-snapshots.disk', 'snapshots');
         $root = config("filesystems.disks.{$disk}.root");
 
-        return is_string($root) && $root !== '' ? $root : storage_path('snapshots');
+        return config("filesystems.disks.{$disk}.driver") === 'local' && is_string($root) && str_starts_with($root, '/') && trim($root, '/') !== ''
+            ? rtrim($root, '/')
+            : null;
     }
 
     public static function localPath(string $name): string
     {
+        if (! preg_match('/\A[A-Za-z0-9][A-Za-z0-9_.-]*\z/', $name)) {
+            throw new RuntimeException('Invalid snapshot name.');
+        }
+
         return static::localDir()."/{$name}.sql.gz";
     }
 
@@ -96,30 +107,18 @@ class Snapshots
     }
 
     /**
-     * Create a compressed snapshot of the local database via spatie/laravel-db-snapshots.
+     * Create a compressed snapshot, using the same dump protocol at either endpoint.
      *
      * @param  list<string>  $excludeTables
      */
-    public function createLocal(string $name, array $excludeTables = []): int
+    public function createLocal(string $name, array $excludeTables = []): void
     {
-        $arguments = ['name' => $name, '--compress' => true];
-
-        if ($excludeTables !== []) {
-            $arguments['--exclude'] = $excludeTables;
-        }
-
-        $extraOptions = static::replacementDumpOptions(Importer::localDriver());
-
-        if ($extraOptions !== []) {
-            $arguments['--extraOptions'] = $extraOptions;
-        }
-
-        return Artisan::call('snapshot:create', $arguments);
+        app(SnapshotDump::class)->create($name, $excludeTables);
     }
 
     public static function verifyGzip(string $name): bool
     {
-        return Process::timeout(300)
+        return Process::timeout((int) config('remote-sync.timeouts.transfer', 1800))
             ->run(['gzip', '-t', static::localPath($name)])
             ->successful();
     }
@@ -132,17 +131,12 @@ class Snapshots
     }
 
     /**
-     * @param  list<string>  $excludeTables
+     * @param  list<string>  $empty  Tables whose structure is needed but whose data must not be copied.
      */
-    public function createRemote(string $name, array $excludeTables = []): ProcessResult
+    public function createRemote(string $name, array $empty = []): ProcessResult
     {
-        $arguments = collect(['snapshot:create', escapeshellarg($name)])
-            ->merge(collect($excludeTables)->map(fn (string $table) => '--exclude='.escapeshellarg($table)))
-            ->merge(collect(static::replacementDumpOptions($this->info->driver))->map(
-                fn (string $option) => '--extraOptions='.escapeshellarg($option)
-            ))
-            ->push('--compress')
-            ->implode(' ');
+        $arguments = implode(' ', ['remote-sync:dump', escapeshellarg($name),
+            ...array_map(static fn (string $table): string => '--empty='.escapeshellarg($table), $empty)]);
 
         return $this->connection->artisan($this->info, $arguments, $this->connection->transferTimeout());
     }
@@ -151,23 +145,9 @@ class Snapshots
     {
         return $this->connection->artisan(
             $this->info,
-            'snapshot:load '.escapeshellarg($name).' --force --drop-tables=0',
+            'remote-sync:load '.escapeshellarg($name).' --force',
             $this->connection->transferTimeout()
         );
-    }
-
-    /**
-     * PostgreSQL dumps do not include DROP statements by default. Add them so
-     * loading a snapshot replaces included objects instead of merging rows.
-     * Excluded tables are absent from the dump and therefore remain in place.
-     *
-     * @return list<string>
-     */
-    protected static function replacementDumpOptions(string $driver): array
-    {
-        return Importer::normalizeDriver($driver) === 'pgsql'
-            ? ['--clean', '--if-exists']
-            : [];
     }
 
     public function deleteRemote(string $name): ProcessResult
@@ -183,11 +163,12 @@ class Snapshots
         $dir = static::localDir();
 
         if (! is_dir($dir)) {
-            mkdir($dir, 0755, true);
+            mkdir($dir, 0700, true);
         }
 
         return Process::timeout($this->connection->transferTimeout())->run([
             'rsync',
+            '-e', Connection::shell(),
             '-az',
             '--partial',
             "{$this->connection->remote->host}:{$this->remotePath($name)}",
@@ -197,8 +178,14 @@ class Snapshots
 
     public function upload(string $name): ProcessResult
     {
+        $directory = $this->connection->run('mkdir -p '.escapeshellarg($this->info->snapshotDir));
+        if (! $directory->successful()) {
+            return $directory;
+        }
+
         return Process::timeout($this->connection->transferTimeout())->run([
             'rsync',
+            '-e', Connection::shell(),
             '-az',
             '--partial',
             static::localPath($name),
@@ -214,13 +201,14 @@ class Snapshots
     public function listRemote(): array
     {
         $dir = escapeshellarg($this->info->snapshotDir);
-        $command = "{ find {$dir} -maxdepth 1 -name '*.sql.gz' -exec stat -c '%Y %n' {} + 2>/dev/null"
-            ." || find {$dir} -maxdepth 1 -name '*.sql.gz' -exec stat -f '%m %N' {} + 2>/dev/null; } | sort -rn || true";
+        $command = "if [ ! -d {$dir} ]; then exit 0; fi; "
+            ."find {$dir} -maxdepth 1 -type f -name '*.sql.gz' -exec stat -c '%Y %n' {} + 2>/dev/null"
+            ." || find {$dir} -maxdepth 1 -type f -name '*.sql.gz' -exec stat -f '%m %N' {} +";
 
         $result = $this->connection->run($command);
 
         if (! $result->successful()) {
-            return [];
+            throw new RuntimeException('Could not list remote snapshots: '.trim($result->errorOutput()));
         }
 
         $snapshots = [];
@@ -239,6 +227,7 @@ class Snapshots
                 'mtime' => (int) $mtime,
             ];
         }
+        usort($snapshots, static fn (array $a, array $b): int => $b['mtime'] <=> $a['mtime']);
 
         return $snapshots;
     }

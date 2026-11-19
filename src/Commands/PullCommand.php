@@ -16,6 +16,7 @@ use Noo\LaravelRemoteSync\Sync\PlanRenderer;
 use Noo\LaravelRemoteSync\Sync\Rsync;
 use Noo\LaravelRemoteSync\Sync\SyncPlan;
 use RuntimeException;
+use Throwable;
 
 use function Laravel\Prompts\multiselect;
 
@@ -39,6 +40,8 @@ class PullCommand extends Command
 
     public function handle(): int
     {
+        $this->failureNotes = [];
+
         if (! $this->guardProduction()) {
             return self::FAILURE;
         }
@@ -70,7 +73,7 @@ class PullCommand extends Command
         $paths = [];
 
         if ($files) {
-            $paths = $this->resolvePaths();
+            $paths = $this->resolvePaths($this->option('path'));
 
             if ($paths === null) {
                 return self::FAILURE;
@@ -103,7 +106,7 @@ class PullCommand extends Command
                 delete: (bool) $this->option('delete'),
                 paths: $paths,
             ));
-        } catch (RuntimeException $e) {
+        } catch (Throwable $e) {
             $this->components->error($e->getMessage());
 
             return self::FAILURE;
@@ -209,9 +212,11 @@ class PullCommand extends Command
                 $steps[] = [
                     'label' => "Creating local backup {$plan->backupName}",
                     'run' => function () use ($snapshots, $plan): ?string {
-                        return $snapshots->createLocal($plan->backupName) === 0
-                            ? null
-                            : __('remote-sync::messages.errors.failed_local_backup');
+                        $snapshots->createLocal($plan->backupName);
+
+                        $this->failureNotes[] = __('remote-sync::messages.info.restore_hint', ['name' => $plan->backupName]);
+
+                        return null;
                     },
                 ];
             }
@@ -225,7 +230,7 @@ class PullCommand extends Command
                     );
 
                     if (! $result->successful()) {
-                        return __('remote-sync::messages.errors.failed_remote_snapshot', ['error' => trim($result->errorOutput())]);
+                        return __('remote-sync::messages.errors.failed_remote_snapshot', ['error' => trim($result->errorOutput()."\n".$result->output())]);
                     }
 
                     $cleanup->push("temporary snapshot on [{$remoteName}]", function () use ($snapshots, $plan) {
@@ -269,7 +274,7 @@ class PullCommand extends Command
                 'run' => function () use ($importer, $plan, $cleanup): ?string {
                     try {
                         $result = $importer->import($plan->snapshotName, dropTables: $plan->full);
-                    } catch (RuntimeException $e) {
+                    } catch (Throwable $e) {
                         $this->noteImportFailure($plan, $cleanup);
 
                         return $e->getMessage();
@@ -279,10 +284,6 @@ class PullCommand extends Command
                         $this->noteImportFailure($plan, $cleanup);
 
                         return __('remote-sync::messages.errors.failed_import', ['error' => trim($result->errorOutput())]);
-                    }
-
-                    if (! $plan->full) {
-                        $importer->truncateExcluded();
                     }
 
                     $filtered = $importer->filterUsers();
@@ -304,12 +305,10 @@ class PullCommand extends Command
                 'label' => 'Running migrations and clearing caches',
                 'run' => function (): ?string {
                     if ($this->callSilently('migrate', ['--force' => true]) !== 0) {
-                        $this->components->warn(__('remote-sync::messages.warnings.migrations_failed'));
+                        return __('remote-sync::messages.errors.migrations_failed');
                     }
 
-                    $this->callSilently('optimize:clear');
-
-                    return null;
+                    return $this->callSilently('optimize:clear') === 0 ? null : 'Clearing local caches failed.';
                 },
             ];
         }
@@ -345,10 +344,6 @@ class PullCommand extends Command
     protected function noteImportFailure(SyncPlan $plan, CleanupStack $cleanup): void
     {
         $cleanup->forget('downloaded snapshot file');
-
-        if ($plan->backup) {
-            $this->failureNotes[] = __('remote-sync::messages.info.restore_hint', ['name' => $plan->backupName]);
-        }
 
         $this->failureNotes[] = __('remote-sync::messages.info.snapshot_kept', [
             'path' => Snapshots::localPath($plan->snapshotName),

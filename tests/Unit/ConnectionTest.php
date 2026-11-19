@@ -35,7 +35,7 @@ describe('Connection', function () {
 
             makeConnection()->run('ls -la');
 
-            Process::assertRan(fn ($process) => $process->command === ['ssh', 'forge@prod.acme.test', 'ls -la']);
+            Process::assertRan(fn ($process) => $process->command === ['ssh', ...Connection::SSH_OPTIONS, '--', 'forge@prod.acme.test', 'ls -la']);
         });
     });
 
@@ -47,6 +47,8 @@ describe('Connection', function () {
 
             Process::assertRan(fn ($process) => $process->command === [
                 'ssh',
+                ...Connection::SSH_OPTIONS,
+                '--',
                 'forge@prod.acme.test',
                 "cd '/home/forge/acme/current' && 'php8.4' artisan migrate --force",
             ]);
@@ -57,7 +59,7 @@ describe('Connection', function () {
 
             makeConnection()->artisan(makeRemoteInfo(phpBinary: null), 'migrate --force');
 
-            Process::assertRan(fn ($process) => str_contains($process->command[2], "'php' artisan migrate --force"));
+            Process::assertRan(fn ($process) => str_contains(last($process->command), "'php' artisan migrate --force"));
         });
     });
 
@@ -89,72 +91,35 @@ describe('Connection', function () {
 
             Process::assertRan(fn ($process) => $process->command === [
                 'ssh',
+                '-o', 'StrictHostKeyChecking=yes',
                 '-o', 'BatchMode=yes',
+                '-o', 'UpdateHostKeys=no',
                 '-o', 'ConnectTimeout=5',
+                '--',
                 'forge@prod.acme.test',
                 'exit',
             ]);
         });
 
-        it('returns ok when there is no host key issue', function () {
-            Process::fake(['*' => Process::result()]);
-
-            expect(makeConnection()->checkHostKey())->toBe('ok');
-        });
-
-        it('returns unknown when the host is not in known_hosts', function () {
+        it('requires independently verified keys for unknown hosts', function () {
             Process::fake(['*' => Process::result(exitCode: 255, errorOutput: 'Host key verification failed.')]);
 
-            expect(makeConnection()->checkHostKey())->toBe('unknown');
+            expect(fn () => makeConnection()->checkHostKey())->toThrow(RuntimeException::class, 'Verify its fingerprint');
         });
 
-        it('returns changed when the host key does not match', function () {
+        it('rejects a changed host key', function () {
             Process::fake(['*' => Process::result(
                 exitCode: 255,
                 errorOutput: "@ WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED! @\nHost key verification failed.",
             )]);
 
-            expect(makeConnection()->checkHostKey())->toBe('changed');
-        });
-    });
-
-    describe('hostFingerprints', function () {
-        it('scans the hostname without the user part', function () {
-            Process::fake(['*' => Process::result(output: '256 SHA256:abc prod.acme.test (ED25519)')]);
-
-            $fingerprints = makeConnection()->hostFingerprints();
-
-            expect($fingerprints)->toBe('256 SHA256:abc prod.acme.test (ED25519)');
-
-            Process::assertRan(fn ($process) => $process->command === "ssh-keyscan -t ed25519,rsa,ecdsa 'prod.acme.test' 2>/dev/null | ssh-keygen -lf -");
+            expect(fn () => makeConnection()->checkHostKey())->toThrow(RuntimeException::class, 'man-in-the-middle');
         });
 
-        it('returns null when the scan produces nothing', function () {
-            Process::fake(['*' => Process::result(output: '')]);
+        it('does not trust a failed ssh connection even without a host key warning', function () {
+            Process::fake(['*' => Process::result(exitCode: 255, errorOutput: 'Permission denied (publickey).')]);
 
-            expect(makeConnection()->hostFingerprints())->toBeNull();
-        });
-    });
-
-    describe('acceptHostKey', function () {
-        it('connects with accept-new to save the key', function () {
-            Process::fake(['*' => Process::result()]);
-
-            expect(makeConnection()->acceptHostKey())->toBeTrue();
-
-            Process::assertRan(fn ($process) => $process->command === [
-                'ssh',
-                '-o', 'StrictHostKeyChecking=accept-new',
-                '-o', 'ConnectTimeout=10',
-                'forge@prod.acme.test',
-                'exit',
-            ]);
-        });
-
-        it('reports failure when verification still fails', function () {
-            Process::fake(['*' => Process::result(exitCode: 255, errorOutput: 'Host key verification failed.')]);
-
-            expect(makeConnection()->acceptHostKey())->toBeFalse();
+            expect(fn () => makeConnection()->checkHostKey())->toThrow(RuntimeException::class, 'Permission denied (publickey).');
         });
     });
 });

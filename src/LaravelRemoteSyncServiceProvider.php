@@ -3,6 +3,9 @@
 namespace Noo\LaravelRemoteSync;
 
 use Noo\LaravelRemoteSync\Commands\DoctorCommand;
+use Noo\LaravelRemoteSync\Commands\DumpCommand;
+use Noo\LaravelRemoteSync\Commands\InfoCommand;
+use Noo\LaravelRemoteSync\Commands\LoadCommand;
 use Noo\LaravelRemoteSync\Commands\PruneCommand;
 use Noo\LaravelRemoteSync\Commands\PullCommand;
 use Noo\LaravelRemoteSync\Commands\PushCommand;
@@ -22,6 +25,9 @@ class LaravelRemoteSyncServiceProvider extends PackageServiceProvider
                 PushCommand::class,
                 PruneCommand::class,
                 DoctorCommand::class,
+                InfoCommand::class,
+                DumpCommand::class,
+                LoadCommand::class,
             ]);
     }
 }

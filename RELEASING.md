@@ -11,10 +11,12 @@ Release from `main` using an explicit version without a `v` prefix. `CHANGELOG.m
 Configured release checks:
 
 ```sh
-composer test
+REMOTE_SYNC_TEST_PGSQL=1 REMOTE_SYNC_TEST_MYSQL=1 composer test
 ```
 
 Install the project’s normal dependencies first. The helper runs these checks when publishing; dry-run prints them without executing them. Run any additional checks needed for the changed behavior before committing.
+
+The database integration fixtures start private socket-only servers under temporary directories as the current, non-root user. Put `initdb`, `postgres`, `pg_dump`, `psql`, `mysqld`, `mysqldump` and `mysql` on `PATH`, and enable PHP's `pdo_pgsql` and `pdo_mysql` extensions. No running service or application credentials are required.
 
 ## Release
 

@@ -50,6 +50,84 @@ afterEach(function () {
 });
 
 describe('remote-sync:prune', function () {
+    it('rejects invalid retention without listing or deleting snapshots', function (string $keep) {
+        Process::fake();
+        createLocalSnapshots(['pre-pull-last' => 10]);
+
+        $this->artisan('remote-sync:prune', ['--keep' => $keep, '--force' => true])
+            ->expectsOutputToContain('--keep must be a non-negative integer')
+            ->assertFailed();
+
+        expect(localSnapshotNames())->toBe(['pre-pull-last']);
+        Process::assertNothingRan();
+    })->with(['', 'five', '-1', '1.5']);
+
+    it('prunes locally in implicit mode if there is no remote to select', function (array $remotes) {
+        config()->set('remote-sync.remotes', $remotes);
+        Process::fake();
+        createLocalSnapshots(['pre-pull-first' => 20, 'pre-pull-last' => 10]);
+
+        $this->artisan('remote-sync:prune', ['--keep' => '1', '--force' => true, '--no-interaction' => true])
+            ->expectsOutputToContain('pruning local snapshots only')
+            ->assertSuccessful();
+
+        expect(localSnapshotNames())->toBe(['pre-pull-last']);
+        Process::assertNothingRan();
+    })->with([
+        'unconfigured' => [[]],
+        'ambiguous' => [['first' => [], 'second' => []]],
+    ]);
+
+    it('does not fall back to local pruning for an explicitly requested remote', function () {
+        config()->set('remote-sync.remotes', []);
+        Process::fake();
+        createLocalSnapshots(['pre-pull-last' => 10]);
+
+        $this->artisan('remote-sync:prune', ['remote' => 'missing', '--keep' => '0', '--force' => true])
+            ->assertFailed();
+        $this->artisan('remote-sync:prune', ['--remote' => true, '--keep' => '0', '--force' => true])
+            ->assertFailed();
+
+        expect(localSnapshotNames())->toBe(['pre-pull-last']);
+        Process::assertNothingRan();
+    });
+
+    it('never prunes locally after a failed host check', function () {
+        createLocalSnapshots(['pre-pull-last' => 10]);
+        fakeSyncProcesses(custom: [
+            'ConnectTimeout=5' => Process::result(exitCode: 255, errorOutput: 'Host key verification failed.'),
+        ]);
+
+        $this->artisan('remote-sync:prune', ['--keep' => '0', '--force' => true])
+            ->assertFailed();
+
+        expect(localSnapshotNames())->toBe(['pre-pull-last']);
+    });
+
+    it('refuses to list or delete snapshots without a remote disk root', function () {
+        fakeSyncProcesses(probeOverrides: ['json' => ['snapshot_dir' => null]]);
+        mockSnapshots()->shouldNotReceive('listRemote');
+        createLocalSnapshots(['pre-pull-last' => 10]);
+
+        $this->artisan('remote-sync:prune', ['--keep' => '0', '--force' => true])
+            ->expectsOutputToContain('Cannot prune')
+            ->assertFailed();
+
+        expect(localSnapshotNames())->toBe(['pre-pull-last']);
+    });
+
+    it('does not delete local snapshots if the remote listing fails', function () {
+        fakeSyncProcesses();
+        mockSnapshots()->shouldReceive('listRemote')->andThrow(new RuntimeException('Cannot list remote snapshots'));
+        createLocalSnapshots(['pre-pull-last' => 10]);
+
+        $this->artisan('remote-sync:prune', ['--keep' => '0', '--force' => true])
+            ->expectsOutputToContain('Cannot list remote snapshots')
+            ->assertFailed();
+
+        expect(localSnapshotNames())->toBe(['pre-pull-last']);
+    });
+
     it('keeps the most recent snapshots and deletes the rest', function () {
         createLocalSnapshots([
             'remote-sync-newest' => 10,

@@ -23,6 +23,8 @@ function happyProbeOutput(): string
         'RSYNC=1',
         'SNAPSHOTS=1',
         'REMOTE_SYNC_JSON='.json_encode([
+            'protocol' => 1,
+            'snapshots_version' => '2.8.0',
             'driver' => 'mysql',
             'tables' => ['users', 'posts'],
             'snapshot_dir' => '/home/forge/acme/shared/snapshots',
@@ -38,8 +40,8 @@ describe('Probe', function () {
             expect($command)
                 ->toContain("'php' 'php8.5' 'php85' 'php8.4'")
                 ->toContain('platform_check.php')
-                ->toContain('artisan tinker --execute=')
-                ->toContain('snapshot_dir');
+                ->toContain('artisan remote-sync:info --no-interaction')
+                ->not->toContain('artisan tinker');
         });
 
         it('only tries the configured php_binary when set', function () {
@@ -65,6 +67,7 @@ describe('Probe', function () {
                 ->and($info->driver)->toBe('mysql')
                 ->and($info->tables)->toBe(['users', 'posts'])
                 ->and($info->hasDbSnapshots)->toBeTrue()
+                ->and($info->databaseProblem())->toBeNull()
                 ->and($info->hasRsync)->toBeTrue();
         });
 
@@ -96,7 +99,7 @@ describe('Probe', function () {
                 ->and($info->tables)->toBe([])
                 ->and($info->hasDbSnapshots)->toBeFalse()
                 ->and($info->hasRsync)->toBeFalse()
-                ->and($info->snapshotDir)->toBe('/home/forge/acme/storage/snapshots');
+                ->and($info->snapshotDir)->toBe('');
         });
 
         it('ignores garbage around the structured lines', function () {

@@ -10,11 +10,33 @@ use Symfony\Component\Process\Process as SymfonyProcess;
 
 class Rsync
 {
+    private ?bool $supportsProgress2 = null;
+
     public function __construct(
         protected Connection $connection,
         protected bool $interactive = false,
         protected bool $verbose = false,
     ) {}
+
+    public static function version(?Connection $connection = null): string
+    {
+        $result = $connection === null
+            ? Process::timeout(10)->run(['rsync', '--version'])
+            : $connection->run('rsync --version', 10);
+        $banner = trim(explode("\n", trim($result->output()), 2)[0]);
+
+        if (! $result->successful() || $banner === '') {
+            throw new RuntimeException(trim($result->errorOutput()) ?: 'Could not determine the rsync version.');
+        }
+
+        return $banner;
+    }
+
+    private function supportsProgress2(): bool
+    {
+        return $this->supportsProgress2 ??= preg_match('/^rsync\s+version\s+(\d+\.\d+(?:\.\d+)?)/i', self::version(), $version) === 1
+            && version_compare($version[1], '3.1', '>=');
+    }
 
     /**
      * @param  list<string>  $excludes  Extra exclude patterns for this transfer (on top of dotfiles and config).
@@ -28,7 +50,7 @@ class Rsync
     ): ProcessResult {
         $options = ['-avz', '--partial'];
 
-        if ($this->interactive) {
+        if ($this->interactive && $this->supportsProgress2()) {
             $options[] = '--info=progress2';
         }
 
@@ -109,7 +131,7 @@ class Rsync
             ? [$remoteSpec, $localPath]
             : [$localPath, $remoteSpec];
 
-        return array_merge(['rsync'], $options, $excludeOptions, [$source, $destination]);
+        return array_merge(['rsync', '-e', Connection::shell()], $options, $excludeOptions, ['--', $source, $destination]);
     }
 
     public function parse(string $output): FileChanges

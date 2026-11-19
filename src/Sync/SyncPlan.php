@@ -7,7 +7,7 @@ readonly class SyncPlan
     /**
      * @param  list<string>  $paths  Storage-relative paths in the files scope.
      * @param  list<string>  $tablesToSync
-     * @param  list<string>  $tablesToTruncate  Truncated locally after a pull / preserved on the remote for a push.
+     * @param  list<string>  $tablesToTruncate  Imported without rows on pull / preserved on push.
      * @param  array<string, FileChanges>  $fileChanges  Keyed by storage-relative path.
      * @param  array<string, list<string>>  $fileExcludes  Extra rsync excludes, keyed by storage-relative path.
      * @param  list<string>|null  $filterUsers

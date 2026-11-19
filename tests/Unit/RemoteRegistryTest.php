@@ -101,6 +101,12 @@ describe('RemoteRegistry', function () {
                 ->toThrow(InvalidArgumentException::class, 'REMOTE_SYNC_PRODUCTION_PATH');
         });
 
+        it('rejects unsafe SSH destinations and remote application roots', function ($host, $path) {
+            config()->set('remote-sync.remotes.staging', compact('host', 'path'));
+
+            expect(fn () => $this->registry->get('staging'))->toThrow(InvalidArgumentException::class);
+        })->with([['-invalid', '/app'], ['valid', '/'], ['valid', '/app/../other'], ['valid', 'relative']]);
+
         it('rejects the shipped placeholder host', function () {
             config()->set('remote-sync.remotes', [
                 'production' => ['host' => 'forge@your-server', 'path' => '/home/forge/acme'],

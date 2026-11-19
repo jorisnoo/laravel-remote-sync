@@ -10,7 +10,8 @@ use Noo\LaravelRemoteSync\Remotes\Probe;
 use Noo\LaravelRemoteSync\Remotes\RemoteRegistry;
 use Noo\LaravelRemoteSync\Snapshots\Importer;
 use Noo\LaravelRemoteSync\Snapshots\Snapshots;
-use RuntimeException;
+use Noo\LaravelRemoteSync\Sync\Rsync;
+use Throwable;
 
 class DoctorCommand extends Command
 {
@@ -62,22 +63,39 @@ class DoctorCommand extends Command
 
         if (in_array($driver, ['mysql', 'pgsql'], true)) {
             $this->passCheck('Database driver', $driver);
-            $client = $driver === 'mysql' ? 'mysql' : 'psql';
-            $this->checkLocalBinary($client);
+            $maria = config('database.connections.'.config('database.default').'.driver') === 'mariadb';
+            foreach ($driver === 'pgsql' ? ['psql', 'pg_dump'] : ($maria ? ['mariadb', 'mariadb-dump'] : ['mysql', 'mysqldump']) as $binary) {
+                $this->checkLocalBinary($binary);
+            }
         } else {
             $this->failCheck('Database driver', "{$driver} (imports need mysql or pgsql)");
         }
 
-        foreach (['gzip', 'rsync', 'ssh'] as $binary) {
+        foreach (['bash', 'gzip', 'ssh'] as $binary) {
             $this->checkLocalBinary($binary);
         }
+        $this->checkRsync();
 
-        $snapshotDir = Snapshots::localDir();
+        $snapshotDir = Snapshots::configuredLocalDir();
+        if ($snapshotDir === null) {
+            $this->failCheck('Snapshot directory', 'configure a local snapshots disk with an absolute root');
+
+            return;
+        }
         $writable = is_dir($snapshotDir) ? is_writable($snapshotDir) : is_writable(dirname($snapshotDir));
 
         $writable
             ? $this->passCheck('Snapshot directory', $snapshotDir)
             : $this->failCheck('Snapshot directory', "{$snapshotDir} is not writable");
+    }
+
+    protected function checkRsync(?Connection $connection = null): void
+    {
+        try {
+            $this->passCheck('rsync', Rsync::version($connection));
+        } catch (Throwable $e) {
+            $this->failCheck('rsync', $e->getMessage());
+        }
     }
 
     protected function checkLocalBinary(string $binary): void
@@ -104,22 +122,19 @@ class DoctorCommand extends Command
 
         $connection = new Connection($remote);
 
-        switch ($connection->checkHostKey()) {
-            case 'changed':
-                $this->failCheck('Host key', 'CHANGED - possible man-in-the-middle, check ~/.ssh/known_hosts');
+        try {
+            $connection->checkHostKey();
+        } catch (Throwable $e) {
+            $this->failCheck('SSH', $e->getMessage());
 
-                return;
-            case 'unknown':
-                $this->failCheck('Host key', 'unknown - connect once interactively (e.g. remote-sync:pull) to trust it');
-
-                return;
-            default:
-                $this->passCheck('Host key', 'known');
+            return;
         }
+
+        $this->passCheck('Host key', 'verified');
 
         try {
             $info = app(Probe::class)->run($connection);
-        } catch (RuntimeException $e) {
+        } catch (Throwable $e) {
             $this->failCheck('Connection', $e->getMessage());
 
             return;
@@ -131,23 +146,29 @@ class DoctorCommand extends Command
             ? $this->passCheck('PHP binary', $info->phpBinary)
             : $this->failCheck('PHP binary', "none of the known binaries work - set 'php_binary' for this remote");
 
-        $info->hasDbSnapshots
-            ? $this->passCheck('spatie/laravel-db-snapshots', 'installed')
-            : $this->failCheck('spatie/laravel-db-snapshots', 'not installed on the remote');
+        if (($error = $info->databaseProblem()) !== null) {
+            $this->failCheck('Remote database prerequisites', $error);
+        } else {
+            $this->passCheck('Remote database prerequisites', 'compatible protocol, snapshots package and local disk');
+        }
 
-        $info->hasRsync
-            ? $this->passCheck('rsync', 'found')
-            : $this->failCheck('rsync', 'not found on the remote');
+        if ($info->hasRsync) {
+            $this->checkRsync($connection);
+        } else {
+            $this->failCheck('rsync', 'not found on the remote');
+        }
 
         if ($info->driver === null) {
-            $this->failCheck('Database driver', 'could not be detected (is laravel/tinker installed on the remote?)');
+            $this->failCheck('Database driver', 'could not be detected by remote-sync:info');
         } elseif (Importer::normalizeDriver($info->driver) === Importer::localDriver()) {
             $this->passCheck('Database driver', "{$info->driver} (matches local)");
         } else {
             $this->failCheck('Database driver', "{$info->driver} does not match local ".Importer::localDriver());
         }
 
-        $this->passCheck('Snapshot directory', $info->snapshotDir);
+        if ($info->snapshotDir !== '') {
+            $this->passCheck('Snapshot directory', $info->snapshotDir);
+        }
     }
 
     protected function passCheck(string $check, string $detail): void

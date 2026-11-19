@@ -1,8 +1,16 @@
 # Upgrading
 
-## 0.x to 1.0
+## 0.7 to 0.8
 
-Version 1.0 is a full redesign. Commands prompt for nothing except the remote, the scope, and one final confirmation; every other decision is a flag with a safe default.
+- Laravel 11 is no longer supported. Upgrade both applications to Laravel 12 or 13 on PHP 8.3+ before installing 0.8.
+- Deploy this package as a regular dependency on each database remote. `remote-sync:info`, `remote-sync:dump` and `remote-sync:load` replace Tinker discovery and Spatie's SQL loader. Configure a local snapshots disk on both ends and install the native database tools and Bash.
+- Verify the server's SSH host key independently and enroll it with SSH before running sync. Use SSH config aliases for nonstandard connections.
+- Keep the configured database backup disk. New backups use the same `.sql.gz` format; restore new backups with `php artisan remote-sync:load <name>`. Do not assume older dumps omit ownership or contain replacement statements.
+- Exclusions on pull now transfer structure without data; push still preserves excluded remote tables. Custom Spatie dump options do not apply to the sync-specific dumper. Failed migrations return a failure status.
+
+## 0.6 to 0.7
+
+Version 0.7 redesigned the commands. They prompt for nothing except the remote, the scope, and one final confirmation; every other decision is a flag with a safe default.
 
 ### Commands
 

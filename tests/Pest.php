@@ -13,6 +13,8 @@ uses(TestCase::class)->in(__DIR__);
 function syncProbeOutput(array $overrides = []): string
 {
     $json = json_encode(array_merge([
+        'protocol' => 1,
+        'snapshots_version' => '2.7.0',
         'driver' => 'sqlite',
         'tables' => ['users', 'posts', 'cache', 'migrations'],
         'snapshot_dir' => '/home/forge/acme/storage/snapshots',
@@ -43,8 +45,8 @@ function fakeSyncProcesses(array $probeOverrides = [], array $custom = []): void
             }
         }
 
-        if (str_contains($command, 'BatchMode=yes')) {
-            return Process::result();
+        if ($command === 'rsync --version') {
+            return Process::result(output: 'rsync  version 3.2.7  protocol version 31');
         }
 
         if (str_contains($command, 'BASE=')) {
@@ -80,7 +82,6 @@ function mockImporter(): MockInterface
     $mock = Mockery::mock(Importer::class);
     $mock->shouldReceive('localTables')->andReturn(['users', 'cache', 'migrations'])->byDefault();
     $mock->shouldReceive('import')->andReturn(Process::result())->byDefault();
-    $mock->shouldReceive('truncateExcluded')->andReturn(['cache'])->byDefault();
     $mock->shouldReceive('filterUsers')->andReturn(null)->byDefault();
 
     app()->bind(Importer::class, fn () => $mock);

@@ -136,8 +136,8 @@ return [
     |--------------------------------------------------------------------------
     |
     | In seconds. 'remote' covers short remote commands (probing, listing
-    | and deleting snapshots, migrations). 'transfer' covers data-sized
-    | operations (snapshot create/load/import and rsync transfers).
+    | and deleting snapshots). 'transfer' covers dumps, imports, migrations
+    | and rsync transfers.
     |
     */
 

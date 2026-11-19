@@ -10,14 +10,14 @@ use Noo\LaravelRemoteSync\Remotes\Remote;
 use Noo\LaravelRemoteSync\Remotes\RemoteInfo;
 use Noo\LaravelRemoteSync\Remotes\RemoteRegistry;
 use Noo\LaravelRemoteSync\Snapshots\Importer;
+use Noo\LaravelRemoteSync\Snapshots\Snapshots;
 use Noo\LaravelRemoteSync\Support\CleanupStack;
 use Noo\LaravelRemoteSync\Support\StoragePath;
-use RuntimeException;
+use Throwable;
 
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\select;
 use function Laravel\Prompts\spin;
-use function Laravel\Prompts\table;
 use function Laravel\Prompts\text;
 
 trait ResolvesRemote
@@ -49,13 +49,14 @@ trait ResolvesRemote
         return app()->isProduction();
     }
 
-    protected function resolveRemote(): ?Remote
+    protected function resolveRemote(bool $warnOnFailure = false): ?Remote
     {
         $registry = app(RemoteRegistry::class);
         $names = $registry->names();
+        $level = $warnOnFailure ? 'warn' : 'error';
 
         if ($names === []) {
-            $this->components->error(__('remote-sync::messages.errors.no_remotes_configured'));
+            $this->components->{$level}(__('remote-sync::messages.errors.no_remotes_configured'));
 
             return null;
         }
@@ -78,7 +79,7 @@ trait ResolvesRemote
             } elseif ($default !== null && $registry->has($default)) {
                 $name = $default;
             } else {
-                $this->components->error(__('remote-sync::messages.errors.ambiguous_remote', [
+                $this->components->{$level}(__('remote-sync::messages.errors.ambiguous_remote', [
                     'names' => implode(', ', $names),
                 ]));
 
@@ -89,7 +90,7 @@ trait ResolvesRemote
         try {
             return $registry->get($name);
         } catch (InvalidArgumentException $e) {
-            $this->components->error($e->getMessage());
+            $this->components->{$level}($e->getMessage());
 
             return null;
         }
@@ -97,73 +98,20 @@ trait ResolvesRemote
 
     protected function verifyHostKey(Connection $connection): bool
     {
-        $status = spin(
-            callback: fn () => $connection->checkHostKey(),
-            message: __('remote-sync::messages.spinners.verifying_host'),
-        );
+        try {
+            spin(
+                callback: function () use ($connection): void {
+                    $connection->checkHostKey();
+                },
+                message: __('remote-sync::messages.spinners.verifying_host'),
+            );
 
-        if ($status === 'ok') {
             return true;
-        }
-
-        $hostname = $connection->remote->hostname();
-
-        if ($status === 'changed') {
-            $this->components->error(__('remote-sync::messages.errors.host_key_changed', ['host' => $hostname]));
+        } catch (Throwable $e) {
+            $this->components->error($e->getMessage());
 
             return false;
         }
-
-        if (! $this->isInteractive()) {
-            $this->components->error(__('remote-sync::messages.errors.host_key_unknown_noninteractive', [
-                'host' => $hostname,
-                'ssh_host' => $connection->remote->host,
-            ]));
-
-            return false;
-        }
-
-        $this->components->warn(__('remote-sync::messages.warnings.unknown_host', ['host' => $hostname]));
-
-        $fingerprints = $connection->hostFingerprints();
-
-        if ($fingerprints !== null) {
-            $rows = collect(explode("\n", $fingerprints))
-                ->filter()
-                ->map(function (string $line) {
-                    if (preg_match('/^\d+\s+(SHA256:\S+)\s+.*\((\w+)\)$/', trim($line), $matches)) {
-                        return [$matches[2], $matches[1]];
-                    }
-
-                    return null;
-                })
-                ->filter()
-                ->values()
-                ->all();
-
-            if ($rows !== []) {
-                table(['Type', 'Fingerprint'], $rows);
-            }
-        }
-
-        if (! confirm(label: __('remote-sync::prompts.confirm.accept_host_key', ['host' => $hostname]), default: false)) {
-            return false;
-        }
-
-        $accepted = spin(
-            callback: fn () => $connection->acceptHostKey(),
-            message: __('remote-sync::messages.spinners.accepting_host_key'),
-        );
-
-        if (! $accepted) {
-            $this->components->error(__('remote-sync::messages.errors.host_key_failed'));
-
-            return false;
-        }
-
-        $this->components->info(__('remote-sync::messages.info.host_key_accepted', ['host' => $hostname]));
-
-        return true;
     }
 
     /**
@@ -194,7 +142,7 @@ trait ResolvesRemote
                 callback: fn () => app(Probe::class)->run($connection),
                 message: __('remote-sync::messages.spinners.probing', ['name' => $connection->remote->name]),
             );
-        } catch (RuntimeException $e) {
+        } catch (Throwable $e) {
             $this->components->error($e->getMessage());
             $this->components->info(__('remote-sync::messages.info.doctor_hint', ['name' => $connection->remote->name]));
 
@@ -240,26 +188,22 @@ trait ResolvesRemote
 
     protected function checkDatabasePreconditions(string $remoteName, RemoteInfo $info): bool
     {
-        if (! $info->hasDbSnapshots) {
-            $this->components->error(__('remote-sync::messages.errors.snapshots_missing_on_remote', ['name' => $remoteName]));
+        if (($error = $info->databaseProblem()) !== null) {
+            $this->components->error($error);
             $this->components->info(__('remote-sync::messages.info.doctor_hint', ['name' => $remoteName]));
 
             return false;
         }
 
-        if ($info->driver === null) {
-            $this->components->warn(__('remote-sync::messages.warnings.driver_detection_failed'));
+        if (Snapshots::configuredLocalDir() === null) {
+            $this->components->error('Configure the local snapshots disk with a local driver and absolute directory root.');
 
-            if ($this->isInteractive() && ! $this->option('force')) {
-                return confirm(label: __('remote-sync::prompts.confirm.continue_without_driver'), default: false);
-            }
-
-            return true;
+            return false;
         }
 
         $localDriver = Importer::localDriver();
 
-        if (Importer::normalizeDriver($info->driver) !== $localDriver) {
+        if ($info->driver === null || Importer::normalizeDriver($info->driver) !== $localDriver) {
             $this->components->error(__('remote-sync::messages.errors.driver_mismatch', [
                 'remote' => $info->driver,
                 'local' => $localDriver,
@@ -272,11 +216,12 @@ trait ResolvesRemote
     }
 
     /**
+     * @param  list<string>  $requested
      * @return list<string>|null null when a path fails validation
      */
-    protected function resolvePaths(): ?array
+    protected function resolvePaths(array $requested): ?array
     {
-        $paths = $this->option('path') ?: config('remote-sync.paths', []);
+        $paths = $requested ?: config('remote-sync.paths', []);
         $paths = array_values(array_unique(array_map(
             fn (string $path) => StoragePath::normalize($path),
             $paths
@@ -309,7 +254,11 @@ trait ResolvesRemote
             $error = null;
 
             $this->components->task("{$number}/{$total} {$step['label']}", function () use ($step, &$error) {
-                $error = ($step['run'])();
+                try {
+                    $error = ($step['run'])();
+                } catch (Throwable $e) {
+                    $error = $e->getMessage() ?: $e::class;
+                }
 
                 return $error === null;
             });

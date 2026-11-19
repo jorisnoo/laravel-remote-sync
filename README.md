@@ -4,24 +4,24 @@
 [![GitHub Tests Action Status](https://img.shields.io/github/actions/workflow/status/jorisnoo/laravel-remote-sync/run-tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/jorisnoo/laravel-remote-sync/actions?query=workflow%3Arun-tests+branch%3Amain)
 [![Total Downloads](https://img.shields.io/packagist/dt/jorisnoo/laravel-remote-sync.svg?style=flat-square)](https://packagist.org/packages/jorisnoo/laravel-remote-sync)
 
-Pull a remote Laravel app's database and storage files to your local machine, or push them the other way. Database dumps use [spatie/laravel-db-snapshots](https://github.com/spatie/laravel-db-snapshots) on the remote; file transfers use rsync over SSH.
+Pull a remote Laravel app's database and storage files to your local machine, or push them the other way. Both ends use native database clients, the configured snapshots disk and rsync over SSH.
 
 ## Requirements
 
 Locally:
 
-- PHP 8.3+, Laravel 11, 12, or 13
-- A `mysql` or `pgsql` database (imports pipe through the `mysql`/`psql` CLI)
-- `ssh`, `rsync`, and `gzip` on your PATH
-- SSH key access to the remote
+- PHP 8.3+ and Laravel 12 or 13
+- `pg_dump` and `psql` for PostgreSQL, `mysqldump` and `mysql` for MySQL, or `mariadb-dump` and `mariadb` for MariaDB. Use clients compatible with the database server and dump format.
+- Bash, `ssh`, `rsync`, and `gzip` on your PATH. Stock macOS openrsync is supported; Homebrew rsync is optional.
+- SSH key access to the remote, with its host key already verified and recorded in known_hosts
 
 On each remote:
 
-- `spatie/laravel-db-snapshots` and `laravel/tinker` installed
-- `rsync`
+- Install the matching `jorisnoo/laravel-remote-sync` 0.8 release as a normal dependency (not `require-dev`); it requires `spatie/laravel-db-snapshots` >= 2.7. Tinker is not required.
+- Install Bash, `rsync`, `gzip` and the native dump and restore clients for the remote database.
 - A PHP binary that satisfies the app. The default `php` is tried first, then versioned binaries (`php8.5`, `php8.4`, ...). You can also pin one with `php_binary` in the config.
 
-The remote's snapshot location, database driver, and deployment layout are discovered automatically on every run - the remote's own configuration is what counts, so local and remote snapshot disks do not need to match.
+The remote's snapshot location, database driver, and deployment layout are discovered on each run. Database sync refuses missing or incompatible protocol information and requires a local filesystem disk with an absolute root on each machine. Use a simple absolute application path (letters, digits, `_`, `-`, `.`, `/`) and an SSH config alias for custom ports, IPv6 or bastions.
 
 ## Installation
 
@@ -54,7 +54,7 @@ Verify the whole setup before the first sync:
 php artisan remote-sync:doctor
 ```
 
-Doctor checks your local binaries and, for each configured remote, the SSH host key, application path, PHP binary, installed packages, rsync, and driver compatibility.
+Doctor checks your local binaries and snapshots disk and, for each configured remote, the SSH host key, application path, PHP binary, package compatibility, rsync version and database driver. Older rsync and openrsync use no progress flag.
 
 ## Configuration
 
@@ -120,7 +120,11 @@ Everything else is a flag:
 | `--dry-run` | Print the plan and exit without changing anything |
 | `--force` / `-f` | Answer the final confirmation with yes |
 
-A standard pull creates a local backup, dumps the remote database (minus `exclude_tables`), downloads and integrity-checks the snapshot, imports it through the `mysql`/`psql` CLI, truncates the excluded tables, then runs `migrate --force` and `optimize:clear`. If the import fails, the downloaded snapshot is kept and the exact restore command for your backup is printed.
+A standard pull creates a full local backup, dumps the remote database, and downloads and verifies the snapshot. Excluded tables arrive with their schema but no data, including on the first pull. Local-only tables remain unless `--full` is set. After import the command runs `migrate --force` and `optimize:clear`; failure stops the sync with a non-zero exit status.
+
+PostgreSQL dumps omit ownership and grants and load in one transaction. If a local-only foreign key conflicts with the replacement, the import fails and the previous data and constraints remain intact. Resolve the dependency before retrying. MySQL DDL is not transactional: keep the default backup. Use `php artisan remote-sync:load <backup-name>` to restore; allow temporary space for the uncompressed SQL at the destination. MariaDB sandbox headers are never stripped; install a current `mariadb` client when loading those dumps.
+
+Sync uses the app's default database connection and its own dump options, not `db-snapshots.extraOptions`, `tables`, `exclude` or custom `dump` options. MySQL uses a single transaction, quick reads and no table locks. Use transactional tables and avoid concurrent DDL during dumps.
 
 Deletion is strictly opt-in: `--force` never implies `--delete`, and the plan preview tells you how many local-only files a `--delete` pass would remove before you commit to anything.
 
@@ -156,16 +160,16 @@ php artisan remote-sync:prune --local --keep=3
 php artisan remote-sync:prune production --remote --dry-run
 ```
 
-Prune only touches snapshots created by this package (`remote-sync-*`, `pre-pull-*`, `pre-push-*`). Pass `--all` to include your own spatie snapshots as well.
+Prune only touches snapshots created by this package (`remote-sync-*`, `pre-pull-*`, `pre-push-*`). Pass `--all` to include your own spatie snapshots as well. `--keep` must be a non-negative integer; use `--keep=0` only to remove all eligible snapshots. If no remote can be selected, implicit local+remote mode warns and prunes locally.
 
 ## Safety
 
 - Pull and push refuse to run when the local app environment is production; set `REMOTE_SYNC_ALLOW_PRODUCTION=true` in your `.env` only when that is intentional (the confirmation then requires a typed `yes`).
 - One plan preview and one confirmation before anything changes; `--dry-run` everywhere.
-- Backups are created by default on both directions, and every failure message includes the command to restore.
-- Unknown SSH hosts show their key fingerprint for review before connecting; changed host keys abort with a man-in-the-middle warning, and non-interactive runs never accept a new host key.
+- A full backup is created by default in either direction. After a backup succeeds its restore command is included with any subsequent step failure.
+- SSH uses strict host-key checking on every connection, including rsync. For an unknown host, connect separately with SSH and compare the fingerprint against one obtained independently; the sync commands never enroll new keys.
 - Interrupting a run (Ctrl+C) removes temporary snapshots on both sides.
-- `filter_users` refuses to act when its patterns would delete every user.
+- `filter_users` matches emails case-insensitively; only `*` is a wildcard. Filtering refuses to act when no users would remain.
 
 ## Security notes
 
@@ -178,6 +182,8 @@ Prune only touches snapshots created by this package (`remote-sync-*`, `pre-pull
 ```bash
 composer test
 ```
+
+The release gate additionally enables the PostgreSQL and MySQL integration suites. See [RELEASING.md](RELEASING.md) for their local prerequisites; they never connect to an existing database server.
 
 ## License
 

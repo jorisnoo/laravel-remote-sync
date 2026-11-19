@@ -16,6 +16,7 @@ use Noo\LaravelRemoteSync\Sync\PlanRenderer;
 use Noo\LaravelRemoteSync\Sync\Rsync;
 use Noo\LaravelRemoteSync\Sync\SyncPlan;
 use RuntimeException;
+use Throwable;
 
 use function Laravel\Prompts\multiselect;
 
@@ -37,6 +38,8 @@ class PushCommand extends Command
 
     public function handle(): int
     {
+        $this->failureNotes = [];
+
         if (! $this->guardProduction()) {
             return self::FAILURE;
         }
@@ -80,7 +83,7 @@ class PushCommand extends Command
         $paths = [];
 
         if ($files) {
-            $paths = $this->resolvePaths();
+            $paths = $this->resolvePaths($this->option('path'));
 
             if ($paths === null) {
                 return self::FAILURE;
@@ -111,7 +114,7 @@ class PushCommand extends Command
                 delete: (bool) $this->option('delete'),
                 paths: $paths,
             ));
-        } catch (RuntimeException $e) {
+        } catch (Throwable $e) {
             $this->components->error($e->getMessage());
 
             return self::FAILURE;
@@ -238,12 +241,17 @@ class PushCommand extends Command
             if ($plan->backup) {
                 $steps[] = [
                     'label' => "Creating remote backup {$plan->backupName} on [{$remoteName}]",
-                    'run' => function () use ($snapshots, $plan): ?string {
-                        $result = $snapshots->createRemote($plan->backupName, Importer::excludedTables());
+                    'run' => function () use ($snapshots, $plan, $remoteName): ?string {
+                        $result = $snapshots->createRemote($plan->backupName);
+                        if (! $result->successful()) {
+                            return __('remote-sync::messages.errors.failed_remote_backup', ['error' => trim($result->errorOutput()."\n".$result->output())]);
+                        }
+                        $this->failureNotes[] = __('remote-sync::messages.info.remote_restore_hint', [
+                            'name' => $remoteName,
+                            'backup' => $plan->backupName,
+                        ]);
 
-                        return $result->successful()
-                            ? null
-                            : __('remote-sync::messages.errors.failed_remote_backup', ['error' => trim($result->errorOutput())]);
+                        return null;
                     },
                 ];
             }
@@ -251,9 +259,7 @@ class PushCommand extends Command
             $steps[] = [
                 'label' => 'Creating local snapshot',
                 'run' => function () use ($snapshots, $plan, $cleanup): ?string {
-                    if ($snapshots->createLocal($plan->snapshotName, Importer::excludedTables()) !== 0) {
-                        return __('remote-sync::messages.errors.failed_local_snapshot');
-                    }
+                    $snapshots->createLocal($plan->snapshotName, Importer::excludedTables());
 
                     $cleanup->push('local snapshot file', fn () => Snapshots::deleteLocal($plan->snapshotName));
 
@@ -282,18 +288,11 @@ class PushCommand extends Command
 
             $steps[] = [
                 'label' => "Loading snapshot on [{$remoteName}]",
-                'run' => function () use ($snapshots, $plan, $remoteName): ?string {
+                'run' => function () use ($snapshots, $plan): ?string {
                     $result = $snapshots->loadRemote($plan->snapshotName);
 
                     if (! $result->successful()) {
-                        if ($plan->backup) {
-                            $this->failureNotes[] = __('remote-sync::messages.info.remote_restore_hint', [
-                                'name' => $remoteName,
-                                'backup' => $plan->backupName,
-                            ]);
-                        }
-
-                        return __('remote-sync::messages.errors.failed_remote_load', ['error' => trim($result->errorOutput())]);
+                        return __('remote-sync::messages.errors.failed_remote_load', ['error' => trim($result->errorOutput()."\n".$result->output())]);
                     }
 
                     return null;
@@ -303,10 +302,10 @@ class PushCommand extends Command
             $steps[] = [
                 'label' => "Running migrations on [{$remoteName}]",
                 'run' => function () use ($connection, $info): ?string {
-                    $result = $connection->artisan($info, 'migrate --force');
+                    $result = $connection->artisan($info, 'migrate --force', $connection->transferTimeout());
 
                     if (! $result->successful()) {
-                        $this->components->warn(__('remote-sync::messages.errors.remote_migrations_failed'));
+                        return __('remote-sync::messages.errors.remote_migrations_failed').' '.(trim($result->errorOutput()) ?: trim($result->output()));
                     }
 
                     return null;

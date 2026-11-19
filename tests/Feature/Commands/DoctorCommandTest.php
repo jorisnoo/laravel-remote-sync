@@ -30,8 +30,10 @@ function fakeDoctorProcesses(array $probeOverrides = [], array $custom = []): vo
             }
         }
 
-        if (str_contains($command, 'BatchMode=yes')) {
-            return Process::result();
+        if (str_contains($command, 'rsync --version')) {
+            return Process::result(output: $command === 'rsync --version'
+                ? "openrsync: protocol version 29\nrsync version 2.6.9 compatible"
+                : 'rsync  version 3.2.7  protocol version 31');
         }
 
         if (str_contains($command, 'BASE=')) {
@@ -56,8 +58,10 @@ describe('remote-sync:doctor', function () {
 
         $this->artisan('remote-sync:doctor')
             ->expectsOutputToContain('Local environment')
+            ->expectsOutputToContain('openrsync: protocol version 29')
             ->expectsOutputToContain('Remote [staging]')
             ->expectsOutputToContain('atomic deployment')
+            ->expectsOutputToContain('3.2.7')
             ->expectsOutputToContain('Everything looks good.')
             ->assertSuccessful();
     });
@@ -93,8 +97,20 @@ describe('remote-sync:doctor', function () {
         ]);
 
         $this->artisan('remote-sync:doctor')
-            ->expectsOutputToContain('connect once interactively')
+            ->expectsOutputToContain('Verify its fingerprint')
             ->assertFailed();
+    });
+
+    it('fails without probing when SSH cannot authenticate', function () {
+        fakeDoctorProcesses(custom: [
+            'ConnectTimeout=5' => Process::result(exitCode: 255, errorOutput: 'Permission denied (publickey).'),
+        ]);
+
+        $this->artisan('remote-sync:doctor')
+            ->expectsOutputToContain('Permission denied')
+            ->assertFailed();
+
+        Process::assertDidntRun(fn ($process) => is_array($process->command) && str_contains(last($process->command), 'BASE='));
     });
 
     it('flags a missing db-snapshots package on the remote', function () {
@@ -104,6 +120,15 @@ describe('remote-sync:doctor', function () {
             ->expectsOutputToContain('not installed on the remote')
             ->assertFailed();
     });
+
+    it('fails for an undefined or non-local snapshots disk', function ($disk) {
+        config()->set('filesystems.disks.snapshots', $disk);
+        fakeDoctorProcesses();
+
+        $this->artisan('remote-sync:doctor')
+            ->expectsOutputToContain('configure a local snapshots disk')
+            ->assertFailed();
+    })->with([[null], [['driver' => 's3', 'root' => '/backup']]]);
 
     it('flags a database driver mismatch', function () {
         fakeDoctorProcesses(probeOverrides: ['json' => ['driver' => 'pgsql']]);

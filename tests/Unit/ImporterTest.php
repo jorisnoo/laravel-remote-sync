@@ -1,12 +1,13 @@
 <?php
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Schema;
 use Noo\LaravelRemoteSync\Snapshots\Importer;
 use Noo\LaravelRemoteSync\Snapshots\Snapshots;
 
-function createSnapshotFile(string $name): string
+function createSnapshotFile(string $name, string $sql = "SELECT 1;\n"): string
 {
     $dir = Snapshots::localDir();
 
@@ -15,15 +16,21 @@ function createSnapshotFile(string $name): string
     }
 
     $path = "{$dir}/{$name}.sql.gz";
-    file_put_contents($path, 'fake');
+    file_put_contents($path, gzencode($sql));
 
     return $path;
 }
 
+beforeEach(function () {
+    $this->snapshotRoot = sys_get_temp_dir().'/import-test-'.bin2hex(random_bytes(8));
+    mkdir($this->snapshotRoot, 0700);
+    config()->set('db-snapshots.disk', 'snapshots');
+    config()->set('filesystems.disks.snapshots', ['driver' => 'local', 'root' => $this->snapshotRoot]);
+    config()->set('database.connections.mysql.unix_socket', $this->snapshotRoot.'/absent.sock');
+});
+
 afterEach(function () {
-    foreach (glob(Snapshots::localDir().'/*.sql.gz') ?: [] as $file) {
-        unlink($file);
-    }
+    File::deleteDirectory($this->snapshotRoot);
 });
 
 describe('Importer', function () {
@@ -61,13 +68,13 @@ describe('Importer', function () {
                 ->toThrow(RuntimeException::class, 'Unsupported database driver for CLI loading: sqlite');
         });
 
-        it('pipes through mysql with host and port', function () {
-            Process::fake();
+        it('loads through mysql with host and port', function () {
+            Process::fake(['*mysql*' => Process::result()]);
             createSnapshotFile('snap');
             config()->set('database.default', 'mysql');
             config()->set('database.connections.mysql', [
                 'driver' => 'mysql',
-                'host' => 'db.internal',
+                'host' => 'db.invalid',
                 'port' => 3307,
                 'database' => 'acme',
                 'username' => 'acme_user',
@@ -76,14 +83,13 @@ describe('Importer', function () {
 
             (new Importer)->import('snap');
 
-            $path = Snapshots::localPath('snap');
-
-            Process::assertRan(fn ($process) => $process->command === "gunzip -c '{$path}' | mysql '--host=db.internal' '--port=3307' '--user=acme_user' 'acme'"
-                && ($process->environment['MYSQL_PWD'] ?? null) === 'secret');
+            Process::assertRan(fn ($process) => $process->command === [
+                'mysql', '--batch', '--skip-force', '--host=db.invalid', '--port=3307', '--user=acme_user', '--database=acme',
+            ] && ($process->environment['MYSQL_PWD'] ?? null) === 'secret');
         });
 
         it('prefers the unix socket when configured', function () {
-            Process::fake();
+            Process::fake(['*mysql*' => Process::result()]);
             createSnapshotFile('snap');
             config()->set('database.default', 'mysql');
             config()->set('database.connections.mysql', [
@@ -96,18 +102,18 @@ describe('Importer', function () {
 
             (new Importer)->import('snap');
 
-            Process::assertRan(fn ($process) => str_contains($process->command, "'--socket=/tmp/mysql.sock'")
-                && ! str_contains($process->command, '--host=')
+            Process::assertRan(fn ($process) => in_array('--socket=/tmp/mysql.sock', $process->command, true)
+                && ! in_array('--host=127.0.0.1', $process->command, true)
                 && ! array_key_exists('MYSQL_PWD', $process->environment));
         });
 
-        it('pipes through psql with PGPASSWORD', function () {
-            Process::fake();
+        it('restores with psql in one transaction', function () {
+            Process::fake(['*psql*' => Process::result()]);
             createSnapshotFile('snap');
             config()->set('database.default', 'pgsql');
             config()->set('database.connections.pgsql', [
                 'driver' => 'pgsql',
-                'host' => 'db.internal',
+                'host' => 'db.invalid',
                 'port' => 5433,
                 'database' => 'acme',
                 'username' => 'acme_user',
@@ -116,16 +122,15 @@ describe('Importer', function () {
 
             (new Importer)->import('snap');
 
-            $path = Snapshots::localPath('snap');
-
-            Process::assertRan(fn ($process) => $process->command === "gunzip -c '{$path}' | psql '-v' 'ON_ERROR_STOP=1' '--host=db.internal' '--port=5433' '--username=acme_user' 'acme'"
+            Process::assertRan(fn ($process) => array_slice($process->command, 0, -1) === [
+                'psql', '--no-psqlrc', '--no-password', '--quiet', '--set=ON_ERROR_STOP=1', '--single-transaction',
+                '--host=db.invalid', '--port=5433', '--username=acme_user', '--dbname=acme',
+            ] && str_starts_with(end($process->command), '--file=')
                 && ($process->environment['PGPASSWORD'] ?? null) === 'pg-secret');
         });
 
         it('reports a PostgreSQL statement error as an import failure', function () {
-            Process::fake(fn ($process) => str_contains($process->command, "'-v' 'ON_ERROR_STOP=1'")
-                ? Process::result(exitCode: 3, errorOutput: 'ERROR: relation "users" already exists')
-                : Process::result());
+            Process::fake(['*psql*' => Process::result(exitCode: 3, errorOutput: 'ERROR: relation "users" already exists')]);
             createSnapshotFile('snap');
             config()->set('database.default', 'pgsql');
             config()->set('database.connections.pgsql', [
@@ -139,33 +144,30 @@ describe('Importer', function () {
                 ->and($result->exitCode())->toBe(3)
                 ->and($result->errorOutput())->toContain('relation "users" already exists');
         });
-    });
 
-    describe('truncateExcluded', function () {
-        it('truncates only excluded tables that exist, never protected ones', function () {
-            Schema::create('cache', function ($table) {
-                $table->increments('id');
-                $table->string('key');
-            });
-            Schema::create('migrations_shadow', function ($table) {
-                $table->string('name');
-            });
-            DB::table('cache')->insert(['key' => 'a']);
-            DB::table('migrations_shadow')->insert(['name' => 'keep-me']);
+        it('uses a sandbox-capable client and passes the original MariaDB header through', function (string $header) {
+            $sql = $header."\nSELECT 123;\n";
+            createSnapshotFile('snap', $sql);
+            config()->set('database.default', 'mysql');
+            $inputs = [];
+            Process::fake(['*mariadb*' => function ($process) use (&$inputs) {
+                $inputs[] = is_resource($process->input) ? stream_get_contents($process->input) : $process->input;
 
-            config()->set('remote-sync.exclude_tables', ['cache', 'migrations', 'not_a_table']);
+                return Process::result();
+            }]);
 
-            $truncated = (new Importer)->truncateExcluded();
+            expect((new Importer)->import('snap')->successful())->toBeTrue()
+                ->and($inputs)->toHaveCount(2)
+                ->and($inputs[1])->toBe($sql);
+        })->with(['/*M!999999\\- enable the sandbox mode */', '/*!999999\\- enable the sandbox mode */']);
 
-            expect($truncated)->toBe(['cache'])
-                ->and(DB::table('cache')->count())->toBe(0)
-                ->and(DB::table('migrations_shadow')->count())->toBe(1);
-        });
+        it('fails before destructive full MySQL restore when the MariaDB client cannot handle the header', function () {
+            createSnapshotFile('snap', "/*M!999999\\- enable the sandbox mode */\nSELECT 1;");
+            config()->set('database.default', 'mysql');
+            Process::fake(['*mariadb*' => Process::result(exitCode: 1, errorOutput: 'unknown command')]);
 
-        it('does nothing when no tables are excluded', function () {
-            config()->set('remote-sync.exclude_tables', []);
-
-            expect((new Importer)->truncateExcluded())->toBe([]);
+            expect(fn () => (new Importer)->import('snap', true))
+                ->toThrow(RuntimeException::class, 'A sandbox-capable mariadb client is required');
         });
     });
 
@@ -205,6 +207,18 @@ describe('Importer', function () {
 
             expect($result['kept'])->toBe(2)
                 ->and(DB::table('users')->pluck('email')->all())->toBe(['keep@acme.test', 'other@elsewhere.test']);
+        });
+
+        it('folds email case and only treats asterisks as wildcards', function () {
+            DB::table('users')->insert([
+                ['email' => 'A_%!\\name@acme.test'],
+                ['email' => 'ax%!\\name@acme.test'],
+                ['email' => 'a_xyz!\\name@acme.test'],
+            ]);
+            config()->set('remote-sync.filter_users', ['KEEP@ACME.TEST', 'a_%!\\n*@acme.test']);
+
+            expect((new Importer)->filterUsers()['kept'])->toBe(2)
+                ->and(DB::table('users')->orderBy('id')->pluck('email')->all())->toBe(['keep@acme.test', 'A_%!\\name@acme.test']);
         });
 
         it('refuses to delete every user when nothing matches', function () {

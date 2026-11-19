@@ -6,6 +6,7 @@ use Noo\LaravelRemoteSync\Remotes\RemoteInfo;
 use Noo\LaravelRemoteSync\Snapshots\Importer;
 use Noo\LaravelRemoteSync\Snapshots\Snapshots;
 use RuntimeException;
+use Throwable;
 
 class Planner
 {
@@ -36,7 +37,7 @@ class Planner
             : [];
 
         $tablesToTruncate = ($database && ! $full)
-            ? array_values(array_intersect($excluded, $this->importer->localTables()))
+            ? array_values(array_intersect($excluded, $this->info->tables))
             : [];
 
         [$fileChanges, $fileExcludes] = $files
@@ -121,23 +122,41 @@ class Planner
         $changes = [];
         $excludes = [];
 
+        if ($this->info->hasDbSnapshots && $this->info->snapshotDir === '') {
+            throw new RuntimeException('Cannot sync files safely: the remote snapshot directory is unknown and backups cannot be excluded.');
+        }
+
         foreach ($paths as $path) {
             $localPath = storage_path($path);
-
-            if ($direction === Direction::Pull && ! is_dir($localPath)) {
-                mkdir($localPath, 0755, true);
-            }
+            $excludes[$path] = $this->snapshotDirExcludesFor($path);
 
             if ($direction === Direction::Push && ! is_dir($localPath)) {
                 $changes[$path] = new FileChanges;
-                $excludes[$path] = [];
 
                 continue;
             }
 
-            $excludes[$path] = $this->snapshotDirExcludesFor($path);
+            $temporaryPath = null;
 
             try {
+                if ($direction === Direction::Pull && ! is_dir($localPath)) {
+                    // A first pull may target nested directories that do not exist yet.
+                    // Compare with an empty directory without touching the destination.
+                    $ancestor = $localPath;
+                    while (! file_exists($ancestor) && ! is_link($ancestor)) {
+                        $ancestor = dirname($ancestor);
+                    }
+                    if (! is_dir($ancestor)) {
+                        throw new RuntimeException("Not a directory: {$ancestor}");
+                    }
+
+                    $localPath = sys_get_temp_dir().'/remote-sync-'.bin2hex(random_bytes(16));
+                    if (! mkdir($localPath, 0700)) {
+                        throw new RuntimeException('Could not create a temporary directory for the dry run.');
+                    }
+                    $temporaryPath = $localPath;
+                }
+
                 $changes[$path] = $this->rsync->dryRun(
                     $direction,
                     "{$this->info->storagePath()}/{$path}/",
@@ -145,8 +164,12 @@ class Planner
                     excludes: $excludes[$path],
                     delete: true,
                 );
-            } catch (RuntimeException $e) {
-                throw new RuntimeException("Could not analyze files for storage/{$path}: {$e->getMessage()}");
+            } catch (Throwable $e) {
+                throw new RuntimeException("Could not analyze files for storage/{$path}: {$e->getMessage()}", previous: $e);
+            } finally {
+                if ($temporaryPath !== null) {
+                    rmdir($temporaryPath);
+                }
             }
         }
 
@@ -161,26 +184,24 @@ class Planner
      */
     protected function snapshotDirExcludesFor(string $path): array
     {
-        $candidates = [];
-
-        $remoteStorage = $this->info->storagePath();
-
-        if (str_starts_with($this->info->snapshotDir, "{$remoteStorage}/")) {
-            $candidates[] = substr($this->info->snapshotDir, strlen($remoteStorage) + 1);
-        }
-
-        $localDir = Snapshots::localDir();
-        $localStorage = storage_path();
-
-        if (str_starts_with($localDir, $localStorage.DIRECTORY_SEPARATOR)) {
-            $candidates[] = str_replace('\\', '/', substr($localDir, strlen($localStorage) + 1));
-        }
-
+        $directories = [
+            [$this->info->storagePath().'/'.$path, $this->info->snapshotDir],
+            [storage_path($path), Snapshots::configuredLocalDir()],
+        ];
         $excludes = [];
 
-        foreach (array_unique($candidates) as $storageRelative) {
-            if (str_starts_with($storageRelative, "{$path}/")) {
-                $excludes[] = '/'.substr($storageRelative, strlen($path) + 1);
+        foreach ($directories as [$syncDir, $snapshotDir]) {
+            if ($snapshotDir === null || $snapshotDir === '') {
+                continue;
+            }
+
+            $syncDir = rtrim(str_replace('\\', '/', $syncDir), '/').'/';
+            $snapshotDir = rtrim(str_replace('\\', '/', $snapshotDir), '/').'/';
+            if (str_starts_with($syncDir, $snapshotDir)) {
+                return ['*'];
+            }
+            if (str_starts_with($snapshotDir, $syncDir)) {
+                $excludes[] = '/'.rtrim(substr($snapshotDir, strlen($syncDir)), '/');
             }
         }
 

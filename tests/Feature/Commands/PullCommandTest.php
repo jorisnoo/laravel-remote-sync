@@ -1,5 +1,7 @@
 <?php
 
+use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Process;
 
 function pullTestConfig(): void
@@ -42,13 +44,34 @@ describe('remote-sync:pull', function () {
                 ->assertFailed();
         });
 
-        it('fails non-interactively when the host key is unknown', function () {
+        it('never enrolls an unknown host key', function (bool $nonInteractive) {
             fakeSyncProcesses(custom: [
                 'BatchMode=yes' => Process::result(exitCode: 255, errorOutput: 'Host key verification failed.'),
             ]);
 
-            $this->artisan('remote-sync:pull', ['--database' => true, '--force' => true, '--no-interaction' => true])
-                ->expectsOutputToContain('StrictHostKeyChecking=accept-new')
+            $this->artisan('remote-sync:pull', ['--database' => true, '--force' => true, '--no-interaction' => $nonInteractive])
+                ->expectsOutputToContain('Verify its fingerprint')
+                ->assertFailed();
+
+            Process::assertRanTimes(fn () => true, 1);
+        })->with([true, false]);
+
+        it('reports a host check exception before starting the probe', function () {
+            Process::fake(fn () => throw new RuntimeException('SSH connection timed out'));
+
+            $this->artisan('remote-sync:pull', ['--files' => true, '--force' => true])
+                ->expectsOutputToContain('SSH connection timed out')
+                ->assertFailed();
+        });
+
+        it('reports a probe exception and the doctor hint', function () {
+            Process::fake(fn ($process) => str_contains(last($process->command), 'BASE=')
+                ? throw new Exception('Remote probe failed')
+                : Process::result());
+
+            $this->artisan('remote-sync:pull', ['--files' => true, '--force' => true])
+                ->expectsOutputToContain('Remote probe failed')
+                ->expectsOutputToContain('remote-sync:doctor')
                 ->assertFailed();
         });
 
@@ -83,6 +106,20 @@ describe('remote-sync:pull', function () {
                 ->expectsOutputToContain('remote-sync:doctor')
                 ->assertFailed();
         });
+
+        it('fails closed before backups when the database probe is incomplete', function ($json, $error) {
+            fakeSyncProcesses(probeOverrides: ['json' => $json]);
+            mockSnapshots()->shouldNotReceive('createLocal', 'createRemote');
+
+            $this->artisan('remote-sync:pull', ['--database' => true, '--force' => true])
+                ->expectsOutputToContain($error)
+                ->assertFailed();
+        })->with([
+            [['driver' => null], 'Could not detect'],
+            [['protocol' => null], 'compatible version'],
+            [['snapshots_version' => '2.6.0'], '>= 2.7.0'],
+            [['snapshot_dir' => null], 'safe absolute directory'],
+        ]);
 
         it('rejects invalid --path values', function () {
             fakeSyncProcesses();
@@ -141,6 +178,40 @@ describe('remote-sync:pull', function () {
     });
 
     describe('execution', function () {
+        it('stops on a thrown transfer error and cleans up the remote snapshot', function () {
+            fakeSyncProcesses();
+            $snapshots = mockSnapshots();
+            $snapshots->shouldReceive('download')->once()->andThrow(new Exception('Snapshot download timed out'));
+            $snapshots->shouldReceive('deleteRemote')->once()->andReturn(Process::result());
+            mockImporter()->shouldNotReceive('import');
+
+            $this->artisan('remote-sync:pull', ['--database' => true, '--force' => true])
+                ->expectsOutputToContain('Snapshot download timed out')
+                ->expectsOutputToContain('remote-sync:load pre-pull-')
+                ->assertFailed();
+        });
+
+        it('returns failure with recovery guidance if local migrations fail', function () {
+            fakeSyncProcesses();
+            mockSnapshots();
+            mockImporter();
+            $migrate = new class extends Command
+            {
+                protected $signature = 'migrate {--force}';
+
+                public function handle(): int
+                {
+                    return self::FAILURE;
+                }
+            };
+            Artisan::registerCommand($migrate);
+
+            $this->artisan('remote-sync:pull', ['--database' => true, '--force' => true])
+                ->expectsOutputToContain('Migrations failed')
+                ->expectsOutputToContain('remote-sync:load pre-pull-')
+                ->assertFailed();
+        });
+
         it('pulls database and files end to end', function () {
             fakeSyncProcesses();
             $snapshots = mockSnapshots();
@@ -148,7 +219,7 @@ describe('remote-sync:pull', function () {
 
             $snapshots->shouldReceive('createLocal')->once()->withArgs(fn ($name) => str_starts_with($name, 'pre-pull-'))->andReturn(0);
             $snapshots->shouldReceive('createRemote')->once()->withArgs(
-                fn ($name, $excludes) => str_starts_with($name, 'remote-sync-') && $excludes === ['cache', 'jobs']
+                fn ($name, $empty) => str_starts_with($name, 'remote-sync-') && $empty === ['cache', 'jobs']
             )->andReturn(Process::result());
             $snapshots->shouldReceive('download')->once()->andReturn(Process::result());
             $importer->shouldReceive('import')->once()->withArgs(
@@ -204,7 +275,6 @@ describe('remote-sync:pull', function () {
             $snapshots->shouldReceive('createRemote')->once()->withArgs(fn ($name, $excludes) => $excludes === [])->andReturn(Process::result());
             $importer = mockImporter();
             $importer->shouldReceive('import')->once()->withArgs(fn ($name, $dropTables) => $dropTables === true)->andReturn(Process::result());
-            $importer->shouldNotReceive('truncateExcluded');
 
             $this->artisan('remote-sync:pull', ['--database' => true, '--full' => true, '--force' => true])
                 ->expectsOutputToContain('All local tables will be DROPPED')
@@ -223,7 +293,7 @@ describe('remote-sync:pull', function () {
 
             $this->artisan('remote-sync:pull', ['--database' => true, '--force' => true])
                 ->expectsOutputToContain('Import failed: ERROR 1064')
-                ->expectsOutputToContain('php artisan snapshot:load pre-pull-')
+                ->expectsOutputToContain('php artisan remote-sync:load pre-pull-')
                 ->expectsOutputToContain('kept for inspection')
                 ->assertFailed();
         });

@@ -4,15 +4,25 @@ namespace Noo\LaravelRemoteSync\Remotes;
 
 use Illuminate\Contracts\Process\ProcessResult;
 use Illuminate\Support\Facades\Process;
+use RuntimeException;
 
 class Connection
 {
+    public const SSH_OPTIONS = ['-o', 'StrictHostKeyChecking=yes', '-o', 'BatchMode=yes', '-o', 'UpdateHostKeys=no'];
+
     public function __construct(public readonly Remote $remote) {}
+
+    public static function shell(): string
+    {
+        return 'ssh '.implode(' ', self::SSH_OPTIONS);
+    }
 
     public function run(string $command, ?int $timeout = null): ProcessResult
     {
         return Process::timeout($timeout ?? $this->remoteTimeout())->run([
             'ssh',
+            ...self::SSH_OPTIONS,
+            '--',
             $this->remote->host,
             $command,
         ]);
@@ -36,57 +46,31 @@ class Connection
         return (int) config('remote-sync.timeouts.transfer', 1800);
     }
 
-    /**
-     * @return string 'ok' if known/not an SSH key issue, 'unknown' if not in known_hosts, 'changed' if key mismatch
-     */
-    public function checkHostKey(): string
+    public function checkHostKey(): void
     {
         $result = Process::timeout(10)->run([
             'ssh',
-            '-o', 'BatchMode=yes',
+            ...self::SSH_OPTIONS,
             '-o', 'ConnectTimeout=5',
+            '--',
             $this->remote->host,
             'exit',
         ]);
 
-        $error = $result->errorOutput();
+        if ($result->successful()) {
+            return;
+        }
+
+        $error = trim($result->errorOutput());
 
         if (str_contains($error, 'REMOTE HOST IDENTIFICATION HAS CHANGED')) {
-            return 'changed';
+            throw new RuntimeException(__('remote-sync::messages.errors.host_key_changed', ['host' => $this->remote->hostname()]));
         }
 
         if (str_contains($error, 'Host key verification failed')) {
-            return 'unknown';
+            throw new RuntimeException(__('remote-sync::messages.errors.host_key_unknown', ['host' => $this->remote->host]));
         }
 
-        return 'ok';
-    }
-
-    public function hostFingerprints(): ?string
-    {
-        $hostname = $this->remote->hostname();
-
-        $result = Process::timeout(10)->run(
-            'ssh-keyscan -t ed25519,rsa,ecdsa '.escapeshellarg($hostname).' 2>/dev/null | ssh-keygen -lf -'
-        );
-
-        if ($result->successful() && trim($result->output()) !== '') {
-            return trim($result->output());
-        }
-
-        return null;
-    }
-
-    public function acceptHostKey(): bool
-    {
-        $result = Process::timeout(15)->run([
-            'ssh',
-            '-o', 'StrictHostKeyChecking=accept-new',
-            '-o', 'ConnectTimeout=10',
-            $this->remote->host,
-            'exit',
-        ]);
-
-        return ! str_contains($result->errorOutput(), 'Host key verification failed');
+        throw new RuntimeException("SSH connection to [{$this->remote->host}] failed: ".($error ?: "exit status {$result->exitCode()}"));
     }
 }

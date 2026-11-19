@@ -8,8 +8,6 @@ return [
         'prune' => 'Delete :count snapshot?|Delete :count snapshots?',
         'typed_yes_suffix' => 'Type "yes" to continue',
         'validation' => 'Type "yes" to confirm',
-        'accept_host_key' => 'Do you want to trust this host [:host] and continue connecting?',
-        'continue_without_driver' => 'Could not detect the remote database driver. Continue anyway?',
     ],
 
     'remote' => [

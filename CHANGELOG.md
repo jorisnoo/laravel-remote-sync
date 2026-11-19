@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.0] - 2026-11-19
+
+### Breaking
+
+- Require Laravel 12 or 13 on PHP 8.3+. Install this package on both endpoints for database sync. Verify SSH host keys outside the sync commands. See [UPGRADING.md](UPGRADING.md) before upgrading.
+
+### Fixed
+
+- PostgreSQL restores now use native psql in one transaction, including `--full`. Dumps omit owner and ACL statements. Failed restores leave existing tables and constraints intact.
+- Pull excluded tables as empty structures rather than omitting their migrations' tables or truncating related data. Preserve excluded tables on push, take full backups and use native clients for recovery.
+- Avoid MySQL table read locks, respect MariaDB sandbox dumps, and match user-filter email patterns literally and case-insensitively except for `*`.
+- Refuse ambiguous disks, drivers and incompatible remote installations before changing data; report subprocess and migration failures with the backup recovery command.
+- Support stock macOS rsync, leave missing destinations untouched during file previews, and validate prune retention before listing or deleting backups.
+
 ## [0.7.1](https://github.com/jorisnoo/laravel-remote-sync/releases/tag/0.7.1) (2026-07-10)
 
 ### Fixed

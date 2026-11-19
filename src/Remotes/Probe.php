@@ -19,10 +19,6 @@ class Probe
         'php84',
         'php8.3',
         'php83',
-        'php8.2',
-        'php82',
-        'php8.1',
-        'php81',
     ];
 
     public function run(Connection $connection): RemoteInfo
@@ -53,7 +49,6 @@ class Probe
 
         $escapedCandidates = implode(' ', array_map('escapeshellarg', $candidates));
         $base = escapeshellarg($remote->path);
-        $tinker = escapeshellarg($this->tinkerCode());
         $marker = self::CD_FAILED_MARKER;
 
         return "BASE={$base}; "
@@ -66,22 +61,8 @@ class Probe
             .'echo "PHP=$PHP"; '
             .'if command -v rsync >/dev/null 2>&1; then echo RSYNC=1; else echo RSYNC=0; fi; '
             .'if [ -d vendor/spatie/laravel-db-snapshots ]; then echo SNAPSHOTS=1; else echo SNAPSHOTS=0; fi; '
-            .'if [ -n "$PHP" ]; then "$PHP" artisan tinker --execute='.$tinker.' 2>/dev/null; fi; '
+            .'if [ -n "$PHP" ]; then "$PHP" artisan remote-sync:info --no-interaction; fi; '
             .'exit 0';
-    }
-
-    protected function tinkerCode(): string
-    {
-        return <<<'PHP'
-$driver = config('database.connections.'.config('database.default').'.driver');
-$schemaBuilder = DB::connection()->getSchemaBuilder();
-$tables = method_exists($schemaBuilder, 'getCurrentSchemaName')
-    ? $schemaBuilder->getTableListing($schemaBuilder->getCurrentSchemaName(), schemaQualified: false)
-    : $schemaBuilder->getTableListing();
-$disk = config('db-snapshots.disk', 'snapshots');
-$root = config('filesystems.disks.'.$disk.'.root');
-echo PHP_EOL.'REMOTE_SYNC_JSON='.json_encode(['driver' => $driver, 'tables' => array_values($tables), 'snapshot_dir' => $root]);
-PHP;
     }
 
     protected function parse(string $output, Remote $remote): RemoteInfo
@@ -93,6 +74,8 @@ PHP;
         $driver = null;
         $tables = [];
         $snapshotDir = null;
+        $protocol = null;
+        $snapshotsVersion = null;
 
         foreach (preg_split('/\r?\n/', $output) ?: [] as $line) {
             $line = trim($line);
@@ -110,9 +93,15 @@ PHP;
                 $decoded = json_decode(substr($line, strlen(self::JSON_MARKER)), true);
 
                 if (is_array($decoded)) {
+                    $protocol = is_int($decoded['protocol'] ?? null) ? $decoded['protocol'] : null;
+                    $snapshotsVersion = is_string($decoded['snapshots_version'] ?? null) ? $decoded['snapshots_version'] : null;
                     $driver = is_string($decoded['driver'] ?? null) ? $decoded['driver'] : null;
-                    $tables = array_values(array_filter($decoded['tables'] ?? [], 'is_string'));
-                    $snapshotDir = is_string($decoded['snapshot_dir'] ?? null) ? $decoded['snapshot_dir'] : null;
+                    if (! is_array($decoded['tables'] ?? null) || ! array_is_list($decoded['tables']) || array_filter($decoded['tables'], 'is_string') !== $decoded['tables']) {
+                        throw new RuntimeException('Invalid table list in the remote database probe.');
+                    }
+                    $tables = $decoded['tables'];
+                    $root = $decoded['snapshot_dir'] ?? null;
+                    $snapshotDir = is_string($root) && RemoteRegistry::safePath($root) ? $root : null;
                 }
             }
         }
@@ -125,11 +114,13 @@ PHP;
             phpBinary: $phpBinary,
             isAtomic: $isAtomic,
             workingPath: $workingPath,
-            snapshotDir: $snapshotDir ?? "{$workingPath}/storage/snapshots",
+            snapshotDir: $snapshotDir ?? '',
             driver: $driver,
             tables: $tables,
             hasDbSnapshots: $hasDbSnapshots,
             hasRsync: $hasRsync,
+            protocol: $protocol,
+            snapshotsVersion: $snapshotsVersion,
         );
     }
 }

@@ -32,8 +32,7 @@ class Importer
     }
 
     /**
-     * Tables excluded from dumps and truncated after import. Protected
-     * tables are filtered out even when a user lists them in config.
+     * Tables configured for exclusion. Protected tables are always synced.
      *
      * @return list<string>
      */
@@ -46,15 +45,14 @@ class Importer
     }
 
     /**
-     * Import a downloaded snapshot by piping it straight into the database
-     * CLI. This deliberately bypasses spatie's snapshot:load, which loads
-     * the dump through PHP and exhausts memory on large databases.
+     * Decompress to a private file before touching the database. A pipe alone
+     * cannot prevent psql from committing a valid SQL prefix on premature EOF.
      */
     public function import(string $snapshotName, bool $dropTables = false): ProcessResult
     {
         $snapshotPath = Snapshots::localPath($snapshotName);
 
-        if (! file_exists($snapshotPath)) {
+        if (is_link($snapshotPath) || ! is_file($snapshotPath) || ! is_readable($snapshotPath)) {
             throw new RuntimeException("Snapshot file not found: {$snapshotPath}");
         }
 
@@ -64,24 +62,46 @@ class Importer
             throw new RuntimeException("Unsupported database driver for CLI loading: {$driver}");
         }
 
-        if ($dropTables) {
-            DB::connection()->getSchemaBuilder()->dropAllTables();
+        $sql = tmpfile();
+
+        if ($sql === false) {
+            throw new RuntimeException('Could not create a private temporary file for the restore.');
         }
 
-        $timeout = (int) config('remote-sync.timeouts.transfer', 1800);
+        try {
+            $path = stream_get_meta_data($sql)['uri'];
+            $timeout = (int) config('remote-sync.timeouts.transfer', 1800);
+            $result = Process::timeout($timeout)->run(
+                'exec gzip -dc < '.escapeshellarg($snapshotPath).' > '.escapeshellarg($path)
+            );
 
-        return $driver === 'mysql'
-            ? $this->importViaMysql($snapshotPath, $timeout)
-            : $this->importViaPsql($snapshotPath, $timeout);
+            if ($result->failed()) {
+                return $result;
+            }
+
+            if (filesize($path) === 0) {
+                throw new RuntimeException('Snapshot contains no SQL.');
+            }
+
+            return $driver === 'mysql'
+                ? $this->importViaMysql($sql, $timeout, $dropTables)
+                : $this->importViaPsql($path, $timeout, $dropTables);
+        } finally {
+            fclose($sql);
+        }
     }
 
-    protected function importViaMysql(string $snapshotPath, int $timeout): ProcessResult
+    /** @param resource $sql */
+    private function importViaMysql($sql, int $timeout, bool $dropTables): ProcessResult
     {
-        $connection = config('database.connections.'.config('database.default'));
-
-        $args = [];
+        $connection = DB::connection()->getConfig();
+        $header = (string) fgets($sql, 128);
+        rewind($sql);
+        $maria = $connection['driver'] === 'mariadb' || preg_match('/^\/\*M?!999999\\\\-/', $header);
+        $args = [$maria ? 'mariadb' : 'mysql', '--batch', '--skip-force'];
 
         if (! empty($connection['unix_socket'])) {
+            $args[] = '--protocol=SOCKET';
             $args[] = '--socket='.$connection['unix_socket'];
         } else {
             $args[] = '--host='.($connection['host'] ?? '127.0.0.1');
@@ -89,43 +109,67 @@ class Importer
         }
 
         $args[] = '--user='.($connection['username'] ?? 'root');
-        $args[] = (string) ($connection['database'] ?? '');
-
-        $command = 'gunzip -c '.escapeshellarg($snapshotPath).' | mysql '.implode(' ', array_map('escapeshellarg', $args));
-
-        $env = [];
+        $args[] = '--database='.$connection['database'];
         $password = $connection['password'] ?? '';
+        $env = $password === '' ? [] : ['MYSQL_PWD' => $password];
 
-        if ($password !== '') {
-            $env['MYSQL_PWD'] = $password;
+        // Check the actual client's sandbox support before a full restore drops
+        // any tables. Never remove the sandbox directive from the dump.
+        if ($maria || $dropTables) {
+            $probe = ($maria ? "/*M!999999\\- enable the sandbox mode */\n" : '')."SELECT 1;\n";
+            $check = Process::timeout($timeout)->env($env)->input($probe)->run($args);
+
+            if ($check->failed()) {
+                throw new RuntimeException(($maria ? 'A sandbox-capable mariadb client is required. ' : '')
+                    .'Database client preflight failed: '.trim($check->errorOutput()));
+            }
         }
 
-        return Process::timeout($timeout)->env($env)->run($command);
+        if ($dropTables) {
+            DB::connection()->getSchemaBuilder()->dropAllTables();
+        }
+
+        return Process::timeout($timeout)->env($env)->input($sql)->run($args);
     }
 
-    protected function importViaPsql(string $snapshotPath, int $timeout): ProcessResult
+    private function importViaPsql(string $path, int $timeout, bool $dropTables): ProcessResult
     {
-        $connection = config('database.connections.'.config('database.default'));
-
+        $db = DB::connection();
+        $connection = $db->getConfig();
         $args = [
-            '-v',
-            'ON_ERROR_STOP=1',
+            'psql', '--no-psqlrc', '--no-password', '--quiet', '--set=ON_ERROR_STOP=1', '--single-transaction',
             '--host='.($connection['host'] ?? '127.0.0.1'),
             '--port='.($connection['port'] ?? 5432),
             '--username='.($connection['username'] ?? 'postgres'),
-            (string) ($connection['database'] ?? ''),
+            '--dbname='.$connection['database'],
         ];
-
-        $command = 'gunzip -c '.escapeshellarg($snapshotPath).' | psql '.implode(' ', array_map('escapeshellarg', $args));
-
-        $env = [];
         $password = $connection['password'] ?? '';
+        $process = Process::timeout($timeout)->env($password === '' ? [] : ['PGPASSWORD' => $password]);
 
-        if ($password !== '') {
-            $env['PGPASSWORD'] = $password;
+        if ($dropTables) {
+            // Discover on Laravel's configured search path, quote on the server,
+            // and run the drops through psql in the very same transaction.
+            $tables = $db->selectFromWriteConnection(<<<'SQL'
+                SELECT schemaname, tablename, format('%I.%I', schemaname, tablename) AS identifier
+                FROM pg_catalog.pg_tables WHERE schemaname = ANY(current_schemas(false))
+                SQL);
+            $keep = $connection['dont_drop'] ?? ['spatial_ref_sys'];
+            $drop = [];
+            foreach ($tables as $table) {
+                if (! in_array($table->tablename, $keep, true) && ! in_array($table->schemaname.'.'.$table->tablename, $keep, true)) {
+                    $drop[] = $table->identifier;
+                }
+            }
+
+            if ($drop !== []) {
+                $process->input('DROP TABLE '.implode(', ', $drop).";\n");
+                $args[] = '--file=-';
+            }
         }
 
-        return Process::timeout($timeout)->env($env)->run($command);
+        $args[] = '--file='.$path;
+
+        return $process->run($args);
     }
 
     /**
@@ -135,53 +179,7 @@ class Importer
     {
         $schemaBuilder = DB::connection()->getSchemaBuilder();
 
-        // getCurrentSchemaName() does not exist on Laravel 11.
-        // @phpstan-ignore function.alreadyNarrowedType
-        if (method_exists($schemaBuilder, 'getCurrentSchemaName')) {
-            return $schemaBuilder->getTableListing(
-                $schemaBuilder->getCurrentSchemaName(),
-                schemaQualified: false
-            );
-        }
-
-        return $schemaBuilder->getTableListing();
-    }
-
-    /**
-     * Replace excluded tables with empty ones after a standard import.
-     *
-     * @return list<string> the tables that were truncated
-     */
-    public function truncateExcluded(): array
-    {
-        $excluded = self::excludedTables();
-
-        if ($excluded === []) {
-            return [];
-        }
-
-        $existing = $this->localTables();
-        $tablesToTruncate = array_values(array_filter(
-            $excluded,
-            fn (string $table) => in_array($table, $existing, true)
-        ));
-
-        if ($tablesToTruncate === []) {
-            return [];
-        }
-
-        $schema = DB::connection()->getSchemaBuilder();
-        $schema->disableForeignKeyConstraints();
-
-        try {
-            foreach ($tablesToTruncate as $table) {
-                DB::table($table)->truncate();
-            }
-        } finally {
-            $schema->enableForeignKeyConstraints();
-        }
-
-        return $tablesToTruncate;
+        return $schemaBuilder->getTableListing($schemaBuilder->getCurrentSchemaName(), schemaQualified: false);
     }
 
     /**
@@ -204,27 +202,18 @@ class Importer
             return null;
         }
 
-        $exactEmails = [];
-        $wildcardPatterns = [];
+        // Use an explicit escape character so a literal backslash has the
+        // same meaning on MySQL and PostgreSQL, regardless of SQL string mode.
+        $patterns = array_map(
+            fn (string $entry) => strtr($entry, ['!' => '!!', '%' => '!%', '_' => '!_', '*' => '%']),
+            $filterUsers
+        );
 
-        foreach ($filterUsers as $entry) {
-            if (str_contains($entry, '*')) {
-                $wildcardPatterns[] = str_replace('*', '%', $entry);
-            } else {
-                $exactEmails[] = $entry;
+        return DB::transaction(function () use ($usersTable, $patterns) {
+            $query = DB::table($usersTable);
+            foreach ($patterns as $pattern) {
+                $query->whereRaw("lower(email) NOT LIKE lower(?) ESCAPE '!'", [$pattern]);
             }
-        }
-
-        return DB::transaction(function () use ($usersTable, $exactEmails, $wildcardPatterns) {
-            $query = DB::table($usersTable)->where(function ($outer) use ($exactEmails, $wildcardPatterns) {
-                if ($exactEmails !== []) {
-                    $outer->whereNotIn('email', $exactEmails);
-                }
-
-                foreach ($wildcardPatterns as $pattern) {
-                    $outer->where('email', 'not like', $pattern);
-                }
-            });
 
             $toDelete = $query->count();
             $total = DB::table($usersTable)->count();

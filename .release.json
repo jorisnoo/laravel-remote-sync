@@ -4,6 +4,9 @@
   "version_files": [],
   "checks": [
     [
+      "env",
+      "REMOTE_SYNC_TEST_PGSQL=1",
+      "REMOTE_SYNC_TEST_MYSQL=1",
       "composer",
       "test"
     ]

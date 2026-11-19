@@ -60,11 +60,10 @@ describe('Planner', function () {
                 ->and($plan->tablesToTruncate)->toBe([]);
         });
 
-        it('only plans to truncate excluded tables that exist locally', function () {
-            // The sqlite test database has no tables, so nothing can be truncated.
+        it('plans empty remote tables even when they do not exist locally', function () {
             $plan = makePlanner()->pull(database: true, files: false);
 
-            expect($plan->tablesToTruncate)->toBe([]);
+            expect($plan->tablesToTruncate)->toBe(['cache', 'jobs']);
         });
 
         it('skips the backup name when backups are disabled', function () {
@@ -84,6 +83,48 @@ describe('Planner', function () {
             expect($filesOnly->filterUsers)->toBeNull();
         });
 
+        it('previews a missing nested destination without creating it', function (bool $fail) {
+            $root = 'preview-'.bin2hex(random_bytes(8));
+            $path = "{$root}/nested";
+            $temporary = null;
+            Process::fake(function ($process) use (&$temporary, $fail) {
+                $temporary = rtrim(last($process->command), '/');
+                expect(is_dir($temporary))->toBeTrue()
+                    ->and(scandir($temporary))->toBe(['.', '..']);
+
+                return $fail
+                    ? Process::result(exitCode: 23, errorOutput: 'dry run interrupted')
+                    : Process::result(output: '>f+++++++++ report.csv');
+            });
+
+            $plan = fn () => makePlanner()->pull(database: false, files: true, paths: [$path]);
+            if ($fail) {
+                expect($plan)->toThrow(RuntimeException::class, 'dry run interrupted');
+            } else {
+                expect($plan()->fileChanges[$path]->transfers)->toBe(['report.csv']);
+            }
+
+            expect($temporary)->not->toBeNull()
+                ->and(file_exists($temporary))->toBeFalse()
+                ->and(file_exists(storage_path($root)))->toBeFalse();
+        })->with([true, false]);
+
+        it('excludes all contents when syncing a snapshot directory or its descendants', function (string $path, bool $local) {
+            Process::fake();
+            $info = plannerInfo(snapshotDir: $local ? '/outside/storage' : '/home/forge/acme/storage/app/backups');
+            config()->set('filesystems.disks.snapshots.root', $local ? storage_path('app/backups') : '/outside/storage');
+
+            $plan = makePlanner($info)->pull(database: false, files: true, paths: [$path]);
+
+            expect($plan->fileExcludes[$path])->toBe(['*']);
+            Process::assertRan(fn ($process) => in_array('--exclude=*', $process->command, true));
+        })->with([
+            ['app/backups', true],
+            ['app/backups/archive', true],
+            ['app/backups', false],
+            ['app/backups/archive', false],
+        ]);
+
         it('always dry-runs with --delete so deletable files are discovered', function () {
             Process::fake(['*' => Process::result(output: "*deleting   stale.jpg\n>f+++++++++ new.jpg")]);
 
@@ -95,6 +136,17 @@ describe('Planner', function () {
             expect($plan->delete)->toBeFalse()
                 ->and($plan->totalDeletions())->toBe(1)
                 ->and($plan->totalTransfers())->toBe(1);
+        });
+
+        it('refuses file sync when the remote snapshot directory cannot be excluded', function () {
+            Process::fake();
+            $planner = makePlanner(plannerInfo(snapshotDir: ''));
+
+            expect(fn () => $planner->pull(database: false, files: true, paths: ['app']))
+                ->toThrow(RuntimeException::class, 'remote snapshot directory is unknown');
+            expect(fn () => $planner->push(database: false, files: true, paths: ['app']))
+                ->toThrow(RuntimeException::class, 'remote snapshot directory is unknown');
+            Process::assertNothingRan();
         });
 
         it('excludes the remote snapshot dir when it lives inside a synced path', function () {

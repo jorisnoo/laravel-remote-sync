@@ -69,6 +69,20 @@ class RemoteRegistry
             );
         }
 
+        if ($key === 'host' && ! preg_match('/\A(?:[a-zA-Z0-9_][a-zA-Z0-9_.-]*@)?[a-zA-Z0-9][a-zA-Z0-9_.-]*\z/', $value)) {
+            throw new InvalidArgumentException("Invalid SSH host in {$envVar}; use a hostname or an SSH config alias.");
+        }
+
+        if ($key === 'path' && ! self::safePath(rtrim($value, '/'))) {
+            throw new InvalidArgumentException("Invalid remote path in {$envVar}; use an absolute application directory.");
+        }
+
         return $value;
+    }
+
+    public static function safePath(string $path): bool
+    {
+        return (bool) preg_match('~\A/(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\z~', $path)
+            && array_intersect(explode('/', $path), ['.', '..']) === [];
     }
 }

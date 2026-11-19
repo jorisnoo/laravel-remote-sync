@@ -1,11 +1,10 @@
 <?php
 
-use Illuminate\Contracts\Console\Kernel;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Process;
 use Noo\LaravelRemoteSync\Remotes\Connection;
 use Noo\LaravelRemoteSync\Remotes\Remote;
 use Noo\LaravelRemoteSync\Remotes\RemoteInfo;
+use Noo\LaravelRemoteSync\Snapshots\SnapshotDump;
 use Noo\LaravelRemoteSync\Snapshots\Snapshots;
 
 function snapshotsFixture(string $driver = 'mysql'): Snapshots
@@ -55,11 +54,11 @@ describe('Snapshots', function () {
                 ->and(Snapshots::localPath('foo'))->toBe('/custom/snapshots/foo.sql.gz');
         });
 
-        it('falls back to storage/snapshots when the disk has no root', function () {
+        it('refuses to guess when the disk is undefined', function () {
             config()->set('db-snapshots.disk', 'missing');
             config()->set('filesystems.disks.missing', null);
 
-            expect(Snapshots::localDir())->toBe(storage_path('snapshots'));
+            expect(fn () => Snapshots::localDir())->toThrow(RuntimeException::class, 'Configure the snapshots disk');
         });
 
         it('deletes a local snapshot file when present', function () {
@@ -92,15 +91,15 @@ describe('Snapshots', function () {
     });
 
     describe('remote operations', function () {
-        it('creates a remote snapshot with excluded tables', function () {
+        it('requests schema-only tables on a remote pull', function () {
             Process::fake();
 
             snapshotsFixture()->createRemote('remote-sync-snap', ['cache', 'jobs']);
 
             Process::assertRan(fn ($process) => $process->command === [
-                'ssh',
+                'ssh', ...Connection::SSH_OPTIONS, '--',
                 'forge@prod.acme.test',
-                "cd '/home/forge/acme/current' && 'php8.4' artisan snapshot:create 'remote-sync-snap' --exclude='cache' --exclude='jobs' --compress",
+                "cd '/home/forge/acme/current' && 'php8.4' artisan remote-sync:dump 'remote-sync-snap' --empty='cache' --empty='jobs'",
             ]);
         });
 
@@ -109,34 +108,13 @@ describe('Snapshots', function () {
 
             snapshotsFixture()->createRemote('remote-sync-snap');
 
-            Process::assertRan(fn ($process) => str_contains($process->command[2], "snapshot:create 'remote-sync-snap' --compress"));
+            Process::assertRan(fn ($process) => str_ends_with(last($process->command), "remote-sync:dump 'remote-sync-snap'"));
         });
 
-        it('adds replacement options to PostgreSQL remote snapshots', function () {
-            Process::fake();
+        it('omits preserved tables from the local push snapshot', function () {
+            $this->mock(SnapshotDump::class)->shouldReceive('create')->once()->with('remote-sync-snap', ['cache']);
 
-            snapshotsFixture('pgsql')->createRemote('remote-sync-snap', ['cache']);
-
-            Process::assertRan(fn ($process) => $process->command === [
-                'ssh',
-                'forge@prod.acme.test',
-                "cd '/home/forge/acme/current' && 'php8.4' artisan snapshot:create 'remote-sync-snap' --exclude='cache' --extraOptions='--clean' --extraOptions='--if-exists' --compress",
-            ]);
-        });
-
-        it('adds replacement options to PostgreSQL local snapshots', function () {
-            config()->set('database.default', 'pgsql');
-            config()->set('database.connections.pgsql.driver', 'pgsql');
-            $artisan = Mockery::mock(Kernel::class);
-            $artisan->shouldReceive('call')->once()->with('snapshot:create', [
-                'name' => 'remote-sync-snap',
-                '--compress' => true,
-                '--exclude' => ['cache'],
-                '--extraOptions' => ['--clean', '--if-exists'],
-            ])->andReturn(0);
-            Artisan::swap($artisan);
-
-            expect(snapshotsFixture('pgsql')->createLocal('remote-sync-snap', ['cache']))->toBe(0);
+            snapshotsFixture()->createLocal('remote-sync-snap', ['cache']);
         });
 
         it('loads a snapshot on the remote without dropping tables', function () {
@@ -145,8 +123,8 @@ describe('Snapshots', function () {
             snapshotsFixture()->loadRemote('remote-sync-snap');
 
             Process::assertRan(fn ($process) => str_contains(
-                $process->command[2],
-                "snapshot:load 'remote-sync-snap' --force --drop-tables=0"
+                last($process->command),
+                "remote-sync:load 'remote-sync-snap' --force"
             ));
         });
 
@@ -156,7 +134,7 @@ describe('Snapshots', function () {
             snapshotsFixture()->deleteRemote('remote-sync-snap');
 
             Process::assertRan(fn ($process) => str_contains(
-                $process->command[2],
+                last($process->command),
                 "snapshot:delete 'remote-sync-snap' --no-interaction"
             ));
         });
@@ -167,7 +145,7 @@ describe('Snapshots', function () {
             snapshotsFixture()->download('remote-sync-snap');
 
             Process::assertRan(fn ($process) => $process->command === [
-                'rsync', '-az', '--partial',
+                'rsync', '-e', Connection::shell(), '-az', '--partial',
                 'forge@prod.acme.test:/home/forge/acme/current/storage/snapshots/remote-sync-snap.sql.gz',
                 Snapshots::localDir().'/',
             ]);
@@ -179,7 +157,7 @@ describe('Snapshots', function () {
             snapshotsFixture()->upload('remote-sync-snap');
 
             Process::assertRan(fn ($process) => $process->command === [
-                'rsync', '-az', '--partial',
+                'rsync', '-e', Connection::shell(), '-az', '--partial',
                 Snapshots::localPath('remote-sync-snap'),
                 'forge@prod.acme.test:/home/forge/acme/current/storage/snapshots/',
             ]);
@@ -199,10 +177,10 @@ describe('Snapshots', function () {
                 ->and($snapshots[1]['name'])->toBe('pre-push-a');
         });
 
-        it('returns an empty list when the remote listing fails', function () {
+        it('reports remote listing failures rather than claiming there are no snapshots', function () {
             Process::fake(['*' => Process::result(exitCode: 255, errorOutput: 'ssh: connection refused')]);
 
-            expect(snapshotsFixture()->listRemote())->toBe([]);
+            expect(fn () => snapshotsFixture()->listRemote())->toThrow(RuntimeException::class, 'ssh: connection refused');
         });
     });
 });

@@ -101,7 +101,7 @@ describe('remote-sync:push', function () {
             mockImporter();
 
             $snapshots->shouldReceive('createRemote')->once()->withArgs(
-                fn ($name, $excludes) => str_starts_with($name, 'pre-push-') && $excludes === ['cache', 'jobs']
+                fn ($name) => str_starts_with($name, 'pre-push-')
             )->andReturn(Process::result());
             $snapshots->shouldReceive('createLocal')->once()->withArgs(
                 fn ($name, $excludes) => str_starts_with($name, 'remote-sync-') && $excludes === ['cache', 'jobs']
@@ -128,14 +128,28 @@ describe('remote-sync:push', function () {
             mockImporter();
 
             $snapshots->shouldReceive('loadRemote')->once()->andReturn(
-                Process::result(exitCode: 1, errorOutput: 'SQLSTATE[42S01]')
+                Process::result(exitCode: 1, output: 'Snapshot file not found')
             );
             // Local and uploaded transfer snapshots are still cleaned up.
             $snapshots->shouldReceive('deleteRemote')->once()->andReturn(Process::result());
 
             $this->artisan('remote-sync:push', ['--database' => true, '--force' => true])
                 ->expectsOutputToContain('Failed to load snapshot on remote')
-                ->expectsOutputToContain('php artisan snapshot:load pre-push-')
+                ->expectsOutputToContain('Snapshot file not found')
+                ->expectsOutputToContain('php artisan remote-sync:load pre-push-')
+                ->assertFailed();
+
+            Process::assertDidntRun(fn ($p) => is_array($p->command) && str_contains(implode(' ', $p->command), 'artisan migrate --force'));
+        });
+
+        it('fails and prints the backup when remote migrations fail', function () {
+            fakeSyncProcesses(custom: ['artisan migrate --force' => Process::result(exitCode: 1, errorOutput: 'migration error')]);
+            mockSnapshots();
+            mockImporter();
+
+            $this->artisan('remote-sync:push', ['--database' => true, '--force' => true])
+                ->expectsOutputToContain('migration error')
+                ->expectsOutputToContain('php artisan remote-sync:load pre-push-')
                 ->assertFailed();
         });
 

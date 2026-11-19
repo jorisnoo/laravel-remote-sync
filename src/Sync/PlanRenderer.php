@@ -55,7 +55,7 @@ class PlanRenderer
 
         if ($plan->tablesToTruncate !== []) {
             $truncateLabel = $plan->direction === Direction::Pull
-                ? 'Truncate after import'
+                ? 'Import structure only'
                 : 'Preserved on remote';
             $this->detail($truncateLabel, count($plan->tablesToTruncate).' tables');
             $this->list($plan->tablesToTruncate);

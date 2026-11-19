@@ -38,7 +38,7 @@ describe('Rsync', function () {
             rsyncFixture()->transfer(Direction::Pull, '/remote/storage/app/', '/local/storage/app/');
 
             Process::assertRan(fn ($process) => $process->command === [
-                'rsync', '-avz', '--partial', '--exclude=.*',
+                'rsync', '-e', Connection::shell(), '-avz', '--partial', '--exclude=.*', '--',
                 'forge@prod.acme.test:/remote/storage/app/',
                 '/local/storage/app/',
             ]);
@@ -50,7 +50,7 @@ describe('Rsync', function () {
             rsyncFixture()->transfer(Direction::Push, '/remote/storage/app/', '/local/storage/app/');
 
             Process::assertRan(fn ($process) => $process->command === [
-                'rsync', '-avz', '--partial', '--exclude=.*',
+                'rsync', '-e', Connection::shell(), '-avz', '--partial', '--exclude=.*', '--',
                 '/local/storage/app/',
                 'forge@prod.acme.test:/remote/storage/app/',
             ]);
@@ -76,13 +76,21 @@ describe('Rsync', function () {
             )) === ['--exclude=.*', '--exclude=*.log', '--exclude=tmp', '--exclude=snapshots']);
         });
 
-        it('shows live progress only in interactive mode', function () {
-            Process::fake();
+        it('detects progress support once for interactive transfers', function (string $banner, bool $progress) {
+            Process::fake(['*' => Process::result(output: $banner)]);
 
-            rsyncFixture(interactive: true)->transfer(Direction::Pull, '/r/', '/l/');
+            $rsync = rsyncFixture(interactive: true);
+            $rsync->transfer(Direction::Pull, '/r/', '/l/');
+            $rsync->transfer(Direction::Push, '/r/', '/l/');
 
-            Process::assertRan(fn ($process) => in_array('--info=progress2', $process->command, true));
-        });
+            Process::assertRanTimes(fn ($process) => $process->command === ['rsync', '--version'], 1);
+            Process::assertRanTimes(fn ($process) => in_array('--partial', $process->command, true)
+                && in_array('--info=progress2', $process->command, true) === $progress, 2);
+        })->with([
+            ['openrsync: protocol version 29', false],
+            ['rsync  version 3.0.9  protocol version 30', false],
+            ['rsync  version 3.1.0  protocol version 31', true],
+        ]);
     });
 
     describe('dryRun', function () {
@@ -93,6 +101,7 @@ describe('Rsync', function () {
 
             Process::assertRan(fn ($process) => in_array('--dry-run', $process->command, true)
                 && in_array('--itemize-changes', $process->command, true)
+                && in_array(Connection::shell(), $process->command, true)
                 && ! in_array('--partial', $process->command, true));
 
             expect($changes->transfers)->toBe(['uploads/a.jpg', 'uploads/b.jpg'])
