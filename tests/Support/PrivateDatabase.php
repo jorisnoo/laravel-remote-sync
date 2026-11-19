@@ -45,7 +45,7 @@ final class PrivateDatabase
                 if ($driver === 'pgsql') {
                     self::run([...$admin, '-c', "CREATE ROLE {$user} LOGIN", '-c', "CREATE DATABASE {$name} OWNER {$user}"]);
                 } else {
-                    self::run([...$admin, '-e', "CREATE DATABASE {$name}; CREATE USER '{$user}'@'localhost'; GRANT ALL ON {$name}.* TO '{$user}'@'localhost'; GRANT PROCESS ON *.* TO '{$user}'@'localhost'"]);
+                    self::run([...$admin, '-e', "CREATE DATABASE {$name}; CREATE USER '{$user}'@'localhost'; GRANT ALL ON {$name}.* TO '{$user}'@'localhost'"]);
                 }
                 config()->set('database.connections.'.$name, [...$connection, 'database' => $name, 'username' => $user, 'password' => '', 'prefix' => '']);
             }

@@ -53,6 +53,18 @@ class SnapshotDump
             $args = [$connection->getDriverName() === 'mariadb' ? 'mariadb-dump' : 'mysqldump',
                 '--single-transaction', '--skip-lock-tables', '--quick', '--no-tablespaces', '--user='.$user,
                 ...(! empty($config['unix_socket']) ? ['--protocol=SOCKET', '--socket='.$config['unix_socket']] : ['--host='.$host, '--port='.($config['port'] ?? 3306)])];
+            // A partial database sync must not copy the server's GTID state.
+            // Oracle mysqldump otherwise requests FLUSH TABLES with a global
+            // read lock even in single-transaction mode. MariaDB has no such option.
+            if ($args[0] === 'mysqldump') {
+                $version = Process::timeout(10)->run(['mysqldump', '--version']);
+                if (! $version->successful()) {
+                    throw new RuntimeException('Cannot identify mysqldump: '.trim($version->errorOutput()));
+                }
+                if (! str_contains($version->output(), 'MariaDB')) {
+                    $args[] = '--set-gtid-purged=OFF';
+                }
+            }
             $ignore = array_map(static fn (string $t): string => "--ignore-table={$database}.{$t}", [...$exclude, ...$empty]);
             // Oracle mysqldump has no --ignore-table-data. Each pass is a gzip member.
             $passes = [[...$args, ...$ignore, '--', $database]];
